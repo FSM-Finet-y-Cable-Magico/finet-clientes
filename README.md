@@ -72,7 +72,8 @@ plantilla completa para desarrollo local.
 
 ```bash
 # Base de datos (PostgreSQL)
-DATABASE_URL="postgresql://user:password@localhost:5432/finet_clientes"
+# Puerto 5555: es el que expone el docker-compose de apps/controller.
+DATABASE_URL="postgresql://postgres:postgres@localhost:5555/finet_clientes"
 POSTGRES_USER="postgres"
 POSTGRES_PASSWORD="postgres"
 POSTGRES_DB="finet_clientes"
@@ -102,7 +103,7 @@ MAIL_FROM="Portal Clientes <no-reply@finet.cl>"
 
 | Variable | Requerida | Descripción |
 |---|---|---|
-| `DATABASE_URL` | Sí | URL de conexión PostgreSQL |
+| `DATABASE_URL` | Sí | URL de conexión PostgreSQL. Con `docker compose up -d` el puerto es **5555**, no el 5432 por defecto |
 | `JWT_SECRET` | Sí | Secreto para firmar los JWT. **Debe ser idéntico al del frontend** |
 | `ADMIN_API_KEY` | Sí | Clave del header `X-API-Key` que protege `/api/admin/*` (hoy, solo el editor de cobertura). **Debe ser idéntica a la del frontend** |
 | `SESSION_INACTIVITY_MINUTES` | No | Minutos de inactividad para expirar la sesión (default: 15) |
