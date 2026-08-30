@@ -205,7 +205,21 @@ Sirven para inspección y scripts; el editor usa el endpoint de pincel. `POST` y
 pnpm -C apps/controller db:seed:cobertura
 ```
 
-176 celdas alineadas a la grilla en 8 zonas de La Pintana y Puente Alto, más 2
-polígonos de ejemplo. Semilla fija: mismos datos en cada corrida.
+Deja el mapa con el **área de cobertura predefinida**:
 
-> Datos ficticios — no representan la red real de Finet.
+- **2 polígonos** — las comunas de La Pintana y Puente Alto, cubiertas completas.
+  Los vértices son los límites administrativos reales de OpenStreetMap
+  (relaciones `191216` y `166571`), simplificados a 240 vértices cada uno. Un
+  rectángulo se habría desbordado a las comunas vecinas: solo el 56% de la caja
+  envolvente de cada comuna cae realmente dentro de ella.
+- **176 celdas de pincel** alineadas a la grilla, como detalle fino encima.
+
+Rasterizado sobre la grilla pública son ~2.900 celdas, bastante por debajo del
+límite práctico de `leaflet.heat`. Semilla fija: mismos datos en cada corrida.
+
+El administrador ajusta este punto de partida desde `/admin/cobertura` — puede
+mover vértices, cambiar la densidad, o sacar una comuna del mapa con
+`PATCH { "activo": false }` sin perderla.
+
+> Los límites de las comunas son reales; las densidades son ficticias y no
+> representan la red real de Finet.

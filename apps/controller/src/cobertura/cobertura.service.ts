@@ -32,9 +32,14 @@ import type {
 /**
  * Área operativa de Finet: La Pintana y Puente Alto (ver README raíz).
  * Fija el encuadre inicial del visor y los límites de paneo/zoom.
+ *
+ * El centro es el de la caja envolvente de las dos comunas juntas
+ * (lat -33,6434..-33,5428, lng -70,6706..-70,4858), que es el área predefinida
+ * que siembra `prisma/seed-cobertura.sql`. A `zoom_inicial` 12 entran las dos
+ * completas sin que el usuario tenga que alejar.
  */
 const VISOR_CONFIG: VisorCoberturaConfigDto = {
-  centro: { latitud: -33.6, longitud: -70.61 },
+  centro: { latitud: -33.5931, longitud: -70.5782 },
   zoom_inicial: 12,
   zoom_min: 10,
   zoom_max: 18,

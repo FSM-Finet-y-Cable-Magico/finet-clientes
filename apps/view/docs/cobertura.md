@@ -102,6 +102,25 @@ una con una herramienta distinta:
 | **Polígono** | `zona_cobertura` | Rellenar el grueso de un área de una vez |
 | **Pincel / goma** | `punto_cobertura` | Retocar el detalle fino, celda por celda |
 
+### El área predefinida
+
+Los dos mapas arrancan con la **misma área base**, porque los dos leen las mismas
+tablas: las comunas de **La Pintana** y **Puente Alto** cubiertas completas, como
+dos polígonos de `zona_cobertura`. El visor público las muestra rellenas desde el
+primer día; el editor las carga como polígonos editables.
+
+Los vértices salen de los límites administrativos reales de OpenStreetMap, no de
+rectángulos dibujados a mano — solo el 56% de la caja envolvente de cada comuna
+cae dentro de ella, así que un rectángulo se habría desbordado a las comunas
+vecinas.
+
+El administrador ajusta ese punto de partida sin tocar código: mover vértices,
+cambiar la densidad, pintar detalle encima, o sacar una comuna del mapa público
+con `PATCH { "activo": false }` (que la desactiva sin borrarla — sigue apareciendo
+en el editor para poder reactivarla).
+
+### Cómo se combinan
+
 El backend rasteriza los polígonos activos, baja las celdas del pincel a la misma
 grilla y las superpone — **el pincel siempre gana**, incluso si baja la densidad,
 porque una corrección a mano tiene que verse aunque haya un polígono encima. El

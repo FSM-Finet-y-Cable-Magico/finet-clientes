@@ -80,8 +80,19 @@ describe('CoberturaService', () => {
   describe('CU-59: Accediendo al visor cartografico de factibilidad tecnica', () => {
     it('entrega el encuadre inicial del visor', () => {
       const config = service.getConfig();
-      expect(config.centro).toEqual({ latitud: -33.6, longitud: -70.61 });
+      // Centro de la caja envolvente de La Pintana + Puente Alto juntas.
+      expect(config.centro).toEqual({ latitud: -33.5931, longitud: -70.5782 });
       expect(config.zoom_inicial).toBe(12);
+    });
+
+    it('CU-62: el centro cae dentro de los limites de paneo', () => {
+      // Si el encuadre inicial quedara fuera de los limites, Leaflet arrastraria
+      // el mapa al borde apenas carga: el visor abriria corrido.
+      const { centro, limites } = service.getConfig();
+      expect(centro.latitud).toBeGreaterThan(limites.sur_oeste.latitud);
+      expect(centro.latitud).toBeLessThan(limites.nor_este.latitud);
+      expect(centro.longitud).toBeGreaterThan(limites.sur_oeste.longitud);
+      expect(centro.longitud).toBeLessThan(limites.nor_este.longitud);
     });
 
     it('CU-61: acota el rango de zoom permitido', () => {
