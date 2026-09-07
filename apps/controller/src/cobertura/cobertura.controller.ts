@@ -29,8 +29,8 @@ export class CoberturaController {
   /**
    * CU-60: GET /cobertura/puntos
    *
-   * Puntos de densidad que alimentan la capa de mapa de calor.
-   * Lee exclusivamente la ultima publicacion, tambien cuando publica el CRM.
+   * Celdas de densidad que alimentan la capa de mapa de calor. Salen de la capa
+   * estatica generada desde el KML de planta externa, no de la base de datos.
    *
    * @query tipo_cobertura?: string — opcional, filtra la capa por tipo.
    */

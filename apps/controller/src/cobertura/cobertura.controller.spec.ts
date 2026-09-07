@@ -6,10 +6,12 @@ import { consultaPuntosCoberturaSchema } from './dto/cobertura.dto.js';
 
 describe('CoberturaController publico', () => {
   let controller: CoberturaController;
-  const service = { getConfig: jest.fn(), getPuntos: jest.fn() };
+  let service: { getConfig: jest.Mock; getPuntos: jest.Mock };
 
   beforeEach(async () => {
-    jest.clearAllMocks();
+    // Los mocks se crean por test en vez de limpiarse con `jest.clearAllMocks()`:
+    // el `jest` que exporta `@jest/globals` en ESM no expone ese metodo.
+    service = { getConfig: jest.fn(), getPuntos: jest.fn() };
     const module = await Test.createTestingModule({
       controllers: [CoberturaController],
       providers: [{ provide: CoberturaService, useValue: service }],
