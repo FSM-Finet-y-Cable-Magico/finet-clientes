@@ -102,12 +102,52 @@ function CapaCalor({ puntos }: { puntos: PuntoCobertura[] }) {
     });
     observador.observe(map.getContainer());
 
+    /**
+     * Maximo desfase tolerado entre el canvas y el contenedor, en pixeles.
+     *
+     * Un repintado cuesta ~14 ms, asi que hacerlo en cada cuadro del arrastre se
+     * come el presupuesto de 16 ms y se siente a tirones. Reaccionar por
+     * distancia en vez de por cuadro acota las dos cosas de una: la franja
+     * descubierta nunca pasa de este valor, y en un arrastre largo se repinta un
+     * puñado de veces en lugar de decenas.
+     */
+    const MAX_DESFASE = 48;
+
+    /**
+     * Mantiene la capa cubriendo el viewport mientras se arrastra el mapa.
+     *
+     * El canvas de leaflet.heat mide exactamente lo que el viewport y solo se
+     * reposiciona al terminar el movimiento. Durante el arrastre viaja con el
+     * mapa, asi que va dejando al descubierto la franja que todavia no cubre: se
+     * ve el borde recto de la capa y, al soltar, reaparece completa.
+     *
+     * `_reset` es interno, pero es lo unico que reposiciona el canvas y lo
+     * vuelve a pintar en una sola pasada. `redraw()` no sirve: repinta sobre un
+     * canvas que quedo en la posicion anterior, asi que desalinea.
+     */
+    const seguirElMovimiento = () => {
+      const canvas = map.getPanes().overlayPane.querySelector("canvas");
+      if (!canvas) return;
+
+      const suyo = canvas.getBoundingClientRect();
+      const nuestro = map.getContainer().getBoundingClientRect();
+      const desfase = Math.max(
+        Math.abs(suyo.top - nuestro.top),
+        Math.abs(suyo.left - nuestro.left)
+      );
+
+      if (desfase < MAX_DESFASE) return;
+      (capa as unknown as { _reset?: () => void })._reset?.();
+    };
+
     sincronizarVisibilidad();
     map.on("zoomend", sincronizarVisibilidad);
+    map.on("move", seguirElMovimiento);
 
     return () => {
       observador.disconnect();
       map.off("zoomend", sincronizarVisibilidad);
+      map.off("move", seguirElMovimiento);
       capa.remove();
     };
   }, [map, puntos]);
