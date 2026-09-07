@@ -77,39 +77,40 @@ function CapaCalor({ puntos }: { puntos: PuntoCobertura[] }) {
       else if (!corresponde && map.hasLayer(capa)) capa.remove();
     };
 
+    /**
+     * Mantiene el canvas de la capa del tamano del contenedor.
+     *
+     * leaflet.heat dimensiona su canvas en `_reset`, que solo corre al agregarse
+     * la capa y en `moveend`. Leaflet, a su vez, solo se entera de un cambio de
+     * tamano por el `resize` de la ventana — y el contenedor cambia sin que eso
+     * ocurra: la barra de scroll de la pagina que aparece o desaparece le quita
+     * o devuelve ~15 px de ancho, y en el telefono la barra del navegador cambia
+     * el `60vh` de su alto. Cuando el canvas queda chico, la capa se ve cortada
+     * contra un borde recto, con mapa base del otro lado.
+     *
+     * No basta con avisarle a Leaflet: `invalidateSize` no emite `moveend` si el
+     * desplazamiento del centro redondea a cero, y ahi el canvas se queda como
+     * estaba. Por eso, ademas de avisar, se vuelve a agregar la capa — su alta
+     * ejecuta `_reset` con el tamano ya actualizado, sin depender de que algun
+     * evento intermedio se dispare.
+     */
+    const observador = new ResizeObserver(() => {
+      map.invalidateSize();
+      if (!map.hasLayer(capa)) return;
+      capa.remove();
+      capa.addTo(map);
+    });
+    observador.observe(map.getContainer());
+
     sincronizarVisibilidad();
     map.on("zoomend", sincronizarVisibilidad);
 
     return () => {
+      observador.disconnect();
       map.off("zoomend", sincronizarVisibilidad);
       capa.remove();
     };
   }, [map, puntos]);
-
-  return null;
-}
-
-/**
- * Mantiene al mapa al tanto del tamano real de su contenedor.
- *
- * Leaflet solo se entera de un cambio de tamano por el `resize` de la ventana,
- * y el contenedor puede cambiar sin que eso ocurra: la barra de scroll de la
- * pagina que aparece o desaparece le quita o devuelve ~15 px de ancho, y en el
- * telefono la barra del navegador al desplazarse cambia el `60vh` del alto.
- * Cuando pasa, el canvas de la capa de calor se queda del tamano anterior y el
- * mapa se ve cortado contra un borde recto.
- *
- * `invalidateSize` hace que Leaflet vuelva a medir y emita `moveend`, que es lo
- * que leaflet.heat escucha para redimensionar su canvas.
- */
-function AjusteDeTamano() {
-  const map = useMap();
-
-  useEffect(() => {
-    const observador = new ResizeObserver(() => map.invalidateSize());
-    observador.observe(map.getContainer());
-    return () => observador.disconnect();
-  }, [map]);
 
   return null;
 }
@@ -147,7 +148,6 @@ export default function MapaCobertura({ config, puntos }: MapaCoberturaProps) {
         maxZoom={config.zoom_max}
       />
       <CapaCalor puntos={puntos} />
-      <AjusteDeTamano />
     </MapContainer>
   );
 }
