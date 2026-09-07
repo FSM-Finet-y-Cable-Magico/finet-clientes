@@ -16,6 +16,23 @@ type MapaCoberturaProps = {
 };
 
 /**
+ * Zoom contra el que leaflet.heat normaliza la intensidad.
+ *
+ * La libreria escala cada punto por `1 / 2^(maxZoom - zoomActual)` y, si no se
+ * le pasa `maxZoom`, toma el del mapa. Eso ata los colores de la capa al tope
+ * de zoom del visor: bajar `zoom_max` de 18 a 15 multiplicaba la intensidad por
+ * ocho y dejaba todo rojo. Fijandolo, la capa se ve igual sin importar hasta
+ * donde se permita acercar.
+ *
+ * El efecto buscado depende de esa escala: a zoom bajo muchas celdas caen en la
+ * misma grilla interna, suman y dan los naranjas; al acercarse dejan de
+ * solaparse, cada una aporta sola y la capa cae al extremo frio del gradiente.
+ * Asi el mapa se atenua a una veladura azul justo cuando su resolucion — celdas
+ * de ~220 m — ya no da para mas detalle.
+ */
+const ZOOM_REFERENCIA_INTENSIDAD = 18;
+
+/**
  * CU-60: capa de mapa de calor sobre el visor.
  * La intensidad se normaliza contra la densidad maxima del set para que la
  * escala de color sea legible sin importar el rango absoluto de los datos.
@@ -41,6 +58,7 @@ function CapaCalor({ puntos }: { puntos: PuntoCobertura[] }) {
       radius: 28,
       blur: 20,
       minOpacity: 0.35,
+      maxZoom: ZOOM_REFERENCIA_INTENSIDAD,
     }).addTo(map);
 
     return () => {
