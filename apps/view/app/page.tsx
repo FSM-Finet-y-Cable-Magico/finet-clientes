@@ -9,6 +9,7 @@ import {
   Headphones,
   ShieldCheck,
   MapPin,
+  MapPinned,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -155,6 +156,12 @@ export default async function HomePage() {
                 </span>
               </div>
             ))}
+          </div>
+          <div className="mt-8 text-center">
+            <PrimaryButton href="/cobertura" variant="solid">
+              <MapPinned size={18} aria-hidden />
+              Ver mapa de cobertura
+            </PrimaryButton>
           </div>
         </div>
       </section>

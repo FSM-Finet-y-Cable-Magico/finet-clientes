@@ -12,7 +12,7 @@ Todas las rutas viven en `app/`. Las protegidas por sesión están marcadas 🔒
 | `/hogar`, `/hogar/internet`, `/hogar/duo`, `/hogar/tv` | Landing de productos hogar |
 | `/empresas`, `/empresas/internet`, `/empresas/cotizador` | Landing y cotizador para empresas |
 | `/tv`, `/tv/canales`, `/tv/parrilla` | Landing de TV |
-| `/cobertura` | Mapa/consulta de cobertura |
+| `/cobertura` | Visor cartográfico de factibilidad — `GET /api/cobertura/config`, `GET /api/cobertura/puntos` (CU-59 a CU-62) |
 | `/velocidad` | Test de velocidad |
 | `/faqs`, `/ayuda`, `/soporte`, `/reportar` | Contenido de soporte |
 | `/legal/terminos`, `/legal/privacidad`, `/legal/reclamos`, `/legal/ley-21398` | Legal |

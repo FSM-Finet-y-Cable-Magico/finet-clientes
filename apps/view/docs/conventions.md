@@ -6,7 +6,7 @@
 - `app/components/` — formularios de auth/perfil (Login, Register, Recovery, Reset, ChangePassword, UpdateEmail, UpdateTelefono, DeudaLookupForm) e inputs asociados (RutInput, TelefonoInput, PasswordInput). Es anterior a la convención de `_components/<dominio>` — se mantiene por continuidad, no es el patrón a copiar para código nuevo.
 - Páginas de `portal/*` son client components (`"use client"`) que hacen fetch en un `useEffect` con `setTimeout(fn, 0)` (evita el warning de `act()` en tests) y manejan tres estados: loading (skeleton), error (con botón "Reintentar"), y success.
 
-## Clientes API — ⚠️ tres módulos distintos, no son intercambiables
+## Clientes API — módulos distintos, no son intercambiables
 
 | Módulo | Uso | Variable de entorno | Notas |
 |---|---|---|---|
@@ -14,7 +14,9 @@
 | `app/_lib/api.ts` | Server components de landing (`getLandingPlanes`, `getPlanById`) | `NEXT_PUBLIC_API_URL` | `fetch` con `next: { revalidate: 300 }`. Si el backend no responde, hace fallback silencioso a catálogo vacío (`console.error("Backend no disponible...")` — esto es lo que se ve en el log de `pnpm build`, es esperado). |
 | `app/portal/_lib/portal-api.ts` | Server-side (`getDeuda`, `getTickets`) | **`API_URL`** (sin `NEXT_PUBLIC_`) | `fetch` con `cache: 'no-store'`. Lanza `Error` si la respuesta no es `ok` — no hace fallback silencioso como el de landing. |
 
-Antes de agregar un cuarto helper de fetch, revisar si alguno de los tres ya cubre el caso — y si se toca alguno, verificar cuál variable de entorno lee realmente (`API_URL` vs `NEXT_PUBLIC_API_URL`), porque no es intuitivo por el nombre del archivo.
+Antes de agregar otro helper de fetch, revisar si alguno de los módulos activos
+ya cubre el caso y verificar cuál variable de entorno lee realmente (`API_URL`
+vs `NEXT_PUBLIC_API_URL`).
 
 ## Sesión
 

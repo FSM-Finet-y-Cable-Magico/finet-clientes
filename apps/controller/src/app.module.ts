@@ -13,6 +13,7 @@ import { AdminModule } from './admin/admin.module.js';
 import { PerfilModule } from './perfil/perfil.module.js';
 import { LandingModule } from './landing/landing.module.js';
 import { ContratacionesModule } from './contrataciones/contrataciones.module.js';
+import { CoberturaModule } from './cobertura/cobertura.module.js';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ContratacionesModule } from './contrataciones/contrataciones.module.js'
     PerfilModule,
     LandingModule,
     ContratacionesModule,
+    CoberturaModule,
   ],
   controllers: [AppController],
   providers: [

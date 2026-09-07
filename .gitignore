@@ -19,3 +19,9 @@ Thumbs.db
 # logs
 *.log
 npm-debug.log*
+
+# Exports de planta externa (KML/KMZ). Traen nombre, RUT, telefono y direccion
+# de clientes reales: nunca se versionan. La capa publica se genera con
+# apps/controller/scripts/extraer-cobertura-kml.mjs y solo emite geometria.
+*.kml
+*.kmz

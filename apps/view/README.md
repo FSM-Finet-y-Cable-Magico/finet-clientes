@@ -21,14 +21,24 @@ Para el panorama completo del monorepo (backend, base de datos, variables de ent
 
 ## Configuración
 
+Crear `apps/view/.env` a mano (no hay `.env.example` en el repo; está en
+`.gitignore` y no se commitea) y levantar el server:
+
 ```bash
-cp .env.example .env
 pnpm dev
 ```
 
 Abrir [http://localhost:3000](http://localhost:3000).
 
 ### Variables de entorno
+
+```bash
+API_URL="http://localhost:4000/api"
+NEXT_PUBLIC_API_URL="http://localhost:4000/api"
+JWT_SECRET="tu-jwt-secret-aqui"
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+NEXT_PUBLIC_SENTRY_DSN=
+```
 
 | Variable | Requerida | Descripción |
 |---|---|---|
@@ -72,7 +82,7 @@ app/
                           # planes, contratar/[planId], consultar-deuda, hogar/, empresas/, tv/, legal/, ...
 ```
 
-Ver [`docs/routing.md`](./docs/routing.md) para el mapa completo de rutas y a qué endpoint/caso de uso corresponde cada una, y [`docs/conventions.md`](./docs/conventions.md) para las convenciones de componentes, fetching y testing (incluye el detalle del quirk de las tres variables de API).
+Ver [`docs/routing.md`](./docs/routing.md) para el mapa completo de rutas y a qué endpoint/caso de uso corresponde cada una, [`docs/conventions.md`](./docs/conventions.md) para las convenciones de componentes, fetching y testing (incluye el detalle del quirk de las variables de API), y [`docs/cobertura.md`](./docs/cobertura.md) para la diferencia entre el mapa público del sitio y el editor del administrador.
 
 ## Sesión y rutas protegidas
 

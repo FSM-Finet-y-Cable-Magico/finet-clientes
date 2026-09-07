@@ -181,3 +181,21 @@ body {
     font-family: inherit;
   }
 }
+
+/**
+ * Visor de cobertura: el mapa se dibuja mas grande que su marco visible.
+ *
+ * leaflet.heat dibuja en un canvas del tamano exacto del viewport y solo lo
+ * reposiciona al soltar, asi que al arrastrar destapa una franja sin pintar y se
+ * ve el borde recto de la capa. Repintar en cada cuadro lo arregla pero cuesta
+ * ~14 ms y el arrastre pierde fluidez.
+ *
+ * Extendiendo el mapa por fuera del marco, esa franja queda fuera de cuadro: no
+ * hay que repintar para ocultarla. El marco recorta con `overflow: hidden` y los
+ * controles se corren hacia adentro para seguir visibles — la atribucion de
+ * OpenStreetMap incluida, que debe verse siempre.
+ */
+.mapa-con-desborde .leaflet-top { top: var(--desborde-mapa); }
+.mapa-con-desborde .leaflet-bottom { bottom: var(--desborde-mapa); }
+.mapa-con-desborde .leaflet-left { left: var(--desborde-mapa); }
+.mapa-con-desborde .leaflet-right { right: var(--desborde-mapa); }
