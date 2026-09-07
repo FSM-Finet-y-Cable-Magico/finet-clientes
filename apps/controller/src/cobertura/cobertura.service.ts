@@ -11,13 +11,12 @@ const VISOR_CONFIG: VisorCoberturaConfigDto = {
   // Las celdas miden ~220 m: a 18 se mostraba 0,5 m por pixel, cuatrocientas
   // veces mas precision de la que existe.
   //
-  // 15 es el punto de equilibrio elegido recorriendo el rango: llega al nivel
-  // de calle y todavia se lee. El costo es que la grilla empieza a notarse,
-  // porque `radius`/`blur` de leaflet.heat estan en pixeles y no acompanan al
-  // zoom: a 14 el radio iguala la separacion entre celdas y el campo cierra, de
-  // 15 en adelante se abre en puntos. 14 es el ultimo nivel totalmente continuo,
-  // si alguna vez se prefiere el aspecto por sobre el acercamiento.
-  zoom_max: 15,
+  // 16 llega al nivel de cuadra. Pasado 14 las celdas dejan de solaparse y la
+  // capa se atenua sola a una veladura azul, que es el comportamiento buscado:
+  // marca la zona sin fingir precision de metros. El aspecto ya no depende de
+  // este numero — la intensidad se normaliza contra un zoom fijo en la capa,
+  // ver `ZOOM_REFERENCIA_INTENSIDAD` en MapaCobertura.tsx.
+  zoom_max: 16,
   limites: {
     sur_oeste: { latitud: -33.72, longitud: -70.78 },
     nor_este: { latitud: -33.48, longitud: -70.45 },
