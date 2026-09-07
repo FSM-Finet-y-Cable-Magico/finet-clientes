@@ -61,7 +61,6 @@ pnpm dev
 | `pnpm lint` | Lint de todos los paquetes |
 | `pnpm test` | Tests de todos los paquetes |
 | `pnpm -C apps/controller prisma ...` | Comandos Prisma (generate, migrate, studio) |
-| `pnpm -C apps/controller db:seed:cobertura` | Datos ficticios del mapa de cobertura |
 
 ## Variables de entorno
 
@@ -105,12 +104,12 @@ MAIL_FROM="Portal Clientes <no-reply@finet.cl>"
 |---|---|---|
 | `DATABASE_URL` | Sí | URL de conexión PostgreSQL. Con `docker compose up -d` el puerto es **5555**, no el 5432 por defecto |
 | `JWT_SECRET` | Sí | Secreto para firmar los JWT. **Debe ser idéntico al del frontend** |
-| `ADMIN_API_KEY` | Sí | Clave del header `X-API-Key` que protege `/api/admin/*` (hoy, solo el editor de cobertura). **Debe ser idéntica a la del frontend** |
+| `ADMIN_API_KEY` | Sí | Clave del header `X-API-Key` que protege los endpoints administrativos activos del backend |
 | `SESSION_INACTIVITY_MINUTES` | No | Minutos de inactividad para expirar la sesión (default: 15) |
 | `PORT` | No | Puerto del servidor (default: 4000) |
 | `NODE_ENV` | No | `development` o `production` |
 | `CORS_ORIGIN` | Sí | Orígenes permitidos, separados por coma |
-| `FRONTEND_URL` | Sí | URL base del frontend, usada en los enlaces de recuperación de contraseña |
+| `FRONTEND_URL` | Sí | URL base del frontend, usada en recuperación de contraseña |
 | `SMTP_*`, `MAIL_FROM` | Sí | Envío de correo (en dev, Mailpit vía `docker compose up -d`) |
 | `POSTGRES_*` | No | Solo los consume el `docker-compose` de desarrollo |
 
@@ -123,7 +122,6 @@ NEXT_PUBLIC_API_URL="http://localhost:4000/api"
 
 # Autenticación
 JWT_SECRET="tu-jwt-secret-aqui"
-ADMIN_API_KEY="tu-admin-api-key-aqui"
 
 # Sitio
 NEXT_PUBLIC_SITE_URL="http://localhost:3000"
@@ -137,7 +135,6 @@ NEXT_PUBLIC_SENTRY_DSN=
 | `NEXT_PUBLIC_API_URL` | Sí | URL del backend para componentes cliente y casi todo el fetching server-side |
 | `API_URL` | Sí | Misma URL, pero la lee **solo** `app/portal/_lib/portal-api.ts`. Ver el quirk documentado en [`apps/view/docs/conventions.md`](apps/view/docs/conventions.md) |
 | `JWT_SECRET` | Sí | Debe coincidir con el backend — `proxy.ts` verifica la firma localmente, sin llamar a la API |
-| `ADMIN_API_KEY` | Solo para el editor de cobertura | Debe coincidir con la del backend. La usa el route handler `POST /api/cobertura/revalidar`, que corre en Next y no en NestJS. Ver [`apps/view/docs/cobertura.md`](apps/view/docs/cobertura.md) |
 | `NEXT_PUBLIC_SITE_URL` | No | URL pública del sitio (SEO: JSON-LD, sitemap) |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Si está seteada, `securityLogger` reporta eventos de seguridad en producción |
 
@@ -151,7 +148,7 @@ NEXT_PUBLIC_SENTRY_DSN=
 | [`apps/controller/docs/`](apps/controller/docs/) | Contrato de cada endpoint de la API |
 | [`apps/view/docs/routing.md`](apps/view/docs/routing.md) | Ruta → endpoint → caso de uso |
 | [`apps/view/docs/conventions.md`](apps/view/docs/conventions.md) | Convenciones de componentes, fetching y testing |
-| [`apps/view/docs/cobertura.md`](apps/view/docs/cobertura.md) | Mapa público vs. editor del administrador |
+| [`apps/view/docs/cobertura.md`](apps/view/docs/cobertura.md) | Mapa de cobertura del portal cliente |
 
 ## Licencia
 

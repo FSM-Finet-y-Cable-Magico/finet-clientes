@@ -74,12 +74,11 @@ export type VisorCoberturaConfig = {
 };
 
 /**
- * Caché de 24 horas para los datos del visor (CU-59 / CU-60).
- * El tag permite que el editor publique al instante en vez de esperar el día:
- * `POST /api/cobertura/revalidar` hace `revalidateTag(COBERTURA_TAG)`.
+ * Caché de 24 horas para el encuadre del visor (CU-59). Es una constante del
+ * backend, así que no hay nada que invalidar: ya no existe un tag porque no
+ * queda editor que publique cambios.
  */
 const COBERTURA_REVALIDATE = 86400;
-const COBERTURA_TAG = "cobertura";
 
 /**
  * CU-59: encuadre y limites del visor.
@@ -89,7 +88,7 @@ const COBERTURA_TAG = "cobertura";
 export async function getVisorCoberturaConfig(): Promise<VisorCoberturaConfig | null> {
   try {
     const res = await fetch(`${API_URL}/cobertura/config`, {
-      next: { revalidate: COBERTURA_REVALIDATE, tags: [COBERTURA_TAG] },
+      next: { revalidate: COBERTURA_REVALIDATE },
     });
 
     if (!res.ok) {
@@ -118,9 +117,8 @@ export async function getPuntosCobertura(
       url.searchParams.set("tipo_cobertura", tipoCobertura);
     }
 
-    const res = await fetch(url.toString(), {
-      next: { revalidate: COBERTURA_REVALIDATE, tags: [COBERTURA_TAG] },
-    });
+    // El CRM puede publicar sin pasar por Next. Cada consulta lee la ultima version.
+    const res = await fetch(url.toString(), { cache: "no-store" });
 
     if (!res.ok) {
       console.error(`Error al obtener puntos de cobertura: ${res.status}`);

@@ -30,12 +30,12 @@ export class CoberturaController {
    * CU-60: GET /cobertura/puntos
    *
    * Puntos de densidad que alimentan la capa de mapa de calor.
-   * Caché de 24 horas según la descripción del CU.
+   * Lee exclusivamente la ultima publicacion, tambien cuando publica el CRM.
    *
    * @query tipo_cobertura?: string — opcional, filtra la capa por tipo.
    */
   @Get('puntos')
-  @Header('Cache-Control', 'public, max-age=86400')
+  @Header('Cache-Control', 'no-store')
   getPuntos(
     @Query(new ZodValidationPipe(consultaPuntosCoberturaSchema))
     query: ConsultaPuntosCoberturaDto,

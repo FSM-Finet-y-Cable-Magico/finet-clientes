@@ -226,7 +226,6 @@ model empresa {
   transferencia_equipo_transferencia_equipo_id_empresa_origenToempresa    transferencia_equipo[]  @relation("transferencia_equipo_id_empresa_origenToempresa")
   unidad_equipo                                                           unidad_equipo[]
   usuario                                                                 usuario[]
-  zona_cobertura                                                          zona_cobertura[]
 }
 
 model evidencia_foto {
@@ -567,10 +566,6 @@ model puerto_nap {
   cliente             cliente?  @relation(fields: [id_cliente_asociado], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_puerto_nap_id_cliente_asociado")
 }
 
-/// Celda pintada con el pincel del editor de cobertura (CU-59/CU-60).
-/// Cada fila es una celda de la grilla fina: `latitud`/`longitud` vienen
-/// redondeadas al paso de grilla (ver `cobertura-grid.ts`), y por eso el par
-/// es unico — repintar la misma celda actualiza la fila en vez de duplicarla.
 model punto_cobertura {
   id_punto           Int      @id @default(autoincrement())
   id_empresa         Int?
@@ -579,29 +574,6 @@ model punto_cobertura {
   densidad_cobertura Decimal? @db.Decimal(5, 2)
   tipo_cobertura     String?  @db.VarChar(20)
   empresa            empresa? @relation(fields: [id_empresa], references: [id_empresa], onDelete: NoAction, onUpdate: NoAction, map: "fk_punto_cobertura_id_empresa")
-
-  @@unique([latitud, longitud], map: "uq_punto_cobertura_celda")
-}
-
-/// Poligono de cobertura dibujado en el editor: rellena el grueso de un area
-/// y el pincel (`punto_cobertura`) se usa encima para el detalle fino.
-/// Al servir el mapa publico el backend rasteriza estos poligonos sobre la
-/// grilla y les superpone las celdas pintadas a mano.
-model zona_cobertura {
-  id_zona             Int       @id @default(autoincrement())
-  id_empresa          Int?
-  nombre              String?   @db.VarChar(80)
-  densidad_cobertura  Decimal   @db.Decimal(5, 2)
-  tipo_cobertura      String?   @db.VarChar(20)
-  /// Anillo exterior del poligono: `[[lat, lng], ...]`, minimo 3 vertices.
-  /// No se cierra explicitamente — el ultimo vertice conecta con el primero.
-  vertices            Json      @db.JsonB
-  activo              Boolean   @default(true)
-  fecha_creacion      DateTime? @default(now()) @db.Timestamp(6)
-  fecha_actualizacion DateTime? @default(now()) @db.Timestamp(6)
-  empresa             empresa?  @relation(fields: [id_empresa], references: [id_empresa], onDelete: NoAction, onUpdate: NoAction, map: "fk_zona_cobertura_id_empresa")
-
-  @@index([activo], map: "idx_zona_cobertura_activo")
 }
 
 model rol {

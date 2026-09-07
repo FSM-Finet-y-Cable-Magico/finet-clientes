@@ -36,7 +36,6 @@ Abrir [http://localhost:3000](http://localhost:3000).
 API_URL="http://localhost:4000/api"
 NEXT_PUBLIC_API_URL="http://localhost:4000/api"
 JWT_SECRET="tu-jwt-secret-aqui"
-ADMIN_API_KEY="tu-admin-api-key-aqui"
 NEXT_PUBLIC_SITE_URL="http://localhost:3000"
 NEXT_PUBLIC_SENTRY_DSN=
 ```
@@ -46,7 +45,6 @@ NEXT_PUBLIC_SENTRY_DSN=
 | `NEXT_PUBLIC_API_URL` | Sí | URL del backend, usada por componentes cliente y por casi todo el server-side fetching |
 | `API_URL` | Sí (ver nota) | URL del backend, usada **solo** por `app/portal/_lib/portal-api.ts`. Ver "Quirk conocido" abajo |
 | `JWT_SECRET` | Sí | Debe ser idéntico al del backend — el proxy verifica el JWT localmente, sin llamar a la API |
-| `ADMIN_API_KEY` | Solo para `/admin/cobertura` | Debe ser idéntica a la del backend. La lee el route handler `POST /api/cobertura/revalidar`, que corre en Next y no en NestJS. Ver [`docs/cobertura.md`](./docs/cobertura.md) |
 | `NEXT_PUBLIC_SITE_URL` | No | URL pública del sitio (SEO: JSON-LD, sitemap) |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Si está seteada, `securityLogger` reporta eventos de seguridad en producción |
 

@@ -34,7 +34,7 @@ Variables principales:
 - `ADMIN_API_KEY` — clave para endpoints admin
 - `SESSION_INACTIVITY_MINUTES` — minutos de inactividad para expirar sesión (default: 15)
 - `CORS_ORIGIN` — lista separada por comas de orígenes CORS permitidos
-- `FRONTEND_URL` — URL base del frontend para enlaces de recuperación
+- `FRONTEND_URL` — URL base del frontend para recuperación de contraseña
 - `PORT` — puerto del servidor (default: 4000)
 - `NODE_ENV` — `development` o `production`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — configuración de correo
@@ -65,11 +65,9 @@ Regenerar Prisma Client (si se modifica el schema):
 $ pnpm prisma generate
 ```
 
-Cargar datos de prueba del visor cartográfico (CU-59 a CU-62):
-
-```bash
-$ pnpm db:seed:cobertura
-```
+El visor cartográfico (CU-59 a CU-62) no necesita seed: su capa es estática y
+vive en `src/cobertura/cobertura-finet.data.ts`. Ver
+[`docs/cobertura.md`](./docs/cobertura.md).
 
 ## Scripts
 
@@ -120,7 +118,7 @@ src/
 ├── portal/                    # Portal autenticado (panel, contratos, deuda, tickets)
 ├── landing/                   # Landing page pública (catálogo de planes)
 ├── deuda-publica/             # Consulta pública de deuda (por RUT o código de abonado)
-├── cobertura/                 # Visor cartográfico público + editor de cobertura
+├── cobertura/                 # Visor cartográfico público (capa estática)
 ├── admin/                     # Panel admin (intentos fallidos, desbloqueo de IP)
 └── generated/zod/             # Schemas Zod auto-generados desde Prisma
 ```
@@ -138,7 +136,7 @@ Documentación de endpoints organizada por feature (bodies, respuestas, errores,
 | **Portal** | [`docs/portal.md`](./docs/portal.md) | Panel, contratos (estado/vigentes), deuda, tickets |
 | **Landing** | [`docs/landing.md`](./docs/landing.md) | Catálogo de planes |
 | **Deuda Pública** | [`docs/deuda-publica.md`](./docs/deuda-publica.md) | Consulta de deuda por RUT o código de abonado |
-| **Cobertura** | [`docs/cobertura.md`](./docs/cobertura.md) | Visor cartográfico público + editor (pincel y polígonos) |
+| **Cobertura** | [`docs/cobertura.md`](./docs/cobertura.md) | Visor cartográfico público, capa generada desde el KML de planta externa |
 | **Admin** | (ver abajo) | Intentos fallidos, desbloquear IP |
 
 ### Documentación técnica

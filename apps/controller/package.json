@@ -8,7 +8,6 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "nest start --watch",
-    "db:seed:cobertura": "prisma db execute --file prisma/seed-cobertura.sql",
     "build": "nest build",
     "postgenerate": "node scripts/fix-prisma-client.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

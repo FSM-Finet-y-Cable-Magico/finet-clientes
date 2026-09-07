@@ -101,17 +101,16 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 | 24 | CU-58 | Descargando reporte financiero generado | Administración | ⏳ Pendiente |
 | 25 | CU-06 | Revisando historial de IPs bloqueadas por intentos fallidos | Administración | 🚧 Parcial/✅ — `GET /admin/intentos-fallidos` (`apps/controller/src/admin/`) ya devuelve exactamente esto, con filtros `bloqueados`/`ip`/`rut` y paginado. Revisar si falta UI de administración o si el endpoint ya cubre el CU |
 | 26 | CU-59 | Accediendo al visor cartográfico de factibilidad técnica | Mapa | ✅ — `/cobertura` monta Leaflet vía `GET /api/cobertura/config` |
-| 27 | CU-60 | Visualizando capa de mapa de calor de cobertura | Mapa | ✅ — `leaflet.heat` sobre `GET /api/cobertura/puntos` (`model punto_cobertura`) |
+| 27 | CU-60 | Visualizando capa de mapa de calor de cobertura | Mapa | ✅ — `leaflet.heat` sobre `GET /api/cobertura/puntos` (capa estática generada desde el KML de planta externa) |
 | 28 | CU-61 | Aplicando zoom sobre el mapa de factibilidad | Mapa | ✅ — rueda/doble click/pellizco, acotado por `zoom_min`/`zoom_max` del backend |
 | 29 | CU-62 | Desplazándose por el mapa de factibilidad mediante paneo | Mapa | ✅ — arrastre con puntero o táctil, acotado por `maxBounds` |
 
-> **Administración del bloque Mapa:** los datos del mapa de calor ya no vienen de un seed fijo —
-> el administrador los dibuja en `/admin/cobertura` con polígonos (relleno grueso) y pincel
-> (detalle fino), y "Publicar" invalida la caché de 24 h para que el cambio se vea al instante.
-> Es una ruta **provisional**, protegida solo por `ADMIN_API_KEY`: el panel de administración
-> real todavía no existe y la página se moverá dentro de él cuando se construya.
-> Ver [`apps/controller/docs/cobertura.md`](../apps/controller/docs/cobertura.md) y la nota de
-> migración en [`docs/db/2026-08-23-editor-cobertura.md`](db/2026-08-23-editor-cobertura.md).
+> **Datos del bloque Mapa:** la capa de calor se genera desde el KML de planta externa que
+> entrega Finet (NAPs, MUFAs y trazado de fibra de la red FTTH) y vive como archivo estático
+> en el backend. Los cuatro CU son de lectura, así que el bloque no necesita administración:
+> el editor y las tablas que lo sostenían se eliminaron. Actualizar la cobertura significa
+> regenerar el archivo con un KML nuevo y desplegar.
+> Ver [`apps/controller/docs/cobertura.md`](../apps/controller/docs/cobertura.md).
 
 ### Ramas creadas para este incremento
 

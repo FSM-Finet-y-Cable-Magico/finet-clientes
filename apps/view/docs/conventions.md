@@ -6,18 +6,17 @@
 - `app/components/` — formularios de auth/perfil (Login, Register, Recovery, Reset, ChangePassword, UpdateEmail, UpdateTelefono, DeudaLookupForm) e inputs asociados (RutInput, TelefonoInput, PasswordInput). Es anterior a la convención de `_components/<dominio>` — se mantiene por continuidad, no es el patrón a copiar para código nuevo.
 - Páginas de `portal/*` son client components (`"use client"`) que hacen fetch en un `useEffect` con `setTimeout(fn, 0)` (evita el warning de `act()` en tests) y manejan tres estados: loading (skeleton), error (con botón "Reintentar"), y success.
 
-## Clientes API — ⚠️ cuatro módulos distintos, no son intercambiables
+## Clientes API — módulos distintos, no son intercambiables
 
 | Módulo | Uso | Variable de entorno | Notas |
 |---|---|---|---|
 | `app/utils/api.ts` | Client components (`"use client"`) — el que usan las páginas de `portal/*` | `NEXT_PUBLIC_API_URL` | Objeto `api.get/post/put/patch/delete`. Envía `credentials: "include"`. En un 401 dispara `window.dispatchEvent(new CustomEvent("auth:session-expired"))` (lo escucha `AuthProvider`) y loguea con `securityLogger`. |
 | `app/_lib/api.ts` | Server components de landing (`getLandingPlanes`, `getPlanById`) | `NEXT_PUBLIC_API_URL` | `fetch` con `next: { revalidate: 300 }`. Si el backend no responde, hace fallback silencioso a catálogo vacío (`console.error("Backend no disponible...")` — esto es lo que se ve en el log de `pnpm build`, es esperado). |
 | `app/portal/_lib/portal-api.ts` | Server-side (`getDeuda`, `getTickets`) | **`API_URL`** (sin `NEXT_PUBLIC_`) | `fetch` con `cache: 'no-store'`. Lanza `Error` si la respuesta no es `ok` — no hace fallback silencioso como el de landing. |
-| `app/_lib/cobertura-admin.ts` | Solo el editor `/admin/cobertura` | `NEXT_PUBLIC_API_URL` | Único que manda `X-API-Key` y habla con `/admin/*`. La clave la escribe el usuario y vive en `sessionStorage` (no hay sesión de administrador todavía). Lanza `ErrorApiKey` en un 401 para poder volver a pedirla. |
 
-El detalle de por qué el editor necesita un cliente propio está en [`cobertura.md`](./cobertura.md).
-
-Antes de agregar otro helper de fetch, revisar si alguno de los cuatro ya cubre el caso — y si se toca alguno, verificar cuál variable de entorno lee realmente (`API_URL` vs `NEXT_PUBLIC_API_URL`), porque no es intuitivo por el nombre del archivo.
+Antes de agregar otro helper de fetch, revisar si alguno de los módulos activos
+ya cubre el caso y verificar cuál variable de entorno lee realmente (`API_URL`
+vs `NEXT_PUBLIC_API_URL`).
 
 ## Sesión
 
