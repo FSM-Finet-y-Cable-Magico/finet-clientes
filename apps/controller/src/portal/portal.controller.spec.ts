@@ -41,6 +41,11 @@ describe('PortalController', () => {
       getTickets: jest
         .fn()
         .mockResolvedValue({ total: 0, tiene_tickets: false, tickets: [] }),
+      getCategoriasTicket: jest.fn().mockResolvedValue([]),
+      crearTicket: jest.fn().mockResolvedValue({
+        id_ticket: 42,
+        codigo_seguimiento: 'FIN-2026-000042',
+      }),
     };
     const module = await Test.createTestingModule({
       controllers: [PortalController],
@@ -81,5 +86,18 @@ describe('PortalController', () => {
   it('GET /portal/tickets?limite=3 parsea el string a número y llama getTickets con 3', async () => {
     await controller.getTickets(CLIENTE_MOCK as any, '3');
     expect(service.getTickets).toHaveBeenCalledWith(1, 3);
+  });
+
+  it('GET /portal/tickets/categorias lista las categorias disponibles', async () => {
+    await controller.getCategoriasTicket();
+    expect(service.getCategoriasTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST /portal/tickets registra la solicitud del cliente autenticado', async () => {
+    const body = { id_categoria: 3, descripcion: 'Sin conexion' };
+
+    await controller.crearTicket(CLIENTE_MOCK as any, body);
+
+    expect(service.crearTicket).toHaveBeenCalledWith(1, body);
   });
 });

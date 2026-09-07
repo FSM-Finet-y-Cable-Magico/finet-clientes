@@ -70,3 +70,14 @@ export interface TicketResumenDto {
   categoria: string;
   origen: string | null;
 }
+
+// CU-71: Registro de solicitud de soporte desde el portal.
+export interface CategoriaTicketDto {
+  id_categoria: number;
+  nombre: string;
+}
+
+export interface CrearTicketResponseDto {
+  id_ticket: number;
+  codigo_seguimiento: string;
+}

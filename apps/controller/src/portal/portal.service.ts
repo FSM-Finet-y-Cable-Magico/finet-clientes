@@ -5,11 +5,16 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { MailService } from '../mail/mail.service.js';
+import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
 import {
+  CategoriaTicketDto,
   ContratoEstadoDto,
   ContratoResumenDto,
+  CrearTicketResponseDto,
   FacturaPendienteDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
@@ -20,7 +25,10 @@ import {
 export class PortalService {
   private readonly logger = new Logger(PortalService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   // Estados válidos según RF-20 y CU-23
   private readonly ESTADOS_CONTRATO_VALIDOS: string[] = [
@@ -272,6 +280,116 @@ export class PortalService {
     };
   }
 
+  async getCategoriasTicket(): Promise<CategoriaTicketDto[]> {
+    return this.prisma.categoria_falla.findMany({
+      select: { id_categoria: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
+  async crearTicket(
+    idCliente: number,
+    dto: CrearTicketDto,
+  ): Promise<CrearTicketResponseDto> {
+    let ticketCreado: {
+      id_ticket: number;
+      codigo_seguimiento: string;
+      cliente: {
+        id_cliente: number;
+        nombre_completo: string;
+        email: string | null;
+      };
+      categoria: string;
+    };
+
+    try {
+      ticketCreado = await this.prisma.$transaction(async (tx) => {
+        const cliente = await tx.cliente.findUnique({
+          where: { id_cliente: idCliente },
+          select: {
+            id_cliente: true,
+            id_empresa: true,
+            nombre_completo: true,
+            email: true,
+          },
+        });
+
+        if (!cliente) {
+          throw new NotFoundException('Cliente no encontrado');
+        }
+
+        const categoria = await tx.categoria_falla.findUnique({
+          where: { id_categoria: dto.id_categoria },
+          select: { id_categoria: true, nombre: true },
+        });
+
+        if (!categoria) {
+          throw new BadRequestException(
+            'La categoria seleccionada no esta disponible',
+          );
+        }
+
+        const ticket = await tx.ticket.create({
+          data: {
+            id_cliente: cliente.id_cliente,
+            id_empresa: cliente.id_empresa,
+            id_categoria: categoria.id_categoria,
+            prioridad: 'media',
+            estado: 'abierto',
+            descripcion: dto.descripcion,
+            origen: 'portal',
+          },
+          select: { id_ticket: true, fecha_creacion: true },
+        });
+
+        const anio =
+          ticket.fecha_creacion?.getFullYear() ?? new Date().getFullYear();
+        const codigoSeguimiento = `FIN-${anio}-${String(ticket.id_ticket).padStart(6, '0')}`;
+
+        await tx.ticket.update({
+          where: { id_ticket: ticket.id_ticket },
+          data: { codigo_seguimiento: codigoSeguimiento },
+        });
+
+        await tx.log_auditoria.create({
+          data: {
+            accion: 'CREAR_TICKET_PORTAL',
+            entidad_afectada: 'ticket',
+            id_entidad_afectada: ticket.id_ticket,
+            valor_nuevo: {
+              codigo_seguimiento: codigoSeguimiento,
+              id_categoria: categoria.id_categoria,
+              estado: 'abierto',
+              origen: 'portal',
+            },
+          },
+        });
+
+        return {
+          id_ticket: ticket.id_ticket,
+          codigo_seguimiento: codigoSeguimiento,
+          cliente,
+          categoria: categoria.nombre,
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `No se pudo crear el ticket para el cliente ${idCliente}`,
+        error,
+      );
+      throw new ServiceUnavailableException(
+        'No fue posible registrar tu solicitud. Intenta nuevamente mas tarde.',
+      );
+    }
+
+    await this.notificarTicketCreado(ticketCreado);
+    return {
+      id_ticket: ticketCreado.id_ticket,
+      codigo_seguimiento: ticketCreado.codigo_seguimiento,
+    };
+  }
+
   // CU-29 / CU-30: Tickets de soporte :DDDDDDDDD AHGG AYUDA
   async getTickets(
     idCliente: number,
@@ -303,6 +421,53 @@ export class PortalService {
       tiene_tickets: ticketsMapeados.length > 0,
       tickets: ticketsMapeados,
     };
+  }
+
+  private async notificarTicketCreado(ticket: {
+    id_ticket: number;
+    codigo_seguimiento: string;
+    categoria: string;
+    cliente: {
+      id_cliente: number;
+      nombre_completo: string;
+      email: string | null;
+    };
+  }): Promise<void> {
+    let estadoEnvio = 'omitido';
+
+    if (ticket.cliente.email) {
+      try {
+        await this.mailService.sendTicketCreated(
+          ticket.cliente.email,
+          ticket.cliente.nombre_completo,
+          ticket.codigo_seguimiento,
+          ticket.categoria,
+        );
+        estadoEnvio = 'enviado';
+      } catch (error) {
+        estadoEnvio = 'fallido';
+        this.logger.error(
+          `No se pudo notificar la creacion del ticket ${ticket.id_ticket}`,
+          error,
+        );
+      }
+    }
+
+    try {
+      await this.prisma.log_notificacion.create({
+        data: {
+          id_cliente: ticket.cliente.id_cliente,
+          canal: 'email',
+          fecha_envio: new Date(),
+          estado_envio: estadoEnvio,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo registrar la notificacion del ticket ${ticket.id_ticket}`,
+        error,
+      );
+    }
   }
 
   // variables meses xD

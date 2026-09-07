@@ -1,8 +1,11 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { PortalService } from './portal.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentClient } from '../auth/decorators/current-client.decorator.js';
 import type { cliente } from '../../generated/prisma/client.js';
+import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
+import { crearTicketSchema } from './dto/crear-ticket.dto.js';
+import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
 
 /**
  * Todas las rutas requieren sesión activa (JwtAuthGuard).
@@ -120,6 +123,19 @@ export class PortalController {
   @Get('deuda')
   getResumenDeuda(@CurrentClient() cliente: cliente) {
     return this.portalService.getResumenDeuda(cliente.id_cliente);
+  }
+
+  @Get('tickets/categorias')
+  getCategoriasTicket() {
+    return this.portalService.getCategoriasTicket();
+  }
+
+  @Post('tickets')
+  crearTicket(
+    @CurrentClient() cliente: cliente,
+    @Body(new ZodValidationPipe(crearTicketSchema)) body: CrearTicketDto,
+  ) {
+    return this.portalService.crearTicket(cliente.id_cliente, body);
   }
 
   /**

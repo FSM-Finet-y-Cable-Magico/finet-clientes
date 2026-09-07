@@ -4,9 +4,11 @@ import {
   BadRequestException,
   NotFoundException,
   InternalServerErrorException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PortalService } from './portal.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { MailService } from '../mail/mail.service.js';
 
 const FECHA_BASE = new Date('2024-01-15T00:00:00.000Z');
 const PLAN_MOCK = {
@@ -35,23 +37,132 @@ const CLIENTE_MOCK = {
 describe('PortalService', () => {
   let service: PortalService;
   let prisma: jest.Mocked<PrismaService>;
+  let mailService: jest.Mocked<MailService>;
 
   beforeEach(async () => {
     const mockPrisma = {
       contrato: { findMany: jest.fn() },
       cliente: { findUnique: jest.fn() },
       factura: { findMany: jest.fn() },
-      ticket: { findMany: jest.fn() },
+      categoria_falla: { findMany: jest.fn(), findUnique: jest.fn() },
+      ticket: {
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
       log_auditoria: { create: jest.fn() },
+      log_notificacion: { create: jest.fn() },
+      $transaction: jest.fn(),
     };
+    const mockMailService = { sendTicketCreated: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortalService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: MailService, useValue: mockMailService },
       ],
     }).compile();
     service = module.get(PortalService);
     prisma = module.get(PrismaService);
+    mailService = module.get(MailService);
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      async (callback: (tx: typeof mockPrisma) => Promise<unknown>) =>
+        callback(mockPrisma),
+    );
+  });
+
+  // CU-71: Registro de solicitud de soporte desde el portal.
+  describe('crearTicket', () => {
+    beforeEach(() => {
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+        ...CLIENTE_MOCK,
+        id_empresa: 2,
+      });
+      (prisma.categoria_falla.findUnique as jest.Mock).mockResolvedValue({
+        id_categoria: 3,
+        nombre: 'Conectividad',
+      });
+      (prisma.ticket.create as jest.Mock).mockResolvedValue({
+        id_ticket: 42,
+        fecha_creacion: new Date('2026-08-24T10:00:00.000Z'),
+      });
+      (prisma.ticket.update as jest.Mock).mockResolvedValue({});
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+      (prisma.log_notificacion.create as jest.Mock).mockResolvedValue({});
+      (mailService.sendTicketCreated as jest.Mock).mockResolvedValue(undefined);
+    });
+
+    it('lista las categorias disponibles ordenadas por nombre', async () => {
+      (prisma.categoria_falla.findMany as jest.Mock).mockResolvedValue([
+        { id_categoria: 3, nombre: 'Conectividad' },
+      ]);
+
+      const result = await service.getCategoriasTicket();
+
+      expect(result).toEqual([{ id_categoria: 3, nombre: 'Conectividad' }]);
+      expect(prisma.categoria_falla.findMany).toHaveBeenCalledWith({
+        select: { id_categoria: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      });
+    });
+
+    it('registra la solicitud, genera el codigo y notifica al cliente', async () => {
+      const result = await service.crearTicket(1, {
+        id_categoria: 3,
+        descripcion: 'Sin conexion desde esta manana',
+      });
+
+      expect(result).toEqual({
+        id_ticket: 42,
+        codigo_seguimiento: 'FIN-2026-000042',
+      });
+      expect(prisma.ticket.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          id_cliente: 1,
+          id_categoria: 3,
+          estado: 'abierto',
+          prioridad: 'media',
+          origen: 'portal',
+        }),
+        select: { id_ticket: true, fecha_creacion: true },
+      });
+      expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          accion: 'CREAR_TICKET_PORTAL',
+          id_entidad_afectada: 42,
+        }),
+      });
+      expect(mailService.sendTicketCreated).toHaveBeenCalledWith(
+        'juan@example.com',
+        'Juan Pérez',
+        'FIN-2026-000042',
+        'Conectividad',
+      );
+    });
+
+    it('rechaza una categoria inexistente', async () => {
+      (prisma.categoria_falla.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.crearTicket(1, {
+          id_categoria: 99,
+          descripcion: 'Sin conexion',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('informa indisponibilidad cuando falla el registro', async () => {
+      (prisma.$transaction as jest.Mock).mockRejectedValue(
+        new Error('database unavailable'),
+      );
+
+      await expect(
+        service.crearTicket(1, {
+          id_categoria: 3,
+          descripcion: 'Sin conexion',
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
   });
 
   // ─── CU-23: getEstadoContratos ────────────────────────────────────────────

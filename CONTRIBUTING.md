@@ -9,6 +9,25 @@ Este documento describe cómo se trabaja con git en este repo — es una convenc
 - **`review/<tema>`** o rama de feature — trabajo en curso. Se cierra mergeándola a `dev` (o abriendo PR hacia `dev`) cuando el trabajo está listo, y luego se borra (local + remota).
 - **`incremento-N/<bloque>`** — trabajo de un incremento completo (ver [`docs/CASOS-DE-USO.md`](docs/CASOS-DE-USO.md)), una rama por "Bloque" funcional del incremento (ej. `incremento-2/deuda`, `incremento-2/smartolt`). Mismo ciclo de vida que una rama de feature: se cierra hacia `dev` cuando el bloque está listo. No hay que esperar a que todos los bloques de un incremento terminen para ir integrando los que sí están listos.
 
+### Regla: nunca commitear directo en `dev`
+
+`dev` es solo destino de merge, no lugar de trabajo. Cada dev trabaja exclusivamente en la rama del bloque que le tocó (`incremento-2/<bloque>`) y la actualiza con sus commits ahí:
+
+```bash
+git checkout incremento-2/<bloque>
+# ... trabajar, commitear, pushear a esa rama ...
+git push origin incremento-2/<bloque>
+```
+
+Si mientras tanto `dev` avanzó (porque otro bloque ya se cerró), traer esos cambios a la rama propia con merge, no rebase (evita reescribir commits que ya se pushearon y que otros puedan tener):
+
+```bash
+git checkout incremento-2/<bloque>
+git merge dev
+```
+
+Cerrar el bloque hacia `dev` es el único momento en que se toca `dev` — y en general vía PR (`gh pr create --base dev --head incremento-2/<bloque>`), no merge directo, para que alguien revise antes de integrar. El fast-forward directo (ver más abajo) queda para casos simples sin necesidad de revisión, no como default en un equipo de 6 personas trabajando en paralelo.
+
 `main` y `dev` pueden divergir (cada una con commits propios que la otra no tiene) — **no asumas que una es ancestro de la otra sin comprobarlo**:
 
 ```bash
@@ -24,7 +43,9 @@ Se hace vía Pull Request (`gh pr create --base main --head dev`), no merge dire
 
 ### Cerrar una rama de feature/review hacia `dev`
 
-Si `dev` resulta ser ancestro de la rama (fast-forward posible), mergear directo es más simple que un PR:
+Con varias personas trabajando en paralelo, el default es PR (`gh pr create --base dev --head <rama>`) — así alguien más revisa antes de integrar, aunque el merge sea técnicamente fast-forward.
+
+El merge directo sin PR queda solo para trabajo propio, de una sola persona, sin necesidad real de revisión (por ejemplo, un ajuste de documentación):
 
 ```bash
 git checkout dev
@@ -33,8 +54,6 @@ git push origin dev
 git branch -d <rama>
 git push origin --delete <rama>
 ```
-
-Si no es fast-forward, o el trabajo necesita revisión antes de integrarse, usar PR (`gh pr create --base dev --head <rama>`) en vez de forzar el merge.
 
 ## Commits — contextual commits
 
