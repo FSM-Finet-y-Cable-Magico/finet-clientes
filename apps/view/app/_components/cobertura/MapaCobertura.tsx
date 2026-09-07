@@ -89,6 +89,31 @@ function CapaCalor({ puntos }: { puntos: PuntoCobertura[] }) {
   return null;
 }
 
+/**
+ * Mantiene al mapa al tanto del tamano real de su contenedor.
+ *
+ * Leaflet solo se entera de un cambio de tamano por el `resize` de la ventana,
+ * y el contenedor puede cambiar sin que eso ocurra: la barra de scroll de la
+ * pagina que aparece o desaparece le quita o devuelve ~15 px de ancho, y en el
+ * telefono la barra del navegador al desplazarse cambia el `60vh` del alto.
+ * Cuando pasa, el canvas de la capa de calor se queda del tamano anterior y el
+ * mapa se ve cortado contra un borde recto.
+ *
+ * `invalidateSize` hace que Leaflet vuelva a medir y emita `moveend`, que es lo
+ * que leaflet.heat escucha para redimensionar su canvas.
+ */
+function AjusteDeTamano() {
+  const map = useMap();
+
+  useEffect(() => {
+    const observador = new ResizeObserver(() => map.invalidateSize());
+    observador.observe(map.getContainer());
+    return () => observador.disconnect();
+  }, [map]);
+
+  return null;
+}
+
 export default function MapaCobertura({ config, puntos }: MapaCoberturaProps) {
   // CU-62: mas alla de estos limites el paneo no avanza.
   const limites = useMemo(
@@ -122,6 +147,7 @@ export default function MapaCobertura({ config, puntos }: MapaCoberturaProps) {
         maxZoom={config.zoom_max}
       />
       <CapaCalor puntos={puntos} />
+      <AjusteDeTamano />
     </MapContainer>
   );
 }
