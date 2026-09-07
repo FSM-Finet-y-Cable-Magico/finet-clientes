@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import type { CSSProperties } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -41,6 +42,15 @@ const ZOOM_REFERENCIA_INTENSIDAD = 18;
  * respuesta que dar a esa escala, asi que se retira la capa y queda el mapa base.
  */
 const ULTIMO_ZOOM_CON_CAPA = 15;
+
+/**
+ * Cuanto se extiende el mapa por fuera de su marco visible, en pixeles.
+ *
+ * Es lo que permite arrastrar sin ver el borde de la capa de calor: la franja
+ * que el canvas destapa al moverse cae dentro de este margen, que el marco
+ * recorta. Cuesta cargar algo mas de teselas alrededor.
+ */
+const DESBORDE = 160;
 
 /**
  * CU-60: capa de mapa de calor sobre el visor.
@@ -105,13 +115,14 @@ function CapaCalor({ puntos }: { puntos: PuntoCobertura[] }) {
     /**
      * Maximo desfase tolerado entre el canvas y el contenedor, en pixeles.
      *
-     * Un repintado cuesta ~14 ms, asi que hacerlo en cada cuadro del arrastre se
-     * come el presupuesto de 16 ms y se siente a tirones. Reaccionar por
-     * distancia en vez de por cuadro acota las dos cosas de una: la franja
-     * descubierta nunca pasa de este valor, y en un arrastre largo se repinta un
-     * puñado de veces en lugar de decenas.
+     * Se queda algo por debajo de `DESBORDE`: mientras la franja descubierta
+     * quepa en lo que el marco recorta, no se ve nada y no hay para que
+     * repintar. Se repinta justo antes de que asome.
+     *
+     * Un repintado cuesta ~14 ms — mas de lo que dura un cuadro — asi que
+     * espaciarlos por distancia recorrida es lo que mantiene fluido el arrastre.
      */
-    const MAX_DESFASE = 48;
+    const MAX_DESFASE = DESBORDE - 20;
 
     /**
      * Mantiene la capa cubriendo el viewport mientras se arrastra el mapa.
@@ -167,27 +178,36 @@ export default function MapaCobertura({ config, puntos }: MapaCoberturaProps) {
   );
 
   return (
-    <MapContainer
-      center={[config.centro.latitud, config.centro.longitud]}
-      zoom={config.zoom_inicial}
-      // CU-61: el rango de escala queda acotado por el backend.
-      minZoom={config.zoom_min}
-      maxZoom={config.zoom_max}
-      maxBounds={limites}
-      maxBoundsViscosity={1}
-      // CU-61: rueda, doble click y pellizco. CU-62: arrastre con puntero o dedo.
-      scrollWheelZoom
-      doubleClickZoom
-      touchZoom
-      dragging
-      className="h-[60vh] min-h-[380px] w-full rounded-2xl border border-border"
+    // El marco es lo que se ve; el mapa de adentro lo desborda por
+    // `DESBORDE` en los cuatro lados y este `overflow-hidden` lo recorta.
+    // Ver `.mapa-con-desborde` en globals.css para el porque.
+    <div
+      className="mapa-con-desborde relative h-[60vh] min-h-[380px] w-full overflow-hidden rounded-2xl border border-border"
+      style={{ "--desborde-mapa": `${DESBORDE}px` } as CSSProperties}
     >
-      <TileLayer
-        attribution='&copy; colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      <MapContainer
+        center={[config.centro.latitud, config.centro.longitud]}
+        zoom={config.zoom_inicial}
+        // CU-61: el rango de escala queda acotado por el backend.
+        minZoom={config.zoom_min}
         maxZoom={config.zoom_max}
-      />
-      <CapaCalor puntos={puntos} />
-    </MapContainer>
+        maxBounds={limites}
+        maxBoundsViscosity={1}
+        // CU-61: rueda, doble click y pellizco. CU-62: arrastre con puntero o dedo.
+        scrollWheelZoom
+        doubleClickZoom
+        touchZoom
+        dragging
+        className="absolute"
+        style={{ top: -DESBORDE, right: -DESBORDE, bottom: -DESBORDE, left: -DESBORDE }}
+      >
+        <TileLayer
+          attribution='&copy; colaboradores de <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={config.zoom_max}
+        />
+        <CapaCalor puntos={puntos} />
+      </MapContainer>
+    </div>
   );
 }
