@@ -33,6 +33,16 @@ type MapaCoberturaProps = {
 const ZOOM_REFERENCIA_INTENSIDAD = 18;
 
 /**
+ * Ultimo zoom en el que se dibuja la capa.
+ *
+ * Pasado este nivel las celdas quedan tan separadas que el heatmap deja de leerse
+ * como una mancha y se ve la grilla: manchones azules alineados en filas, que no
+ * dicen nada sobre la cuadra que se esta mirando. Con celdas de ~220 m no hay
+ * respuesta que dar a esa escala, asi que se retira la capa y queda el mapa base.
+ */
+const ULTIMO_ZOOM_CON_CAPA = 15;
+
+/**
  * CU-60: capa de mapa de calor sobre el visor.
  * La intensidad se normaliza contra la densidad maxima del set para que la
  * escala de color sea legible sin importar el rango absoluto de los datos.
@@ -59,9 +69,19 @@ function CapaCalor({ puntos }: { puntos: PuntoCobertura[] }) {
       blur: 20,
       minOpacity: 0.35,
       maxZoom: ZOOM_REFERENCIA_INTENSIDAD,
-    }).addTo(map);
+    });
+
+    const sincronizarVisibilidad = () => {
+      const corresponde = map.getZoom() <= ULTIMO_ZOOM_CON_CAPA;
+      if (corresponde && !map.hasLayer(capa)) capa.addTo(map);
+      else if (!corresponde && map.hasLayer(capa)) capa.remove();
+    };
+
+    sincronizarVisibilidad();
+    map.on("zoomend", sincronizarVisibilidad);
 
     return () => {
+      map.off("zoomend", sincronizarVisibilidad);
       capa.remove();
     };
   }, [map, puntos]);
