@@ -17,6 +17,14 @@ export default async function CoberturaPage() {
 
   return (
     <section className="mx-auto w-full max-w-5xl px-4 py-12">
+      {/*
+        El elemento LCP de esta pagina es una tesela de OpenStreetMap, y no se
+        pide hasta que hidrata y carga el chunk de Leaflet — recien ahi arranca
+        el DNS y el TLS del servidor de teselas. Adelantar la conexion le quita
+        esas idas y vueltas al camino critico. React lo iza al <head>.
+      */}
+      <link rel="preconnect" href="https://tile.openstreetmap.org" />
+
       <h1 className="text-2xl font-bold text-foreground">
         Consulta de cobertura
       </h1>

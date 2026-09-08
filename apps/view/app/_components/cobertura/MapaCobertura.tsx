@@ -48,9 +48,11 @@ const ULTIMO_ZOOM_CON_CAPA = 15;
  *
  * Es lo que permite arrastrar sin ver el borde de la capa de calor: la franja
  * que el canvas destapa al moverse cae dentro de este margen, que el marco
- * recorta. Cuesta cargar algo mas de teselas alrededor.
+ * recorta. Cada pixel de mas agranda el viewport y con el la cantidad de
+ * teselas de la carga inicial, asi que se queda en lo justo para tapar el
+ * arrastre tipico.
  */
-const DESBORDE = 160;
+const DESBORDE = 96;
 
 /**
  * CU-60: capa de mapa de calor sobre el visor.
