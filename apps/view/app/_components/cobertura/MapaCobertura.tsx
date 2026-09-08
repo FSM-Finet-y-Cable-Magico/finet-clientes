@@ -105,6 +105,9 @@ function CapaCalor({ puntos }: { puntos: PuntoCobertura[] }) {
      * evento intermedio se dispare.
      */
     const observador = new ResizeObserver(() => {
+      // Con el contenedor en cero — primer cuadro, o la pagina en segundo plano —
+      // el canvas queda de ancho 0 y el repintado revienta en `getImageData`.
+      if (!map.getContainer().clientWidth) return;
       map.invalidateSize();
       if (!map.hasLayer(capa)) return;
       capa.remove();
@@ -178,11 +181,14 @@ export default function MapaCobertura({ config, puntos }: MapaCoberturaProps) {
   );
 
   return (
-    // El marco es lo que se ve; el mapa de adentro lo desborda por
-    // `DESBORDE` en los cuatro lados y este `overflow-hidden` lo recorta.
-    // Ver `.mapa-con-desborde` en globals.css para el porque.
+    // El marco es lo que se ve; el mapa de adentro lo desborda por `DESBORDE`
+    // en los cuatro lados y este `overflow-hidden` lo recorta. Ver
+    // `.mapa-con-desborde` en globals.css para el porque.
+    //
+    // `isolate` encierra los z-index de Leaflet (paneles 400, controles 1000)
+    // en este marco; sin eso se cuelan por encima del header.
     <div
-      className="mapa-con-desborde relative h-[60vh] min-h-[380px] w-full overflow-hidden rounded-2xl border border-border"
+      className="mapa-con-desborde relative isolate h-[60vh] min-h-[380px] w-full overflow-hidden rounded-2xl border border-border"
       style={{ "--desborde-mapa": `${DESBORDE}px` } as CSSProperties}
     >
       <MapContainer
