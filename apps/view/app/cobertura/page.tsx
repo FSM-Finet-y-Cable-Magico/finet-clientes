@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { MapPinOff } from "lucide-react";
 import VisorCobertura from "../_components/cobertura/VisorCobertura";
 import { getPuntosCobertura, getVisorCoberturaConfig } from "../_lib/api";
+import { vistaPreviaCobertura } from "../_components/cobertura/vista-previa";
 
 export const metadata: Metadata = {
   title: "Consulta de cobertura",
@@ -50,7 +51,11 @@ export default async function CoberturaPage() {
           </div>
         ) : (
           <>
-            <VisorCobertura config={config} puntos={puntos} />
+            <VisorCobertura
+              config={config}
+              puntos={puntos}
+              vistaPrevia={vistaPreviaCobertura(puntos)}
+            />
 
             {/* CU-60, Excepcion 1: sin datos se muestra el visor sin capa tematica. */}
             {puntos.length === 0 && (
