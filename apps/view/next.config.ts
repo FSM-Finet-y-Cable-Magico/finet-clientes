@@ -8,7 +8,12 @@ const cspHeader = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  "connect-src 'self' https://finet.cl http://localhost:4000",
+  // CU-34/35: el test de velocidad transfiere contra los CDN de Netflix, cuyo
+  // subdominio cambia segun la red desde la que se pide
+  // (`ipv4-cXXX-...-isp.N.oca.nflxvideo.net`), asi que necesita comodin.
+  // `api.fast.com` no va aca: solo acepta el origen https://fast.com, asi que
+  // los servidores los pide el backend y no el navegador.
+  "connect-src 'self' https://finet.cl http://localhost:4000 https://*.nflxvideo.net",
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",

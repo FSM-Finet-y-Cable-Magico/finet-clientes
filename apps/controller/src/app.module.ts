@@ -14,6 +14,7 @@ import { PerfilModule } from './perfil/perfil.module.js';
 import { LandingModule } from './landing/landing.module.js';
 import { ContratacionesModule } from './contrataciones/contrataciones.module.js';
 import { CoberturaModule } from './cobertura/cobertura.module.js';
+import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { CoberturaModule } from './cobertura/cobertura.module.js';
     LandingModule,
     ContratacionesModule,
     CoberturaModule,
+    DiagnosticoModule,
   ],
   controllers: [AppController],
   providers: [
