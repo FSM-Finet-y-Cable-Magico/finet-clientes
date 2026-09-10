@@ -20,6 +20,9 @@ export const navItems: NavItem[] = [
     ],
   },
   { label: 'Cobertura', href: '/cobertura' },
+  // Junto a Cobertura porque son las dos herramientas del sitio: una para ver
+  // si llega la red y otra para medirla (CU-34/35).
+  { label: 'Test de velocidad', href: '/velocidad' },
   { label: 'Ayuda', href: '/ayuda' },
 ];
 

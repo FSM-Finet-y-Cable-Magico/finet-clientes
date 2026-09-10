@@ -38,6 +38,7 @@ Variables principales:
 - `PORT` — puerto del servidor (default: 4000)
 - `NODE_ENV` — `development` o `production`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — configuración de correo
+- `FAST_API_URL`, `FAST_TOKEN` — API de fast.com para el test de velocidad (CU-34/35). El navegador no puede consultarla directamente porque solo acepta el origen `https://fast.com`, así que el backend pide los servidores de medición y se los entrega al cliente vía `GET /diagnostico/servidores`
 
 ## Servicios locales con Docker
 
