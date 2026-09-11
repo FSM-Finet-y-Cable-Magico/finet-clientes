@@ -81,3 +81,14 @@ export interface CrearTicketResponseDto {
   id_ticket: number;
   codigo_seguimiento: string;
 }
+
+// ─── CU-32: Solicitud de cambio de clave de red inalambrica ──────────────────
+// El portal solo registra la solicitud: la ejecucion en el equipo del cliente
+// es CU-33 y corre por cuenta del CRM. Por eso la respuesta confirma la
+// creacion de la solicitud y no un cambio ya aplicado.
+export interface SolicitudWifiResponseDto {
+  id_solicitud: number;
+  id_contrato: number;
+  estado: string;
+  fecha_solicitud: string | null;
+}

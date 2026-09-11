@@ -2,8 +2,12 @@
 
 import { cookies } from 'next/headers';
 
-// RF-24: Solo caracteres alfanuméricos, validado también en servidor
-const WIFI_PASSWORD_REGEX = /^[a-zA-Z0-9]+$/;
+// CU-31, su Excepción 2 y RF-24 dicen "únicamente alfanuméricos"; se decidió
+// permitir símbolos igual (pedido de Dani, confirmado por Emilio) — diverge
+// del CU escrito, ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md. Se mantienen
+// prohibidos los espacios en blanco. No se hace trim() de la clave: recortarla
+// cambiaría la clave que el cliente escribió.
+const WIFI_PASSWORD_REGEX = /^\S+$/;
 const WIFI_PASSWORD_MIN = 8;
 const WIFI_PASSWORD_MAX = 63; // WPA2 máximo
 
@@ -21,35 +25,51 @@ async function authHeaders(): Promise<HeadersInit> {
   return headers;
 }
 
+/**
+ * CU-31 + CU-32: solicitud de cambio de clave de red inalambrica.
+ *
+ * No cambia la clave: deja registrada la solicitud para que el CRM la ejecute
+ * despues contra el equipo del cliente (CU-33). El formato se revalida aca
+ * porque la validacion del componente corre en el navegador y no es confiable.
+ */
 export async function changeWifiPassword(
+  idContrato: number,
   password: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Validación server-side (no confiar solo en el cliente)
-  if (typeof password !== 'string' || password.trim().length === 0) {
-    return { success: false, error: 'Contraseña inválida' };
+  if (!Number.isInteger(idContrato) || idContrato <= 0) {
+    return { success: false, error: 'Selecciona el servicio al que aplicar el cambio' };
   }
-  const sanitized = password.trim();
-  if (sanitized.length < WIFI_PASSWORD_MIN || sanitized.length > WIFI_PASSWORD_MAX) {
+  if (typeof password !== 'string' || password.length === 0) {
+    return { success: false, error: 'Ingresa la nueva contraseña' };
+  }
+  if (password.length < WIFI_PASSWORD_MIN || password.length > WIFI_PASSWORD_MAX) {
     return {
       success: false,
       error: `La contraseña debe tener entre ${WIFI_PASSWORD_MIN} y ${WIFI_PASSWORD_MAX} caracteres`,
     };
   }
-  if (!WIFI_PASSWORD_REGEX.test(sanitized)) {
-    return { success: false, error: 'Solo se permiten caracteres alfanuméricos' };
+  if (!WIFI_PASSWORD_REGEX.test(password)) {
+    return {
+      success: false,
+      error: 'No se permiten espacios en blanco',
+    };
   }
 
   try {
     const res = await fetch(apiUrl('/portal/wifi/password'), {
       method: 'POST',
       headers: await authHeaders(),
-      body: JSON.stringify({ password: sanitized }),
+      body: JSON.stringify({ id_contrato: idContrato, password }),
+      cache: 'no-store',
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
+      const mensaje = (data as { message?: string | string[] }).message;
       return {
         success: false,
-        error: (data as { message?: string }).message ?? 'Error al cambiar la contraseña',
+        error:
+          (Array.isArray(mensaje) ? mensaje[0] : mensaje) ??
+          'No se pudo registrar la solicitud',
       };
     }
     return { success: true };

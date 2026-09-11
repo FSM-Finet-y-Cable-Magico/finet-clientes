@@ -89,8 +89,8 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 | 12 | CU-49 | Aplicando recargo de reconexión al saldo del cliente suspendido | SmartOLT | ⏳ Pendiente |
 | 13 | CU-50 | Reactivando servicio de cliente suspendido tras pago total | SmartOLT | ⏳ Pendiente |
 | 14 | CU-51 | Registrando bitácora de eventos de suspensión y reactivación | SmartOLT | ⏳ Pendiente — podría reutilizar `log_auditoria` en vez de un modelo nuevo |
-| 15 | CU-31 | Validando formato de nueva clave de red inalámbrica | Autogestión | 🚧 Parcial — frontend y validación ya implementados: `apps/view/app/_components/portal/WifiPasswordSection.tsx` |
-| 16 | CU-32 | Solicitando cambio de contraseña de red inalámbrica | Autogestión | 🚧 Parcial — el Server Action `changeWifiPassword` (`apps/view/app/portal/_lib/portal-actions.ts`) ya llama a `POST /portal/wifi/password`, pero **ese endpoint no existe en el backend** — solo falta implementarlo ahí |
+| 15 | CU-31 | Validando formato de nueva clave de red inalámbrica | Autogestión | ✅ — valida formato en `WifiPasswordSection.tsx` y en el backend con Zod (`dto/solicitud-wifi.dto.ts`). **Diverge del RF-24 escrito**: se permiten símbolos, solo se rechazan espacios en blanco (decisión de equipo, pendiente de reflejar en el Documento 0) |
+| 16 | CU-32 | Solicitando cambio de contraseña de red inalámbrica | Autogestión | ✅ — `POST /portal/wifi/password` registra la solicitud en la tabla `solicitud_wifi` (estado `pendiente`) y la muestra en `/portal/servicios`. El portal **no** cambia la clave: la ejecución es CU-33 y corre por cuenta del CRM |
 | 17 | CU-33 | Ejecutando cambio de clave WiFi solicitado por el cliente | Autogestión | ⏳ Pendiente — la ejecución real contra el equipo del cliente (ONT/router) no está implementada |
 | 18 | CU-34 | Iniciando prueba de velocidad de red con herramienta Ookla | Diagnóstico | 🚧 Parcial — widget de Speedtest.net embebido (`OoklaSpeedTest.tsx`), sin backend propio ni persistencia de resultados |
 | 19 | CU-36 | Ejecutando evaluación de red para diagnóstico técnico | Diagnóstico | ⏳ Pendiente — alcance a confirmar con el equipo (no hay evidencia de un flujo propio más allá del widget de Ookla) |
@@ -104,6 +104,10 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 | 27 | CU-60 | Visualizando capa de mapa de calor de cobertura | Mapa | ✅ — `leaflet.heat` sobre `GET /api/cobertura/puntos` (capa estática generada desde el KML de planta externa) |
 | 28 | CU-61 | Aplicando zoom sobre el mapa de factibilidad | Mapa | ✅ — rueda/doble click/pellizco, acotado por `zoom_min`/`zoom_max` del backend |
 | 29 | CU-62 | Desplazándose por el mapa de factibilidad mediante paneo | Mapa | ✅ — arrastre con puntero o táctil, acotado por `maxBounds` |
+
+> **Reparto con el Grupo 8.** El documento `CU_Grupo2_Equivalencias_Grupo8_Incremento2.pdf`
+> cerró el alcance de este incremento: 7 CU son 100% nuestros, 5 se trabajan en conjunto con G8
+> (CU-31/32, CU-52/53 y CU-71) y 17 se derivan enteros a G8.
 
 > **Datos del bloque Mapa:** la capa de calor se genera desde el KML de planta externa que
 > entrega Finet (NAPs, MUFAs y trazado de fibra de la red FTTH) y vive como archivo estático

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -10,6 +11,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
+import type { SolicitarCambioWifiDto } from './dto/solicitud-wifi.dto.js';
 import {
   CategoriaTicketDto,
   ContratoEstadoDto,
@@ -18,6 +20,7 @@ import {
   FacturaPendienteDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
+  SolicitudWifiResponseDto,
   TicketsResponseDto,
 } from './dto/portal-response.dto.js';
 
@@ -466,6 +469,90 @@ export class PortalService {
       this.logger.error(
         `No se pudo registrar la notificacion del ticket ${ticket.id_ticket}`,
         error,
+      );
+    }
+  }
+
+  //  CU-31 + CU-32: Solicitud de cambio de clave de red inalambrica
+  //
+  //  El portal NO cambia la clave: solo deja registrada la solicitud para que el
+  //  CRM la ejecute contra el equipo del cliente (CU-33). La clave se guarda
+  //  legible a proposito, porque CU-33 exige que quien la aplique vea "la nueva
+  //  clave validada" — hashearla haria ese caso de uso imposible.
+  //
+  //  El formato ya viene validado por Zod en el controller (CU-31 / RF-24).
+  async solicitarCambioWifi(
+    idCliente: number,
+    dto: SolicitarCambioWifiDto,
+  ): Promise<SolicitudWifiResponseDto> {
+    // El contrato tiene que ser del cliente autenticado. Si es de otro, se
+    // responde 404 igual que si no existiera: no se confirma su existencia.
+    const contrato = await this.prisma.contrato.findFirst({
+      where: { id_contrato: dto.id_contrato, id_cliente: idCliente },
+      select: { id_contrato: true, estado: true },
+    });
+
+    if (!contrato) {
+      throw new NotFoundException('No encontramos el servicio seleccionado');
+    }
+
+    // CU-32 Excepcion 2: el plan no esta activo -> se impide crear la solicitud
+    // y se informa la restriccion.
+    if (contrato.estado !== 'activo') {
+      throw new ConflictException(
+        'Solo puedes solicitar el cambio de clave en un servicio activo',
+      );
+    }
+
+    try {
+      const solicitud = await this.prisma.$transaction(async (tx) => {
+        const creada = await tx.solicitud_wifi.create({
+          data: {
+            id_contrato: contrato.id_contrato,
+            id_cliente: idCliente,
+            password_nueva: dto.password,
+            estado: 'pendiente',
+          },
+          select: {
+            id_solicitud: true,
+            id_contrato: true,
+            estado: true,
+            fecha_solicitud: true,
+          },
+        });
+
+        // La clave nueva no se registra en la auditoria: quedaria expuesta en
+        // un log que lee mucha mas gente que la solicitud misma.
+        await tx.log_auditoria.create({
+          data: {
+            accion: 'SOLICITAR_CAMBIO_WIFI_PORTAL',
+            entidad_afectada: 'solicitud_wifi',
+            id_entidad_afectada: creada.id_solicitud,
+            valor_nuevo: {
+              id_contrato: creada.id_contrato,
+              estado: creada.estado,
+              origen: 'portal',
+            },
+          },
+        });
+
+        return creada;
+      });
+
+      return {
+        id_solicitud: solicitud.id_solicitud,
+        id_contrato: solicitud.id_contrato,
+        estado: solicitud.estado,
+        fecha_solicitud: solicitud.fecha_solicitud?.toISOString() ?? null,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `No se pudo registrar la solicitud de cambio de clave WiFi del cliente ${idCliente}`,
+        error,
+      );
+      throw new ServiceUnavailableException(
+        'No fue posible registrar tu solicitud. Intenta nuevamente mas tarde.',
       );
     }
   }

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Wifi, Zap, Calendar, AlertCircle, RefreshCw } from "lucide-react";
 import { api } from "../../utils/api";
 import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
+import WifiPasswordSection from "@/app/_components/portal/WifiPasswordSection";
 
 type Plan = {
   id_plan: number;
@@ -191,6 +192,15 @@ export default function ServiciosPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* CU-31 + CU-32: el cambio de clave WiFi se pide sobre un contrato, asi
+          que vive junto a la lista de servicios y reusa los contratos ya
+          cargados en vez de volver a pedirlos. */}
+      {contratos && contratos.length > 0 && !loading && (
+        <div className="mt-6">
+          <WifiPasswordSection contratos={contratos} />
         </div>
       )}
     </div>
