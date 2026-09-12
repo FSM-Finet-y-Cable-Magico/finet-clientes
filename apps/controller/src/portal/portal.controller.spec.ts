@@ -45,7 +45,7 @@ describe('PortalController', () => {
       solicitarCambioContrasenaWifi: jest.fn().mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: '2024-01-15T00:00:00.000Z',
       }),
       crearTicket: jest.fn().mockResolvedValue({
@@ -119,7 +119,7 @@ describe('PortalController', () => {
 
     expect(service.solicitarCambioContrasenaWifi).toHaveBeenCalledWith(1, body);
     expect(respuesta).toEqual(
-      expect.objectContaining({ estado: 'pendiente', id_solicitud: 7 }),
+      expect.objectContaining({ estado: 'PENDIENTE', id_solicitud: 7 }),
     );
   });
 });

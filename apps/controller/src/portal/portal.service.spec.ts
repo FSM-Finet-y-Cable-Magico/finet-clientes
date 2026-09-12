@@ -1,5 +1,6 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
-import * as bcrypt from 'bcrypt';
+import { constants, generateKeyPairSync, privateDecrypt } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
@@ -13,6 +14,28 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 
 const FECHA_BASE = new Date('2024-01-15T00:00:00.000Z');
+
+// Par de llaves de prueba, para verificar el cifrado de la clave WiFi de punta
+// a punta: se cifra con la publica (como hace el servicio) y se descifra con la
+// privada (como hara el CRM). 2048 bits porque generar una 4096 en cada corrida
+// de tests es lento; el codigo no depende del tamano.
+const { publicKey: LLAVE_PUBLICA_CRM, privateKey: LLAVE_PRIVADA_CRM } =
+  generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+
+function descifrarComoElCrm(cifrada: string): string {
+  return privateDecrypt(
+    {
+      key: LLAVE_PRIVADA_CRM,
+      padding: constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: 'sha256',
+    },
+    Buffer.from(cifrada, 'base64'),
+  ).toString('utf8');
+}
 const PLAN_MOCK = {
   id_plan: 1,
   nombre_comercial: 'Fibra 200',
@@ -40,6 +63,7 @@ describe('PortalService', () => {
   let service: PortalService;
   let prisma: jest.Mocked<PrismaService>;
   let mailService: jest.Mocked<MailService>;
+  let configService: jest.Mocked<ConfigService>;
 
   beforeEach(async () => {
     const mockPrisma = {
@@ -58,14 +82,21 @@ describe('PortalService', () => {
       $transaction: jest.fn(),
     };
     const mockMailService = { sendTicketCreated: jest.fn() };
+    const mockConfigService = {
+      get: jest.fn((clave: string) =>
+        clave === 'CRM_PUBLIC_KEY' ? LLAVE_PUBLICA_CRM : undefined,
+      ),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortalService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: MailService, useValue: mockMailService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
     service = module.get(PortalService);
+    configService = module.get(ConfigService);
     prisma = module.get(PrismaService);
     mailService = module.get(MailService);
     (prisma.$transaction as jest.Mock).mockImplementation(
@@ -468,7 +499,7 @@ describe('PortalService', () => {
   describe('solicitarCambioContrasenaWifi', () => {
     const DTO = { id_contrato: 1, password: 'MiRedNueva2026' };
 
-    it('registra la solicitud como pendiente cuando el contrato esta activo', async () => {
+    it('registra la solicitud como PENDIENTE cuando el contrato esta activo', async () => {
       (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
         id_contrato: 1,
         estado: 'activo',
@@ -476,7 +507,7 @@ describe('PortalService', () => {
       (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE,
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
@@ -486,13 +517,13 @@ describe('PortalService', () => {
       expect(resultado).toEqual({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE.toISOString(),
       });
     });
 
-    // Pedido de Dani en el review: la clave se guarda hasheada, no legible.
-    it('guarda la clave hasheada con bcrypt y no en texto plano', async () => {
+    // Pedido de Dani en el review: la clave nunca en texto plano.
+    it('no escribe la clave legible en ningun campo de la fila', async () => {
       (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
         id_contrato: 1,
         estado: 'activo',
@@ -500,7 +531,7 @@ describe('PortalService', () => {
       (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE,
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
@@ -508,18 +539,10 @@ describe('PortalService', () => {
       await service.solicitarCambioContrasenaWifi(1, DTO);
 
       const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
-        .mock.calls[0][0] as {
-        data: { password_nueva_hash: string; estado: string };
-      };
+        .mock.calls[0][0] as { data: Record<string, unknown> };
 
-      expect(data.estado).toBe('pendiente');
-      expect(data.password_nueva_hash).not.toBe(DTO.password);
-      expect(data.password_nueva_hash).toMatch(/^\$2[aby]\$/);
-      // El hash tiene que corresponder a la clave que pidio el cliente: es lo
-      // unico que le queda a CU-33 para verificar lo que aplica en el equipo.
-      await expect(
-        bcrypt.compare(DTO.password, data.password_nueva_hash),
-      ).resolves.toBe(true);
+      expect(data.estado).toBe('PENDIENTE');
+      expect(JSON.stringify(data)).not.toContain(DTO.password);
     });
 
     it('no deja la clave nueva en el log de auditoria', async () => {
@@ -530,7 +553,7 @@ describe('PortalService', () => {
       (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE,
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
@@ -547,6 +570,64 @@ describe('PortalService', () => {
       );
     });
 
+    // CU-33 necesita la clave en claro para escribirla en el equipo, y el hash
+    // no se puede revertir: por eso va tambien cifrada con la llave publica del
+    // CRM. Se verifica el ida y vuelta completo.
+    it('guarda la clave cifrada para que solo el CRM pueda leerla', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'ACTIVO',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
+        .mock.calls[0][0] as { data: { password_nueva_cifrada: string } };
+
+      expect(data.password_nueva_cifrada).not.toBe(DTO.password);
+      expect(descifrarComoElCrm(data.password_nueva_cifrada)).toBe(
+        DTO.password,
+      );
+    });
+
+    // Si falta la llave la solicitud se registra igual: el cliente no tiene
+    // por que quedarse sin pedir el cambio por un error de configuracion
+    // nuestro, y el null le dice al CRM que la clave hay que pedirsela.
+    it('registra la solicitud sin cifrar si falta la llave del CRM', async () => {
+      (configService.get as jest.Mock).mockReturnValue(undefined);
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'ACTIVO',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      const resultado = await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
+        .mock.calls[0][0] as {
+        data: { password_nueva_cifrada: string | null };
+      };
+
+      // La solicitud queda registrada igual y sin la clave: el CRM la
+      // reconoce por el NULL y se la pide al cliente.
+      expect(resultado.estado).toBe('PENDIENTE');
+      expect(data.password_nueva_cifrada).toBeNull();
+      expect(JSON.stringify(data)).not.toContain(DTO.password);
+    });
+
     // Comentario de Dani en el review sobre el estandar de estados: el resto
     // del servicio normaliza contra la Tabla 11.15 y esta validacion comparaba
     // el string crudo. Con 'ACTIVO' (lo que escribe el CRM) daba 409.
@@ -558,7 +639,7 @@ describe('PortalService', () => {
       (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE,
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});

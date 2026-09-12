@@ -92,6 +92,15 @@ PORT=4000
 CORS_ORIGIN="http://localhost:3000,https://app.tudominio.com"
 FRONTEND_URL="http://localhost:3000"
 
+# Cambio de clave WiFi (CU-32) — llave PUBLICA RSA de quien aplica el cambio,
+# en base64. Con esto la clave que pide el cliente queda cifrada en la base y
+# solo quien tiene la privada puede leerla para escribirla en el equipo.
+# De quien es la privada esta pendiente de definir entre G8 y G3: el acuerdo de
+# integracion del 12-09-2026 deja SmartOLT y el cambio WiFi tecnico en G3, pero
+# la validacion comercial en G8. Si falta la llave, la solicitud se registra sin
+# cifrar y hay que pedirle la clave al cliente.
+CRM_PUBLIC_KEY=""
+
 # SMTP (Mail)
 SMTP_HOST=localhost
 SMTP_PORT=1025
@@ -111,6 +120,7 @@ MAIL_FROM="Portal Clientes <no-reply@finet.cl>"
 | `CORS_ORIGIN` | Sí | Orígenes permitidos, separados por coma |
 | `FRONTEND_URL` | Sí | URL base del frontend, usada en recuperación de contraseña |
 | `SMTP_*`, `MAIL_FROM` | Sí | Envío de correo (en dev, Mailpit vía `docker compose up -d`) |
+| `CRM_PUBLIC_KEY` | No | Llave pública RSA (PEM en base64) con la que se cifra la clave WiFi de CU-32. La privada la tiene quien aplica el cambio en el equipo — G8 o G3, pendiente de definir entre ellos. Sin ella el endpoint sigue funcionando, pero la solicitud queda sin la clave cifrada — ver `portal.service.ts` |
 | `POSTGRES_*` | No | Solo los consume el `docker-compose` de desarrollo |
 
 ### Frontend — `apps/view/.env`
