@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { faqJsonLd } from "../_lib/jsonld";
+import { WHATSAPP_URL } from "../_lib/company";
 
 export const metadata: Metadata = {
   title: "Ayuda y Preguntas Frecuentes",
@@ -92,7 +93,9 @@ export default function AyudaPage() {
           <p className="text-sm text-muted">
             ¿No encuentras lo que buscas?{" "}
             <a
-              href="/soporte"
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
               Contacta a soporte

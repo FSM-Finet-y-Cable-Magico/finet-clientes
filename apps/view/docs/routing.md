@@ -9,12 +9,11 @@ Todas las rutas viven en `app/`. Las protegidas por sesión están marcadas 🔒
 | `/` | Home |
 | `/planes` | Catálogo de planes — `GET /api/landing/planes` (CU-15/CU-17) |
 | `/contratar/[planId]` | Formulario de contratación de un plan (CU-18) |
-| `/hogar`, `/hogar/internet`, `/hogar/duo`, `/hogar/tv` | Landing de productos hogar |
-| `/empresas`, `/empresas/internet`, `/empresas/cotizador` | Landing y cotizador para empresas |
+| `/empresas` | Landing para empresas |
 | `/tv`, `/tv/canales`, `/tv/parrilla` | Landing de TV |
 | `/cobertura` | Visor cartográfico de factibilidad — `GET /api/cobertura/config`, `GET /api/cobertura/puntos` (CU-59 a CU-62) |
 | `/velocidad` | Test de velocidad |
-| `/faqs`, `/ayuda`, `/soporte`, `/reportar` | Contenido de soporte |
+| `/ayuda` | Preguntas frecuentes y contacto de soporte |
 | `/legal/terminos`, `/legal/privacidad`, `/legal/reclamos`, `/legal/ley-21398` | Legal |
 
 ## Públicas — auth y consulta de deuda
@@ -25,7 +24,6 @@ Todas las rutas viven en `app/`. Las protegidas por sesión están marcadas 🔒
 | `/recuperar-password` | `POST /api/auth/recuperar-password` | CU-03 |
 | `/restablecer-password` | `POST /api/auth/restablecer-password` | CU-03 / RF-09 |
 | `/consultar-deuda` | `GET /api/deuda-publica/rut`, `GET /api/deuda-publica/abonado` | CU-39 / CU-40 / CU-41 |
-| `/pagar` | — (sin pasarela real todavía, ver [CASOS-DE-USO.md](../../../docs/CASOS-DE-USO.md) CU-42) |
 
 El registro de cuenta (CU-04, `POST /api/auth/register`) se sirve desde el mismo flujo de `/inicio-sesion` (`RegisterForm.tsx` + `AuthSwitch.tsx`), no tiene ruta propia.
 

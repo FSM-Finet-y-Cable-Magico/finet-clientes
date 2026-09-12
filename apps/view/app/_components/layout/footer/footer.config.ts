@@ -1,6 +1,11 @@
 import { WHATSAPP_URL } from '../../../_lib/company';
 
-export type FooterLink = { label: string; href: string; icon?: string };
+export type FooterLink = {
+  label: string;
+  href: string;
+  icon?: string;
+  variant?: 'button';
+};
 export type FooterColumn = { title: string; links: FooterLink[] };
 
 export const footerColumns: FooterColumn[] = [
@@ -17,26 +22,12 @@ export const footerColumns: FooterColumn[] = [
     title: 'Te ayudamos',
     links: [
       { label: 'WhatsApp', href: WHATSAPP_URL, icon: 'whatsapp' },
-      { label: 'Soporte técnico', href: '/soporte' },
-      { label: 'Reportar falla', href: '/reportar' },
-      { label: 'FAQs', href: '/faqs' },
-    ],
-  },
-  {
-    title: 'Hogar',
-    links: [
-      { label: 'Internet hogar', href: '/hogar/internet' },
-      { label: 'TV digital', href: '/hogar/tv' },
-      { label: 'Internet + TV', href: '/hogar/duo' },
-      { label: 'Canales', href: '/tv/canales' },
+      { label: 'Preguntas Frecuentes', href: '/ayuda' },
     ],
   },
   {
     title: 'Empresas',
-    links: [
-      { label: 'Internet empresas', href: '/empresas/internet' },
-      { label: 'Cotizador', href: '/empresas/cotizador' },
-    ],
+    links: [{ label: 'Empresas', href: '/empresas', variant: 'button' }],
   },
 ];
 
