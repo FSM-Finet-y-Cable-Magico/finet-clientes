@@ -15,7 +15,7 @@ export const WIFI_PASSWORD_REGEX = /^\S+$/;
 export const WIFI_PASSWORD_MIN = 8;
 export const WIFI_PASSWORD_MAX = 63;
 
-export const solicitarCambioWifiSchema = z
+export const solicitarCambioContrasenaWifiSchema = z
   .object({
     id_contrato: z.number().int().positive('Selecciona un servicio valido'),
     password: z
@@ -26,4 +26,6 @@ export const solicitarCambioWifiSchema = z
   })
   .strict();
 
-export type SolicitarCambioWifiDto = z.infer<typeof solicitarCambioWifiSchema>;
+export type SolicitarCambioContrasenaWifiDto = z.infer<
+  typeof solicitarCambioContrasenaWifiSchema
+>;

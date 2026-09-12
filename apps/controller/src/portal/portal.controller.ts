@@ -6,8 +6,8 @@ import type { cliente } from '../../generated/prisma/client.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
 import { crearTicketSchema } from './dto/crear-ticket.dto.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
-import { solicitarCambioWifiSchema } from './dto/solicitud-wifi.dto.js';
-import type { SolicitarCambioWifiDto } from './dto/solicitud-wifi.dto.js';
+import { solicitarCambioContrasenaWifiSchema } from './dto/solicitud-contrasena-wifi.dto.js';
+import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
 
 /**
  * Todas las rutas requieren sesión activa (JwtAuthGuard).
@@ -175,7 +175,7 @@ export class PortalController {
   }
 
   /**
-   * CU-31 + CU-32: Solicitar cambio de clave de red inalambrica
+   * CU-31 + CU-32: Solicitar cambio de contrasena de la red WiFi
    *
    * POST /portal/wifi/password
    * Auth: Bearer <token>
@@ -188,8 +188,10 @@ export class PortalController {
    *   - password: 8 a 63 caracteres, sin espacios en blanco. Se permiten
    *     simbolos (decision del equipo, diverge de CU-31/RF-24 escritos —
    *     ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md)
+   *   - se guarda hasheada con bcrypt en `solicitud_contrasena_wifi`: no queda
+   *     en texto plano y no se puede recuperar desde la tabla
    *
-   * Respuesta: SolicitudWifiResponseDto
+   * Respuesta: SolicitudContrasenaWifiResponseDto
    *   - id_solicitud, id_contrato, estado ("pendiente"), fecha_solicitud
    *
    * Errores:
@@ -200,11 +202,14 @@ export class PortalController {
    *   503 - No fue posible registrar la solicitud
    */
   @Post('wifi/password')
-  solicitarCambioWifi(
+  solicitarCambioContrasenaWifi(
     @CurrentClient() cliente: cliente,
-    @Body(new ZodValidationPipe(solicitarCambioWifiSchema))
-    body: SolicitarCambioWifiDto,
+    @Body(new ZodValidationPipe(solicitarCambioContrasenaWifiSchema))
+    body: SolicitarCambioContrasenaWifiDto,
   ) {
-    return this.portalService.solicitarCambioWifi(cliente.id_cliente, body);
+    return this.portalService.solicitarCambioContrasenaWifi(
+      cliente.id_cliente,
+      body,
+    );
   }
 }

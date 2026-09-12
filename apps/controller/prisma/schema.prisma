@@ -75,35 +75,35 @@ model categoria_falla {
 }
 
 model cliente {
-  id_cliente             Int                      @id @default(autoincrement())
-  id_empresa             Int?
-  rut                    String?                  @unique @db.VarChar(12)
-  nombre_completo        String                   @db.VarChar(120)
-  email                  String?                  @db.VarChar(120)
-  telefono               String?                  @db.VarChar(21)
-  password_portal_hash   String?                  @db.VarChar(72)
-  estado                 String                   @db.VarChar(20)
-  es_conflictivo         Boolean?                 @default(false)
-  importado_masivo       Boolean?                 @default(false)
-  fecha_creacion         DateTime?                @default(now()) @db.Timestamp(6)
-  obs_conflictivo        String?
-  empresa                empresa?                 @relation(fields: [id_empresa], references: [id_empresa], onDelete: NoAction, onUpdate: NoAction, map: "fk_cliente_id_empresa")
-  consentimiento_cookies consentimiento_cookies[]
-  contrato               contrato[]
-  conversacion_bot       conversacion_bot[]
-  direccion_servicio     direccion_servicio[]
-  lista_negra            lista_negra[]
-  log_notificacion       log_notificacion[]
-  mensaje_whatsapp       mensaje_whatsapp[]
-  monitoreo_ont          monitoreo_ont[]
-  orden_trabajo          orden_trabajo[]
-  pago                   pago[]
-  prospecto              prospecto?
-  puerto_nap             puerto_nap[]
-  sesion_portal          sesion_portal[]
-  solicitud_wifi         solicitud_wifi[]
-  ticket                 ticket[]
-  unidad_equipo          unidad_equipo[]
+  id_cliente                Int                         @id @default(autoincrement())
+  id_empresa                Int?
+  rut                       String?                     @unique @db.VarChar(12)
+  nombre_completo           String                      @db.VarChar(120)
+  email                     String?                     @db.VarChar(120)
+  telefono                  String?                     @db.VarChar(21)
+  password_portal_hash      String?                     @db.VarChar(72)
+  estado                    String                      @db.VarChar(20)
+  es_conflictivo            Boolean?                    @default(false)
+  importado_masivo          Boolean?                    @default(false)
+  fecha_creacion            DateTime?                   @default(now()) @db.Timestamp(6)
+  obs_conflictivo           String?
+  empresa                   empresa?                    @relation(fields: [id_empresa], references: [id_empresa], onDelete: NoAction, onUpdate: NoAction, map: "fk_cliente_id_empresa")
+  consentimiento_cookies    consentimiento_cookies[]
+  contrato                  contrato[]
+  conversacion_bot          conversacion_bot[]
+  direccion_servicio        direccion_servicio[]
+  lista_negra               lista_negra[]
+  log_notificacion          log_notificacion[]
+  mensaje_whatsapp          mensaje_whatsapp[]
+  monitoreo_ont             monitoreo_ont[]
+  orden_trabajo             orden_trabajo[]
+  pago                      pago[]
+  prospecto                 prospecto?
+  puerto_nap                puerto_nap[]
+  sesion_portal             sesion_portal[]
+  solicitud_contrasena_wifi solicitud_contrasena_wifi[]
+  ticket                    ticket[]
+  unidad_equipo             unidad_equipo[]
 }
 
 model configuracion_seo {
@@ -130,20 +130,20 @@ model consentimiento_cookies {
 }
 
 model contrato {
-  id_contrato       Int                @id @default(autoincrement())
-  id_cliente        Int?
-  id_plan           Int?
-  id_empresa        Int?
-  fecha_inicio      DateTime           @db.Date
-  dia_vencimiento   Int                @db.SmallInt
-  estado            String             @db.VarChar(20)
-  fecha_suspension  DateTime?          @db.Date
-  cliente           cliente?           @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_contrato_id_cliente")
-  empresa           empresa?           @relation(fields: [id_empresa], references: [id_empresa], onDelete: NoAction, onUpdate: NoAction, map: "fk_contrato_id_empresa")
-  plan              plan?              @relation(fields: [id_plan], references: [id_plan], onDelete: NoAction, onUpdate: NoAction, map: "fk_contrato_id_plan")
-  credenciales_tvip credenciales_tvip?
-  factura           factura[]
-  solicitud_wifi    solicitud_wifi[]
+  id_contrato               Int                         @id @default(autoincrement())
+  id_cliente                Int?
+  id_plan                   Int?
+  id_empresa                Int?
+  fecha_inicio              DateTime                    @db.Date
+  dia_vencimiento           Int                         @db.SmallInt
+  estado                    String                      @db.VarChar(20)
+  fecha_suspension          DateTime?                   @db.Date
+  cliente                   cliente?                    @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_contrato_id_cliente")
+  empresa                   empresa?                    @relation(fields: [id_empresa], references: [id_empresa], onDelete: NoAction, onUpdate: NoAction, map: "fk_contrato_id_empresa")
+  plan                      plan?                       @relation(fields: [id_plan], references: [id_plan], onDelete: NoAction, onUpdate: NoAction, map: "fk_contrato_id_plan")
+  credenciales_tvip         credenciales_tvip?
+  factura                   factura[]
+  solicitud_contrasena_wifi solicitud_contrasena_wifi[]
 }
 
 model conversacion_bot {
@@ -595,16 +595,16 @@ model sesion_portal {
   cliente          cliente?  @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_sesion_portal_id_cliente")
 }
 
-model solicitud_wifi {
-  id_solicitud    Int       @id @default(autoincrement())
-  id_contrato     Int
-  id_cliente      Int
-  password_nueva  String    @db.VarChar(63)
-  estado          String    @db.VarChar(20)
-  fecha_solicitud DateTime? @default(now()) @db.Timestamp(6)
-  fecha_procesada DateTime? @db.Timestamp(6)
-  cliente         cliente   @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_wifi_id_cliente")
-  contrato        contrato  @relation(fields: [id_contrato], references: [id_contrato], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_wifi_id_contrato")
+model solicitud_contrasena_wifi {
+  id_solicitud        Int       @id @default(autoincrement())
+  id_contrato         Int
+  id_cliente          Int
+  password_nueva_hash String    @db.VarChar(72)
+  estado              String    @db.VarChar(20)
+  fecha_solicitud     DateTime? @default(now()) @db.Timestamp(6)
+  fecha_procesada     DateTime? @db.Timestamp(6)
+  cliente             cliente   @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_contrasena_wifi_id_cliente")
+  contrato            contrato  @relation(fields: [id_contrato], references: [id_contrato], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_contrasena_wifi_id_contrato")
 }
 
 model stock_consumible {

@@ -3,6 +3,7 @@
 import { useId, useState, useTransition } from "react";
 import { Wifi, CheckCircle2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { changeWifiPassword } from "@/app/portal/_lib/portal-actions";
+import { esContratoActivo } from "@/app/_lib/estado-contrato";
 
 // CU-31, su Excepcion 2 y RF-24 dicen "unicamente alfanumericos". Se decidio
 // permitir simbolos igual (pedido de Dani, confirmado por Emilio) — diverge
@@ -35,7 +36,11 @@ type Props = {
 };
 
 export default function WifiPasswordSection({ contratos }: Props) {
-  const activos = contratos.filter((c) => c.estado === "activo");
+  // `/portal/contratos/vigentes` devuelve el estado canónico de la Tabla 11.15
+  // en MAYÚSCULAS (`ACTIVO`), no el "activo" del formato de presentación:
+  // filtrar por minúsculas dejaba `activos` siempre vacío y el formulario no se
+  // renderizaba nunca.
+  const activos = contratos.filter((c) => esContratoActivo(c.estado));
 
   const selectId = useId();
   const claveId = useId();

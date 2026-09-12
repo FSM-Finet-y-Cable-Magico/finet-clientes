@@ -14,15 +14,25 @@ const mockChange = changeWifiPassword as jest.MockedFunction<
   typeof changeWifiPassword
 >;
 
+// El estado llega como lo devuelve `/portal/contratos/vigentes`: el valor
+// canonico en MAYUSCULAS de la Tabla 11.15 del Documento 0, no el "Activo" del
+// formato de presentacion. Las fixtures en minuscula escondian que el filtro
+// del componente dejaba el formulario sin renderizar nunca.
 const CONTRATO_ACTIVO: ContratoWifi = {
   id_contrato: 1,
-  estado: "activo",
+  estado: "ACTIVO",
   plan: { nombre_comercial: "Fibra 200" },
 };
 const CONTRATO_SUSPENDIDO: ContratoWifi = {
   id_contrato: 2,
-  estado: "suspendido",
+  estado: "SUSPENDIDO",
   plan: { nombre_comercial: "Fibra 400" },
+};
+// Valor heredado que sigue vivo en la base compartida.
+const CONTRATO_ACTIVO_HEREDADO: ContratoWifi = {
+  id_contrato: 3,
+  estado: "activo",
+  plan: { nombre_comercial: "Fibra 600" },
 };
 
 describe("WifiPasswordSection (CU-31 / CU-32)", () => {
@@ -47,6 +57,14 @@ describe("WifiPasswordSection (CU-31 / CU-32)", () => {
     render(<WifiPasswordSection contratos={[CONTRATO_ACTIVO]} />);
 
     expect(screen.queryByLabelText("Servicio")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /solicitar cambio/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("acepta el estado heredado en minuscula que queda en la base", () => {
+    render(<WifiPasswordSection contratos={[CONTRATO_ACTIVO_HEREDADO]} />);
+
     expect(
       screen.getByRole("button", { name: /solicitar cambio/i }),
     ).toBeInTheDocument();

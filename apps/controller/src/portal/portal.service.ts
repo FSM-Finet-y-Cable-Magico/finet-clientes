@@ -8,6 +8,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   ESTADOS_CONTRATO_VIGENTES,
@@ -15,7 +16,7 @@ import {
 } from '../common/constants/contrato.js';
 import { MailService } from '../mail/mail.service.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
-import type { SolicitarCambioWifiDto } from './dto/solicitud-wifi.dto.js';
+import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
 import {
   CategoriaTicketDto,
   ContratoEstadoDto,
@@ -24,7 +25,7 @@ import {
   FacturaPendienteDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
-  SolicitudWifiResponseDto,
+  SolicitudContrasenaWifiResponseDto,
   TicketsResponseDto,
 } from './dto/portal-response.dto.js';
 
@@ -480,18 +481,23 @@ export class PortalService {
     }
   }
 
-  //  CU-31 + CU-32: Solicitud de cambio de clave de red inalambrica
+  //  CU-31 + CU-32: Solicitud de cambio de contrasena de la red WiFi
   //
   //  El portal NO cambia la clave: solo deja registrada la solicitud para que el
-  //  CRM la ejecute contra el equipo del cliente (CU-33). La clave se guarda
-  //  legible a proposito, porque CU-33 exige que quien la aplique vea "la nueva
-  //  clave validada" — hashearla haria ese caso de uso imposible.
+  //  CRM la ejecute contra el equipo del cliente (CU-33).
+  //
+  //  La clave se guarda hasheada con bcrypt, nunca en texto plano (pedido de
+  //  Dani en el review de esta rama). Ojo con la consecuencia: bcrypt no es
+  //  reversible, asi que CU-33 ya no puede leer de la tabla la clave que tiene
+  //  que aplicar en el equipo — queda pendiente definir por donde la recibe
+  //  quien la aplica. Lo que el hash permite es verificar despues que la clave
+  //  aplicada es la que el cliente pidio.
   //
   //  El formato ya viene validado por Zod en el controller (CU-31 / RF-24).
-  async solicitarCambioWifi(
+  async solicitarCambioContrasenaWifi(
     idCliente: number,
-    dto: SolicitarCambioWifiDto,
-  ): Promise<SolicitudWifiResponseDto> {
+    dto: SolicitarCambioContrasenaWifiDto,
+  ): Promise<SolicitudContrasenaWifiResponseDto> {
     // El contrato tiene que ser del cliente autenticado. Si es de otro, se
     // responde 404 igual que si no existiera: no se confirma su existencia.
     const contrato = await this.prisma.contrato.findFirst({
@@ -505,19 +511,34 @@ export class PortalService {
 
     // CU-32 Excepcion 2: el plan no esta activo -> se impide crear la solicitud
     // y se informa la restriccion.
-    if (contrato.estado !== 'activo') {
+    //
+    // El estado se normaliza a la Tabla 11.15 antes de comparar, igual que el
+    // resto del servicio: la base compartida la escriben cuatro equipos y el CRM
+    // guarda 'ACTIVO' en mayusculas, asi que comparar el string crudo contra
+    // 'activo' le respondia 409 a un cliente con el servicio andando.
+    //
+    // REACTIVADO queda fuera a proposito: la tabla 11.15 lo lista como estado
+    // distinto de ACTIVO y CU-32 pide "activo". Si tras CU-50 el CRM lo deja
+    // fijo en vez de volver a ACTIVO, hay que sumarlo aca.
+    if (normalizarEstadoContrato(contrato.estado) !== 'ACTIVO') {
       throw new ConflictException(
         'Solo puedes solicitar el cambio de clave en un servicio activo',
       );
     }
 
     try {
+      // Se hashea recien aca: despues de validar el contrato, para no gastar el
+      // cost de bcrypt en requests que terminan en 404/409, y antes de abrir la
+      // transaccion, para no tenerla esperando el hash. Cost 10, el mismo que
+      // usan auth y perfil.
+      const passwordNuevaHash = await bcrypt.hash(dto.password, 10);
+
       const solicitud = await this.prisma.$transaction(async (tx) => {
-        const creada = await tx.solicitud_wifi.create({
+        const creada = await tx.solicitud_contrasena_wifi.create({
           data: {
             id_contrato: contrato.id_contrato,
             id_cliente: idCliente,
-            password_nueva: dto.password,
+            password_nueva_hash: passwordNuevaHash,
             estado: 'pendiente',
           },
           select: {
@@ -528,12 +549,12 @@ export class PortalService {
           },
         });
 
-        // La clave nueva no se registra en la auditoria: quedaria expuesta en
-        // un log que lee mucha mas gente que la solicitud misma.
+        // La clave nueva no se registra en la auditoria, ni hasheada: el log lo
+        // lee mucha mas gente que la solicitud misma y no lo necesita.
         await tx.log_auditoria.create({
           data: {
-            accion: 'SOLICITAR_CAMBIO_WIFI_PORTAL',
-            entidad_afectada: 'solicitud_wifi',
+            accion: 'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+            entidad_afectada: 'solicitud_contrasena_wifi',
             id_entidad_afectada: creada.id_solicitud,
             valor_nuevo: {
               id_contrato: creada.id_contrato,
@@ -555,7 +576,7 @@ export class PortalService {
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.logger.error(
-        `No se pudo registrar la solicitud de cambio de clave WiFi del cliente ${idCliente}`,
+        `No se pudo registrar la solicitud de cambio de contrasena WiFi del cliente ${idCliente}`,
         error,
       );
       throw new ServiceUnavailableException(

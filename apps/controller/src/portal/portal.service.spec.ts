@@ -1,4 +1,5 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
+import * as bcrypt from 'bcrypt';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
@@ -51,7 +52,7 @@ describe('PortalService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
-      solicitud_wifi: { create: jest.fn() },
+      solicitud_contrasena_wifi: { create: jest.fn() },
       log_auditoria: { create: jest.fn() },
       log_notificacion: { create: jest.fn() },
       $transaction: jest.fn(),
@@ -463,8 +464,8 @@ describe('PortalService', () => {
     });
   });
 
-  // CU-31 + CU-32: Solicitud de cambio de clave de red inalambrica.
-  describe('solicitarCambioWifi', () => {
+  // CU-31 + CU-32: Solicitud de cambio de contrasena de la red WiFi.
+  describe('solicitarCambioContrasenaWifi', () => {
     const DTO = { id_contrato: 1, password: 'MiRedNueva2026' };
 
     it('registra la solicitud como pendiente cuando el contrato esta activo', async () => {
@@ -472,7 +473,7 @@ describe('PortalService', () => {
         id_contrato: 1,
         estado: 'activo',
       });
-      (prisma.solicitud_wifi.create as jest.Mock).mockResolvedValue({
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
         estado: 'pendiente',
@@ -480,7 +481,7 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      const resultado = await service.solicitarCambioWifi(1, DTO);
+      const resultado = await service.solicitarCambioContrasenaWifi(1, DTO);
 
       expect(resultado).toEqual({
         id_solicitud: 7,
@@ -490,12 +491,13 @@ describe('PortalService', () => {
       });
     });
 
-    it('guarda la clave legible: CU-33 exige que quien la aplique pueda verla', async () => {
+    // Pedido de Dani en el review: la clave se guarda hasheada, no legible.
+    it('guarda la clave hasheada con bcrypt y no en texto plano', async () => {
       (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
         id_contrato: 1,
         estado: 'activo',
       });
-      (prisma.solicitud_wifi.create as jest.Mock).mockResolvedValue({
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
         estado: 'pendiente',
@@ -503,16 +505,21 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await service.solicitarCambioWifi(1, DTO);
+      await service.solicitarCambioContrasenaWifi(1, DTO);
 
-      expect(prisma.solicitud_wifi.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            password_nueva: 'MiRedNueva2026',
-            estado: 'pendiente',
-          }),
-        }),
-      );
+      const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
+        .mock.calls[0][0] as {
+        data: { password_nueva_hash: string; estado: string };
+      };
+
+      expect(data.estado).toBe('pendiente');
+      expect(data.password_nueva_hash).not.toBe(DTO.password);
+      expect(data.password_nueva_hash).toMatch(/^\$2[aby]\$/);
+      // El hash tiene que corresponder a la clave que pidio el cliente: es lo
+      // unico que le queda a CU-33 para verificar lo que aplica en el equipo.
+      await expect(
+        bcrypt.compare(DTO.password, data.password_nueva_hash),
+      ).resolves.toBe(true);
     });
 
     it('no deja la clave nueva en el log de auditoria', async () => {
@@ -520,7 +527,7 @@ describe('PortalService', () => {
         id_contrato: 1,
         estado: 'activo',
       });
-      (prisma.solicitud_wifi.create as jest.Mock).mockResolvedValue({
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
         estado: 'pendiente',
@@ -528,39 +535,64 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await service.solicitarCambioWifi(1, DTO);
+      await service.solicitarCambioContrasenaWifi(1, DTO);
 
       const llamada = (prisma.log_auditoria.create as jest.Mock).mock
         .calls[0][0] as { data: { accion: string; valor_nuevo: unknown } };
-      expect(llamada.data.accion).toBe('SOLICITAR_CAMBIO_WIFI_PORTAL');
+      expect(llamada.data.accion).toBe(
+        'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+      );
       expect(JSON.stringify(llamada.data.valor_nuevo)).not.toContain(
         DTO.password,
       );
     });
 
+    // Comentario de Dani en el review sobre el estandar de estados: el resto
+    // del servicio normaliza contra la Tabla 11.15 y esta validacion comparaba
+    // el string crudo. Con 'ACTIVO' (lo que escribe el CRM) daba 409.
+    it('acepta el estado canonico ACTIVO de la Tabla 11.15', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'ACTIVO',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'pendiente',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      expect(prisma.solicitud_contrasena_wifi.create).toHaveBeenCalled();
+    });
+
     it('responde 404 si el contrato no es del cliente autenticado', async () => {
       (prisma.contrato.findFirst as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.solicitarCambioWifi(1, DTO)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(prisma.solicitud_wifi.create).not.toHaveBeenCalled();
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
     });
 
     // CU-32 Excepcion 2: el plan no esta activo.
     it('impide crear la solicitud si el contrato no esta activo', async () => {
       (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
         id_contrato: 1,
-        estado: 'suspendido',
+        estado: 'SUSPENDIDO',
       });
 
-      await expect(service.solicitarCambioWifi(1, DTO)).rejects.toThrow(
-        ConflictException,
-      );
-      await expect(service.solicitarCambioWifi(1, DTO)).rejects.toThrow(
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(ConflictException);
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(
         'Solo puedes solicitar el cambio de clave en un servicio activo',
       );
-      expect(prisma.solicitud_wifi.create).not.toHaveBeenCalled();
+      expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
     });
 
     it('devuelve 503 si falla la persistencia', async () => {
@@ -568,13 +600,13 @@ describe('PortalService', () => {
         id_contrato: 1,
         estado: 'activo',
       });
-      (prisma.solicitud_wifi.create as jest.Mock).mockRejectedValue(
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockRejectedValue(
         new Error('db caida'),
       );
 
-      await expect(service.solicitarCambioWifi(1, DTO)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(ServiceUnavailableException);
     });
   });
 });

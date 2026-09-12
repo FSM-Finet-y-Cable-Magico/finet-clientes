@@ -42,7 +42,7 @@ describe('PortalController', () => {
         .fn()
         .mockResolvedValue({ total: 0, tiene_tickets: false, tickets: [] }),
       getCategoriasTicket: jest.fn().mockResolvedValue([]),
-      solicitarCambioWifi: jest.fn().mockResolvedValue({
+      solicitarCambioContrasenaWifi: jest.fn().mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
         estado: 'pendiente',
@@ -112,12 +112,12 @@ describe('PortalController', () => {
   it('POST /portal/wifi/password registra la solicitud del cliente autenticado', async () => {
     const body = { id_contrato: 1, password: 'MiRedNueva2026' };
 
-    const respuesta = await controller.solicitarCambioWifi(
+    const respuesta = await controller.solicitarCambioContrasenaWifi(
       CLIENTE_MOCK as any,
       body,
     );
 
-    expect(service.solicitarCambioWifi).toHaveBeenCalledWith(1, body);
+    expect(service.solicitarCambioContrasenaWifi).toHaveBeenCalledWith(1, body);
     expect(respuesta).toEqual(
       expect.objectContaining({ estado: 'pendiente', id_solicitud: 7 }),
     );
