@@ -409,7 +409,10 @@ export class PortalService {
     limite?: number,
   ): Promise<TicketsResponseDto> {
     const tickets = await this.prisma.ticket.findMany({
-      where: { id_cliente: idCliente },
+      // Los resueltos no le sirven al cliente en su panel de soporte activo:
+      // se excluyen aca para no traerlos de la base ni tener que filtrarlos
+      // despues en memoria.
+      where: { id_cliente: idCliente, estado: { not: 'resuelto' } },
       include: {
         categoria_falla: { select: { nombre: true } },
       },
