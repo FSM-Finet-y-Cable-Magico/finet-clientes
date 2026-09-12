@@ -104,7 +104,13 @@ function CapaCalor({ puntos }: { puntos: PuntoCobertura[] }) {
      * ejecuta `_reset` con el tamano ya actualizado, sin depender de que algun
      * evento intermedio se dispare.
      */
-    const observador = new ResizeObserver(() => {
+    const observador = new ResizeObserver(([entrada]) => {
+      // El contenedor pasa por 0x0 al desmontarse (y en algun paso intermedio
+      // de layout). Redibujar ahi hace que leaflet.heat cree un canvas sin
+      // ancho y `getImageData` explote al pedir su gradiente.
+      const { width, height } = entrada.contentRect;
+      if (width === 0 || height === 0) return;
+
       map.invalidateSize();
       if (!map.hasLayer(capa)) return;
       capa.remove();
@@ -181,8 +187,13 @@ export default function MapaCobertura({ config, puntos }: MapaCoberturaProps) {
     // El marco es lo que se ve; el mapa de adentro lo desborda por
     // `DESBORDE` en los cuatro lados y este `overflow-hidden` lo recorta.
     // Ver `.mapa-con-desborde` en globals.css para el porque.
+    //
+    // `isolate` abre un stacking context propio: sin el, los z-index
+    // internos de Leaflet (1000 en controles, `.leaflet-top`/`.leaflet-bottom`)
+    // compiten directo contra el header (z-50) en el contexto raiz y ganan,
+    // asi que el mapa tapaba el header sticky al hacer scroll.
     <div
-      className="mapa-con-desborde relative h-[60vh] min-h-[380px] w-full overflow-hidden rounded-2xl border border-border"
+      className="mapa-con-desborde relative isolate h-[60vh] min-h-[380px] w-full overflow-hidden rounded-2xl border border-border"
       style={{ "--desborde-mapa": `${DESBORDE}px` } as CSSProperties}
     >
       <MapContainer
