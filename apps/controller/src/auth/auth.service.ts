@@ -170,7 +170,7 @@ export class AuthService {
       throw new UnauthorizedException('RUT o contraseña incorrectos');
     }
 
-    if (cliente.estado !== 'activo') {
+    if (cliente.estado.trim().toLowerCase() !== 'activo') {
       this.logger.warn(
         `Login rejected: RUT ${rutLimpio} estado=${cliente.estado}, IP ${ip}`,
       );
