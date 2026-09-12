@@ -1,4 +1,5 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { DiagnosticoService } from './diagnostico.service.js';
 
 /**
@@ -21,9 +22,17 @@ export class DiagnosticoController {
    * Los servidores son los mismos para todos los clientes —los elige Netflix
    * segun la IP del servidor— asi que se cachean; el `max-age` acompana ese
    * mismo criterio.
+   *
+   * Sin `@SkipThrottle`, el limite global (10/min) se agotaba con un par de
+   * recargas de pagina o clicks en "Medir de nuevo" y el cliente veia
+   * "la herramienta de medicion no esta disponible" con fast.com sano: el
+   * servicio ya cachea la respuesta real (arriba, ~1h) y esta misma
+   * `Cache-Control` la cachea tambien en el navegador, asi que no hay nada
+   * que este limite protegiera.
    */
   @Get('servidores')
   @Header('Cache-Control', 'public, max-age=300')
+  @SkipThrottle()
   getServidores() {
     return this.diagnosticoService.getServidores();
   }
