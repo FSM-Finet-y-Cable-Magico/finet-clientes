@@ -85,13 +85,13 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 | 8 | CU-46 | Incorporando abonos de recaudación externa al saldo del cliente | Núcleo de pago | ⏳ Pendiente |
 | 9 | CU-52 | Generando comprobante de pago en formato PDF | Núcleo de pago | ⏳ Pendiente — schema listo: `pago.comprobante_pdf_url` ya existe |
 | 10 | CU-53 | Enviando comprobante de pago al correo del cliente | Núcleo de pago | ⏳ Pendiente — reutilizable: `MailService`/Nodemailer ya existe (`apps/controller/src/mail/`) |
-| 11 | CU-48 | Suspendiendo servicio por morosidad mediante SmartOLT | SmartOLT | ⏳ Pendiente — sin integración SmartOLT en el código |
+| 11 | CU-48 | Suspendiendo servicio por morosidad mediante SmartOLT | SmartOLT | ⏳ Pendiente — sin integración SmartOLT en el código. **Derivado**: la detección de morosidad es de G8 y la ejecución en SmartOLT es de **G3** (acuerdo del 12-09-2026) |
 | 12 | CU-49 | Aplicando recargo de reconexión al saldo del cliente suspendido | SmartOLT | ⏳ Pendiente |
 | 13 | CU-50 | Reactivando servicio de cliente suspendido tras pago total | SmartOLT | ⏳ Pendiente |
-| 14 | CU-51 | Registrando bitácora de eventos de suspensión y reactivación | SmartOLT | ⏳ Pendiente — podría reutilizar `log_auditoria` en vez de un modelo nuevo |
+| 14 | CU-51 | Registrando bitácora de eventos de suspensión y reactivación | SmartOLT | ⏳ Pendiente — podría reutilizar `log_auditoria` en vez de un modelo nuevo. Como CU-49 y CU-50, queda del lado de quien opera SmartOLT (**G3**) |
 | 15 | CU-31 | Validando formato de nueva clave de red inalámbrica | Autogestión | ✅ — valida formato en `WifiPasswordSection.tsx` y en el backend con Zod (`dto/solicitud-contrasena-wifi.dto.ts`). **Diverge del RF-24 escrito**: se permiten símbolos, solo se rechazan espacios en blanco (decisión de equipo, pendiente de reflejar en el Documento 0) |
 | 16 | CU-32 | Solicitando cambio de contraseña de red inalámbrica | Autogestión | ✅ — `POST /portal/wifi/password` registra la solicitud en la tabla `solicitud_contrasena_wifi` (estado `PENDIENTE`, en mayúsculas por el §11.15) y la muestra en `/portal/servicios`. La clave nunca se guarda en texto plano: va **cifrada con la llave pública RSA del CRM** (`password_nueva_cifrada`, la vía por la que CU-33 la obtiene; el CRM la borra al aplicarla). El portal **no** cambia la clave: la ejecución es CU-33 y corre por cuenta del CRM |
-| 17 | CU-33 | Ejecutando cambio de clave WiFi solicitado por el cliente | Autogestión | ⏳ Pendiente — la ejecución real contra el equipo del cliente (ONT/router) no está implementada, corre por cuenta de G8 (su CU-40, vía Smart OLT). **Cómo obtienen la clave**: descifran `solicitud_contrasena_wifi.password_nueva_cifrada` con su llave privada RSA (nosotros ciframos con la pública, `CRM_PUBLIC_KEY`), y al marcar `APLICADA` dejan esa columna en `NULL` — con eso la fila deja de guardar cualquier secreto. Si la columna cifrada llega en `NULL` es que faltaba la llave: hay que pedirle la clave al cliente |
+| 17 | CU-33 | Ejecutando cambio de clave WiFi solicitado por el cliente | Autogestión | ⏳ Pendiente — la ejecución real contra el equipo del cliente (ONT/router) no está implementada y no es nuestra. **Quién la hace**: según el acuerdo de integración de G8 del 12-09-2026, **G8 valida comercialmente y G3 ejecuta técnicamente** (SmartOLT es de G3, ver la nota de reparto más abajo). Antes teníamos anotado que la aplicaba G8 vía Smart OLT; ese documento lo corrige. **Cómo obtienen la clave**: descifran `solicitud_contrasena_wifi.password_nueva_cifrada` con la llave privada RSA (nosotros ciframos con la pública, `CRM_PUBLIC_KEY`), y al marcar `APLICADA` dejan esa columna en `NULL` — con eso la fila deja de guardar cualquier secreto. Si la columna cifrada llega en `NULL` es que faltaba la llave: hay que pedirle la clave al cliente. **Abierto**: de quién es la llave privada, de G8 o de G3 — lo tienen que definir entre ellos |
 | 18 | CU-34 | Iniciando prueba de velocidad de red con herramienta Ookla | Diagnóstico | 🚧 Parcial — widget de Speedtest.net embebido (`OoklaSpeedTest.tsx`), sin backend propio ni persistencia de resultados |
 | 19 | CU-36 | Ejecutando evaluación de red para diagnóstico técnico | Diagnóstico | ⏳ Pendiente — alcance a confirmar con el equipo (no hay evidencia de un flujo propio más allá del widget de Ookla) |
 | 20 | CU-35 | Visualizando resultados de la evaluación de red | Diagnóstico | 🚧 Parcial — el widget de Ookla muestra resultados inline, pero no hay componente propio ni persistencia |
@@ -108,6 +108,23 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 > **Reparto con el Grupo 8.** El documento `CU_Grupo2_Equivalencias_Grupo8_Incremento2.pdf`
 > cerró el alcance de este incremento: 7 CU son 100% nuestros, 5 se trabajan en conjunto con G8
 > (CU-31/32, CU-52/53 y CU-71) y 17 se derivan enteros a G8.
+>
+> **Confirmado y corregido por el acuerdo de G8 del 12-09-2026** (`acuerdo-integracion-g2-portal-crm.md`,
+> §1 "Responsabilidad definitiva propuesta"). Dos cosas que ese documento deja por escrito y
+> valen independientemente de cómo se resuelva el resto de la integración, porque son reparto
+> de dominio y no mecanismo:
+>
+> - **G8 se declara dueño** de contratación comercial, contratos, planes, tickets CRM, deuda,
+>   pagos, morosidad, comprobantes y estados comerciales. Eso **confirma por escrito** la
+>   derivación de los CU de deuda y pago que teníamos anotados sin respuesta suya: CU-44,
+>   CU-45, CU-46, CU-47, CU-54, CU-55, CU-56 y CU-80, más la generación del comprobante (CU-52).
+> - **G3 se declara dueño** de órdenes de trabajo, ejecución en terreno, **SmartOLT** y el
+>   **cambio WiFi técnico**. Esto corrige lo que teníamos: el bloque SmartOLT (CU-48 a CU-51)
+>   y la ejecución de CU-33 **no son de G8**, son de G3.
+>
+> Lo que sigue abierto es el mecanismo (si las integraciones van por la base compartida o por
+> API). Nuestra respuesta a ese acuerdo, con la contrapropuesta y las 10 preguntas respondidas
+> una por una, está en `CAMBIOS-BD-Y-SOLICITUDES.md`, enviado a G8 el 12-09-2026.
 
 > **Datos del bloque Mapa:** la capa de calor se genera desde el KML de planta externa que
 > entrega Finet (NAPs, MUFAs y trazado de fibra de la red FTTH) y vive como archivo estático
