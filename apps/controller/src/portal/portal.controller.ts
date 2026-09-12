@@ -192,7 +192,7 @@ export class PortalController {
    *     en texto plano y no se puede recuperar desde la tabla
    *
    * Respuesta: SolicitudContrasenaWifiResponseDto
-   *   - id_solicitud, id_contrato, estado ("pendiente"), fecha_solicitud
+   *   - id_solicitud, id_contrato, estado ("PENDIENTE"), fecha_solicitud
    *
    * Errores:
    *   400 - La clave no cumple el formato (CU-32 Excepcion 3)

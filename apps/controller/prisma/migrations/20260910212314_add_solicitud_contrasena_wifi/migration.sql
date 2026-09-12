@@ -7,8 +7,14 @@
 --
 -- El portal solo REGISTRA la solicitud; la ejecucion contra el equipo del
 -- cliente corre por cuenta del CRM (CU-33). `estado` permite que CU-33
--- Excepcion 2 deje la solicitud como 'pendiente' cuando falla al aplicarla
+-- Excepcion 2 deje la solicitud como 'PENDIENTE' cuando falla al aplicarla
 -- en el equipo.
+--
+-- Catalogo de `estado`: PENDIENTE | APLICADA | FALLIDA, en MAYUSCULAS por la
+-- convencion del §11.15 del Documento 0 (ahi todo catalogo cerrado va asi:
+-- ACTIVO, ABIERTO, MEDIA...). El portal solo escribe PENDIENTE; las otras dos
+-- las escribe el CRM al ejecutar CU-33. Falta agregar esta fila al §11.15:
+-- queda pedido en CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md.
 --
 -- `password_nueva_hash` guarda hash bcrypt (cost 10), nunca texto plano
 -- (pedido de Dani en el mismo review). VARCHAR(72) igual que

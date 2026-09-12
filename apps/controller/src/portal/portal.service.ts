@@ -539,7 +539,9 @@ export class PortalService {
             id_contrato: contrato.id_contrato,
             id_cliente: idCliente,
             password_nueva_hash: passwordNuevaHash,
-            estado: 'pendiente',
+            // MAYUSCULAS por la convencion del §11.15 del Documento 0: todo
+            // catalogo cerrado se guarda asi (ACTIVO, ABIERTO, MEDIA...).
+            estado: 'PENDIENTE',
           },
           select: {
             id_solicitud: true,

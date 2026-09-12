@@ -468,7 +468,7 @@ describe('PortalService', () => {
   describe('solicitarCambioContrasenaWifi', () => {
     const DTO = { id_contrato: 1, password: 'MiRedNueva2026' };
 
-    it('registra la solicitud como pendiente cuando el contrato esta activo', async () => {
+    it('registra la solicitud como PENDIENTE cuando el contrato esta activo', async () => {
       (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
         id_contrato: 1,
         estado: 'activo',
@@ -476,7 +476,7 @@ describe('PortalService', () => {
       (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE,
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
@@ -486,7 +486,7 @@ describe('PortalService', () => {
       expect(resultado).toEqual({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE.toISOString(),
       });
     });
@@ -500,7 +500,7 @@ describe('PortalService', () => {
       (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE,
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
@@ -512,7 +512,7 @@ describe('PortalService', () => {
         data: { password_nueva_hash: string; estado: string };
       };
 
-      expect(data.estado).toBe('pendiente');
+      expect(data.estado).toBe('PENDIENTE');
       expect(data.password_nueva_hash).not.toBe(DTO.password);
       expect(data.password_nueva_hash).toMatch(/^\$2[aby]\$/);
       // El hash tiene que corresponder a la clave que pidio el cliente: es lo
@@ -530,7 +530,7 @@ describe('PortalService', () => {
       (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE,
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
@@ -558,7 +558,7 @@ describe('PortalService', () => {
       (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
         id_solicitud: 7,
         id_contrato: 1,
-        estado: 'pendiente',
+        estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE,
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
