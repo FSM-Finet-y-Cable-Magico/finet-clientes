@@ -599,7 +599,6 @@ model solicitud_contrasena_wifi {
   id_solicitud           Int       @id @default(autoincrement())
   id_contrato            Int
   id_cliente             Int
-  password_nueva_hash    String    @db.VarChar(72)
   password_nueva_cifrada String?   @db.Text
   estado                 String    @db.VarChar(20)
   fecha_solicitud        DateTime? @default(now()) @db.Timestamp(6)

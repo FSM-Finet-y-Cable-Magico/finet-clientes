@@ -1,5 +1,4 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
-import * as bcrypt from 'bcrypt';
 import { constants, generateKeyPairSync, privateDecrypt } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -523,8 +522,8 @@ describe('PortalService', () => {
       });
     });
 
-    // Pedido de Dani en el review: la clave se guarda hasheada, no legible.
-    it('guarda la clave hasheada con bcrypt y no en texto plano', async () => {
+    // Pedido de Dani en el review: la clave nunca en texto plano.
+    it('no escribe la clave legible en ningun campo de la fila', async () => {
       (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
         id_contrato: 1,
         estado: 'activo',
@@ -540,20 +539,10 @@ describe('PortalService', () => {
       await service.solicitarCambioContrasenaWifi(1, DTO);
 
       const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
-        .mock.calls[0][0] as {
-        data: { password_nueva_hash: string; estado: string };
-      };
+        .mock.calls[0][0] as { data: Record<string, unknown> };
 
       expect(data.estado).toBe('PENDIENTE');
-      expect(data.password_nueva_hash).not.toBe(DTO.password);
-      // ninguna de las dos columnas guarda la clave legible
       expect(JSON.stringify(data)).not.toContain(DTO.password);
-      expect(data.password_nueva_hash).toMatch(/^\$2[aby]\$/);
-      // El hash tiene que corresponder a la clave que pidio el cliente: es lo
-      // unico que le queda a CU-33 para verificar lo que aplica en el equipo.
-      await expect(
-        bcrypt.compare(DTO.password, data.password_nueva_hash),
-      ).resolves.toBe(true);
     });
 
     it('no deja la clave nueva en el log de auditoria', async () => {
@@ -629,16 +618,14 @@ describe('PortalService', () => {
 
       const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
         .mock.calls[0][0] as {
-        data: {
-          password_nueva_cifrada: string | null;
-          password_nueva_hash: string;
-        };
+        data: { password_nueva_cifrada: string | null };
       };
 
+      // La solicitud queda registrada igual y sin la clave: el CRM la
+      // reconoce por el NULL y se la pide al cliente.
       expect(resultado.estado).toBe('PENDIENTE');
       expect(data.password_nueva_cifrada).toBeNull();
-      // el hash se guarda igual: el registro para verificar no se pierde
-      expect(data.password_nueva_hash).toMatch(/^\$2[aby]\$/);
+      expect(JSON.stringify(data)).not.toContain(DTO.password);
     });
 
     // Comentario de Dani en el review sobre el estandar de estados: el resto

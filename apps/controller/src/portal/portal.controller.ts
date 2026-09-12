@@ -188,8 +188,9 @@ export class PortalController {
    *   - password: 8 a 63 caracteres, sin espacios en blanco. Se permiten
    *     simbolos (decision del equipo, diverge de CU-31/RF-24 escritos —
    *     ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md)
-   *   - se guarda hasheada con bcrypt en `solicitud_contrasena_wifi`: no queda
-   *     en texto plano y no se puede recuperar desde la tabla
+   *   - se guarda cifrada con la llave publica del CRM en
+   *     `solicitud_contrasena_wifi.password_nueva_cifrada`: no queda en texto
+   *     plano y solo el CRM puede leerla (la necesita para aplicarla)
    *
    * Respuesta: SolicitudContrasenaWifiResponseDto
    *   - id_solicitud, id_contrato, estado ("PENDIENTE"), fecha_solicitud

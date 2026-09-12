@@ -8,7 +8,6 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { constants, publicEncrypt } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -489,19 +488,17 @@ export class PortalService {
   //  El portal NO cambia la clave: solo deja registrada la solicitud para que el
   //  CRM la ejecute contra el equipo del cliente (CU-33).
   //
-  //  La clave se guarda de dos formas y ninguna es texto plano:
+  //  La clave NO se guarda en texto plano: va en `password_nueva_cifrada`,
+  //  cifrada con la llave publica del CRM. Solo Grupo 8 tiene la privada, asi
+  //  que en nuestra base no hay nada legible, y ellos la descifran para
+  //  escribirla en el equipo (el router la necesita en claro: la usa para
+  //  derivar la PSK de WPA2). La borran al marcar la solicitud APLICADA, y ahi
+  //  la fila deja de tener cualquier secreto.
   //
-  //    password_nueva_hash     bcrypt. Queda para siempre y sirve para
-  //                            verificar despues que la clave aplicada es la
-  //                            que el cliente pidio. No se puede revertir.
-  //
-  //    password_nueva_cifrada  cifrada con la llave publica del CRM. Es la via
-  //                            por la que CU-33 obtiene la clave para
-  //                            escribirla en el equipo: el router necesita la
-  //                            clave en claro para derivar la PSK de WPA2, y
-  //                            un hash no le sirve. Solo Grupo 8 tiene la
-  //                            privada, asi que en nuestra base no hay nada
-  //                            legible. Ellos la borran al marcar APLICADA.
+  //  Se descarto guardar tambien un hash bcrypt: solo habria servido para
+  //  "verificar" algo que ningun CU pide, y un hash de una clave WiFi corta se
+  //  saca por diccionario, asi que era un secreto extra guardado para siempre
+  //  a cambio de nada.
   //
   //  El formato ya viene validado por Zod en el controller (CU-31 / RF-24).
   async solicitarCambioContrasenaWifi(
@@ -537,11 +534,8 @@ export class PortalService {
     }
 
     try {
-      // Se hashea y se cifra recien aca: despues de validar el contrato, para
-      // no gastar el cost de bcrypt en requests que terminan en 404/409, y
-      // antes de abrir la transaccion, para no tenerla esperando el hash.
-      // Cost 10, el mismo que usan auth y perfil.
-      const passwordNuevaHash = await bcrypt.hash(dto.password, 10);
+      // Se cifra recien aca, despues de validar el contrato: no tiene sentido
+      // gastar el cifrado en un request que va a terminar en 404 o 409.
       const passwordNuevaCifrada = this.cifrarClaveParaCrm(dto.password);
 
       const solicitud = await this.prisma.$transaction(async (tx) => {
@@ -549,7 +543,6 @@ export class PortalService {
           data: {
             id_contrato: contrato.id_contrato,
             id_cliente: idCliente,
-            password_nueva_hash: passwordNuevaHash,
             password_nueva_cifrada: passwordNuevaCifrada,
             // MAYUSCULAS por la convencion del §11.15 del Documento 0: todo
             // catalogo cerrado se guarda asi (ACTIVO, ABIERTO, MEDIA...).
