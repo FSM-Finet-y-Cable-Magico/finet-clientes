@@ -1,10 +1,10 @@
-import NavLogo from './NavLogo';
-import NavbarAuthArea from './NavbarAuthArea';
-import ThemeToggle from './ThemeToggle';
-import MobileMenu from './MobileMenu';
-import DesktopNavItem from './DesktopNavItem';
-import AudienceSwitch from './AudienceSwitch';
-import { navItems, audienceSwitch } from './nav.config';
+import NavLogo from "./NavLogo";
+import NavbarAuthArea from "./NavbarAuthArea";
+import ThemeToggle from "./ThemeToggle";
+import MobileMenu from "./MobileMenu";
+import DesktopNavItem from "./DesktopNavItem";
+import AudienceSwitch from "./AudienceSwitch";
+import { navItems, audienceSwitch } from "./nav.config";
 
 export default function Navbar() {
   return (

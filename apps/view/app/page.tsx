@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { Hero } from "./_components/layout/hero/Hero";
 import PlanCard from "./_components/catalog/PlanCard";
 import PrimaryButton from "./_components/ui/PrimaryButton";
@@ -58,8 +59,11 @@ const comunas = [
 export default async function HomePage() {
   const planes = await getLandingPlanes();
 
-  const sorted = [...planes].sort((a, b) => a.precio_mensual - b.precio_mensual);
-  const featuredId = sorted.length >= 2 ? sorted[Math.floor(sorted.length / 2)].id_plan : null;
+  const sorted = [...planes].sort(
+    (a, b) => a.precio_mensual - b.precio_mensual,
+  );
+  const featuredId =
+    sorted.length >= 2 ? sorted[Math.floor(sorted.length / 2)].id_plan : null;
 
   return (
     <>
@@ -67,10 +71,16 @@ export default async function HomePage() {
       <Hero />
 
       {/* ==================== BENEFICIOS ==================== */}
-      <section aria-labelledby="beneficios-heading" className="px-4 py-20 bg-surface">
+      <section
+        aria-labelledby="beneficios-heading"
+        className="px-4 py-20 bg-surface"
+      >
         <div className="mx-auto max-w-7xl">
           <div className="text-center mb-12">
-            <h2 id="beneficios-heading" className="text-3xl font-bold text-foreground">
+            <h2
+              id="beneficios-heading"
+              className="text-3xl font-bold text-foreground"
+            >
               Por que elegir Finet
             </h2>
             <p className="text-muted mt-3 max-w-xl mx-auto">
@@ -84,9 +94,7 @@ export default async function HomePage() {
                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 text-primary mb-4">
                   <b.icon size={28} strokeWidth={1.5} />
                 </div>
-                <h3 className="font-semibold text-foreground">
-                  {b.title}
-                </h3>
+                <h3 className="font-semibold text-foreground">{b.title}</h3>
                 <p className="text-sm text-muted mt-2">{b.desc}</p>
               </div>
             ))}
@@ -98,7 +106,10 @@ export default async function HomePage() {
       <section aria-labelledby="planes-heading" className="px-4 py-20">
         <div className="mx-auto max-w-7xl">
           <div className="text-center mb-12">
-            <h2 id="planes-heading" className="text-3xl font-bold text-foreground">
+            <h2
+              id="planes-heading"
+              className="text-3xl font-bold text-foreground"
+            >
               Planes de Internet
             </h2>
             <p className="text-muted mt-3 max-w-xl mx-auto">
@@ -130,13 +141,35 @@ export default async function HomePage() {
       </section>
 
       {/* ==================== COBERTURA ==================== */}
-      <section aria-labelledby="cobertura-heading" className="px-4 py-20 bg-surface">
-        <div className="mx-auto max-w-7xl">
+      <section
+        aria-labelledby="cobertura-heading"
+        className="relative px-4 py-20 bg-surface overflow-hidden"
+      >
+        <Image
+          src="/home/cobertura.webp"
+          // Decorativa: el titulo y las comunas listadas ya dicen todo lo
+          // que la foto aporta.
+          alt=""
+          fill
+          loading="lazy"
+          sizes="100vw"
+          className="object-cover"
+        />
+        {/* Scrim claro: mantiene legible el texto oscuro que ya usa esta
+            seccion sin tener que rehacer sus colores para fondo oscuro. */}
+        <div
+          className="absolute inset-0 bg-surface/60 backdrop-blur-xs"
+          aria-hidden
+        />
+        <div className="relative z-10 mx-auto max-w-7xl">
           <div className="text-center mb-12">
-            <h2 id="cobertura-heading" className="text-3xl font-bold text-foreground">
+            <h2
+              id="cobertura-heading"
+              className="text-3xl font-bold text-foreground"
+            >
               Zona de cobertura
             </h2>
-            <p className="text-muted mt-3 max-w-xl mx-auto">
+            <p className="opacity-60 mt-3 max-w-xl mx-auto">
               Estamos presentes en las siguientes comunas del sur de Santiago.
               Consulta disponibilidad en tu direccion.
             </p>
@@ -147,13 +180,8 @@ export default async function HomePage() {
                 key={comuna}
                 className="flex items-center gap-3 border border-border rounded-xl p-4 bg-background"
               >
-                <MapPin
-                  size={20}
-                  className="shrink-0 text-primary"
-                />
-                <span className="font-medium text-foreground">
-                  {comuna}
-                </span>
+                <MapPin size={20} className="shrink-0 text-primary" />
+                <span className="font-medium text-foreground">{comuna}</span>
               </div>
             ))}
           </div>
@@ -173,8 +201,8 @@ export default async function HomePage() {
             Listo para conectarte?
           </h2>
           <p className="text-muted mt-3">
-            Elige tu plan y solicita la instalacion hoy. Te contactamos en
-            menos de 24 horas.
+            Elige tu plan y solicita la instalacion hoy. Te contactamos en menos
+            de 24 horas.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <PrimaryButton href="/planes" variant="solid">
