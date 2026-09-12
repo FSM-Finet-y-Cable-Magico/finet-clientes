@@ -72,7 +72,9 @@ export class ContratacionesService {
               id_cliente: cliente.id_cliente,
               id_plan: dto.id_plan,
               id_empresa: 1,
-              estado: 'en_tramite',
+              // Tabla 11.15 del Documento 0: el contrato nace en PENDIENTE.
+              // Antes se escribia 'en_tramite', que no existe en esa tabla.
+              estado: 'PENDIENTE',
               fecha_inicio: hoy,
               dia_vencimiento: 5,
             },

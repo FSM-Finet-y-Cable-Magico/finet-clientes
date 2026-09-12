@@ -170,7 +170,7 @@ describe('PortalService', () => {
   // ─── CU-23: getEstadoContratos ────────────────────────────────────────────
 
   describe('getEstadoContratos', () => {
-    it('retorna contratos con estado y fechas formateadas', async () => {
+    it('devuelve el estado canonico de la tabla 11.15 y las fechas formateadas', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
         CONTRATO_MOCK,
       ]);
@@ -180,7 +180,8 @@ describe('PortalService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].id_contrato).toBe(1);
-      expect(result[0].estado).toBe('activo');
+      // El mock trae 'activo' en minuscula; se devuelve normalizado.
+      expect(result[0].estado).toBe('ACTIVO');
       expect(result[0].fecha_inicio).toBe('2024-01-15');
       expect(result[0].fecha_suspension).toBeNull();
     });
@@ -193,72 +194,70 @@ describe('PortalService', () => {
       );
     });
 
-    it('lanza BadRequestException y registra en log_auditoria si el estado no es reconocido (CU-23 Excepción 3)', async () => {
-      const contratoInvalido = { ...CONTRATO_MOCK, estado: 'cortado' };
+    // El CRM corta el servicio por morosidad (CU-48) y escribe CORTADO. Antes
+    // eso tumbaba el panel del cliente con un 400.
+    it('acepta CORTADO y BAJA, que antes hacian caer el panel', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        contratoInvalido,
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'CORTADO' },
+        { ...CONTRATO_MOCK, id_contrato: 2, estado: 'BAJA' },
+        { ...CONTRATO_MOCK, id_contrato: 3, estado: 'REACTIVADO' },
+      ]);
+
+      const result = await service.getEstadoContratos(1);
+
+      expect(result.map((c) => c.estado)).toEqual([
+        'CORTADO',
+        'BAJA',
+        'REACTIVADO',
+      ]);
+      expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+    });
+
+    it('normaliza los alias historicos que quedaron en la base', async () => {
+      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'en_tramite' },
+        { ...CONTRATO_MOCK, id_contrato: 2, estado: 'inactivo' },
+      ]);
+
+      const result = await service.getEstadoContratos(1);
+
+      expect(result.map((c) => c.estado)).toEqual(['PENDIENTE', 'BAJA']);
+      expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+    });
+
+    // CU-23 Excepcion 3: un estado desconocido se registra, pero no rompe.
+    it('deja pasar un estado desconocido y lo registra en auditoria', async () => {
+      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'activo' },
+        { ...CONTRATO_MOCK, id_contrato: 5, estado: 'HIBERNANDO' },
       ]);
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        'no es reconocido',
-      );
+      const result = await service.getEstadoContratos(1);
 
+      expect(result.map((c) => c.estado)).toEqual(['ACTIVO', 'HIBERNANDO']);
       expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
           entidad_afectada: 'contrato',
-          id_entidad_afectada: 1,
-          valor_anterior: { estado_recibido: 'cortado' },
+          id_entidad_afectada: 5,
         }),
       });
     });
 
-    it('lanza BadRequestException con IDs de contratos afectados cuando hay estados mixtos (CU-23 Excepción 3)', async () => {
-      const contratoValido1 = {
-        ...CONTRATO_MOCK,
-        id_contrato: 1,
-        estado: 'activo',
-      };
-      const contratoInvalido = {
-        ...CONTRATO_MOCK,
-        id_contrato: 5,
-        estado: 'cortado',
-      };
-      const contratoValido2 = {
-        ...CONTRATO_MOCK,
-        id_contrato: 9,
-        estado: 'suspendido',
-      };
+    it('no se cae si falla el registro de auditoria', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        contratoValido1,
-        contratoInvalido,
-        contratoValido2,
+        { ...CONTRATO_MOCK, estado: 'LO_QUE_SEA' },
       ]);
-      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
-
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        '#5 (cortado)',
+      (prisma.log_auditoria.create as jest.Mock).mockRejectedValue(
+        new Error('auditoria caida'),
       );
 
-      // Solo se registra auditoría para el contrato inválido
-      expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
-          id_entidad_afectada: 5,
-          valor_anterior: { estado_recibido: 'cortado' },
-        }),
-      });
+      const result = await service.getEstadoContratos(1);
+
+      expect(result[0].estado).toBe('LO_QUE_SEA');
     });
   });
-
-  // ─── CU-25 / CU-26: getContratosVigentes ─────────────────────────────────
 
   describe('getContratosVigentes', () => {
     it('retorna contratos activos con datos del plan (precio como number)', async () => {

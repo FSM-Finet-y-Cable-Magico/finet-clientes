@@ -112,7 +112,7 @@ describe('ContratacionesService', () => {
         data: expect.objectContaining({
           id_cliente: 10,
           id_plan: 1,
-          estado: 'en_tramite',
+          estado: 'PENDIENTE',
           dia_vencimiento: 5,
         }),
       });

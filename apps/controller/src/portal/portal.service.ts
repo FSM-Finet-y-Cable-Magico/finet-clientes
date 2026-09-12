@@ -9,6 +9,10 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  ESTADOS_CONTRATO_VIGENTES,
+  normalizarEstadoContrato,
+} from '../common/constants/contrato.js';
 import { MailService } from '../mail/mail.service.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
 import type { SolicitarCambioWifiDto } from './dto/solicitud-wifi.dto.js';
@@ -33,13 +37,6 @@ export class PortalService {
     private readonly mailService: MailService,
   ) {}
 
-  // Estados válidos según RF-20 y CU-23
-  private readonly ESTADOS_CONTRATO_VALIDOS: string[] = [
-    'activo',
-    'suspendido',
-    'en_tramite',
-  ];
-
   //  CU-23: Consultar estado operativo del contrato
   // Retorna el estado de TODOS los contratos del cliente (puede tener varios) y se ve si esta activo, fechas e identificador ;3.
   async getEstadoContratos(idCliente: number): Promise<ContratoEstadoDto[]> {
@@ -59,58 +56,61 @@ export class PortalService {
       );
     }
 
-    // CU-23 Excepción 3: validar que todos los estados sean reconocidos
-    const estadosNoReconocidos: { id_contrato: number; estado: string }[] = [];
+    // CU-23 Excepción 3: estado no reconocido.
+    //
+    // Antes esto lanzaba un 400 y dejaba al cliente sin panel. No puede ser: la
+    // base es compartida con los otros equipos y cualquiera puede escribir un
+    // estado que todavía no conocemos. Un valor inesperado se registra para que
+    // alguien lo revise, pero se devuelve tal cual y el portal sigue en pie.
+    const noReconocidos: { id_contrato: number; estado: string }[] = [];
 
-    for (const c of contratos) {
-      if (!this.ESTADOS_CONTRATO_VALIDOS.includes(c.estado)) {
-        estadosNoReconocidos.push({
-          id_contrato: c.id_contrato,
-          estado: c.estado,
-        });
+    const estados = contratos.map((c) => {
+      const canonico = normalizarEstadoContrato(c.estado);
 
-        // Registrar en log de auditoría para revisión administrativa
-        try {
-          await this.prisma.log_auditoria.create({
-            data: {
-              accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
-              entidad_afectada: 'contrato',
-              id_entidad_afectada: c.id_contrato,
-              valor_anterior: { estado_recibido: c.estado },
-              valor_nuevo: {
-                estados_permitidos: this.ESTADOS_CONTRATO_VALIDOS,
-              },
-            },
-          });
-        } catch (auditError) {
-          this.logger.error(
-            `No se pudo registrar auditoría para estado no reconocido del contrato ${c.id_contrato}`,
-            auditError,
-          );
-        }
+      if (!canonico) {
+        noReconocidos.push({ id_contrato: c.id_contrato, estado: c.estado });
       }
-    }
 
-    if (estadosNoReconocidos.length > 0) {
-      const ids = estadosNoReconocidos
+      return {
+        id_contrato: c.id_contrato,
+        // El canónico de la tabla 11.15 cuando se reconoce; si no, el valor
+        // crudo, para que el cliente vea algo y no un hueco.
+        estado: canonico ?? c.estado,
+        fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
+        fecha_suspension: c.fecha_suspension
+          ? c.fecha_suspension.toISOString().split('T')[0]
+          : null,
+      };
+    });
+
+    if (noReconocidos.length > 0) {
+      const detalle = noReconocidos
         .map((e) => `#${e.id_contrato} (${e.estado})`)
         .join(', ');
       this.logger.warn(
-        `Estados de contrato no reconocidos para cliente ${idCliente}: ${ids}`,
+        `Estados de contrato fuera de la tabla 11.15 para el cliente ${idCliente}: ${detalle}`,
       );
-      throw new BadRequestException(
-        `El estado operativo de algunos contratos no es reconocido por el sistema. Contacte al administrador. Contratos afectados: ${ids}`,
-      );
+
+      // La auditoría no puede tumbar la consulta: si falla, se registra y sigue.
+      try {
+        await this.prisma.log_auditoria.create({
+          data: {
+            accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
+            entidad_afectada: 'contrato',
+            id_entidad_afectada: noReconocidos[0].id_contrato,
+            valor_anterior: { estados_recibidos: noReconocidos },
+            valor_nuevo: { estados_canonicos: ESTADOS_CONTRATO_VIGENTES },
+          },
+        });
+      } catch (auditError) {
+        this.logger.error(
+          'No se pudo registrar la auditoría de estados no reconocidos',
+          auditError,
+        );
+      }
     }
 
-    return contratos.map((c) => ({
-      id_contrato: c.id_contrato,
-      estado: c.estado,
-      fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
-      fecha_suspension: c.fecha_suspension
-        ? c.fecha_suspension.toISOString().split('T')[0]
-        : null,
-    }));
+    return estados;
   }
 
   // ─── CU-24: Panel principal del Portal Cliente ─────────────────────────────
@@ -162,7 +162,14 @@ export class PortalService {
       .findMany({
         where: {
           id_cliente: idCliente,
-          estado: { in: ['activo', 'suspendido'] },
+          // Se listan todos los estados en los que el servicio sigue siendo del
+          // cliente, incluidos SUSPENDIDO y CORTADO: si el CRM corta por
+          // morosidad, el cliente tiene que verlo en su portal. Queda fuera
+          // solo BAJA. Se comparan ambas capitalizaciones porque en la base
+          // conviven valores viejos en minúscula con los de la tabla 11.15.
+          estado: {
+            in: ESTADOS_CONTRATO_VIGENTES.flatMap((e) => [e, e.toLowerCase()]),
+          },
         },
         include: {
           plan: {
@@ -186,7 +193,7 @@ export class PortalService {
 
     return contratos.map((c) => ({
       id_contrato: c.id_contrato,
-      estado: c.estado,
+      estado: normalizarEstadoContrato(c.estado) ?? c.estado,
       fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
       dia_vencimiento: c.dia_vencimiento,
       plan: c.plan

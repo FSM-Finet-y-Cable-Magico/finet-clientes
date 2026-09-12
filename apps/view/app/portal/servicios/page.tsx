@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Wifi, Zap, Calendar, AlertCircle, RefreshCw } from "lucide-react";
 import { api } from "../../utils/api";
-import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
+import StatusBadge from "@/app/_components/ui/StatusBadge";
+import { estadoContratoBadge } from "@/app/_lib/estado-contrato";
 import WifiPasswordSection from "@/app/_components/portal/WifiPasswordSection";
 
 type Plan = {
@@ -34,15 +35,6 @@ function formatFecha(iso: string) {
   });
 }
 
-function estadoBadge(estado: string): { label: string; tone: StatusTone } {
-  const map: Record<string, { label: string; tone: StatusTone }> = {
-    activo: { label: "Activo", tone: "success" },
-    suspendido: { label: "Suspendido", tone: "warning" },
-    cortado: { label: "Cortado", tone: "error" },
-    inactivo: { label: "Inactivo", tone: "neutral" },
-  };
-  return map[estado] ?? { label: estado, tone: "neutral" };
-}
 
 export default function ServiciosPage() {
   const [contratos, setContratos] = useState<Contrato[] | null>(null);
@@ -140,7 +132,7 @@ export default function ServiciosPage() {
       {contratos && contratos.length > 0 && !loading && (
         <div className="space-y-4">
           {contratos.map((c) => {
-            const badge = estadoBadge(c.estado);
+            const badge = estadoContratoBadge(c.estado);
             return (
               <div
                 key={c.id_contrato}

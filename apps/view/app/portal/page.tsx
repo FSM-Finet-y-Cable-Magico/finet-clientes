@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../_lib/auth";
 import { api } from "../utils/api";
-import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
+import StatusBadge from "@/app/_components/ui/StatusBadge";
+import { estadoContratoBadge } from "@/app/_lib/estado-contrato";
 
 type Contrato = {
   id_contrato: number;
@@ -74,15 +75,6 @@ function formatFechaCorta(iso: string) {
   });
 }
 
-function estadoBadge(estado: string): { label: string; tone: StatusTone } {
-  const map: Record<string, { label: string; tone: StatusTone }> = {
-    activo: { label: "Activo", tone: "success" },
-    suspendido: { label: "Suspendido", tone: "warning" },
-    cortado: { label: "Cortado", tone: "error" },
-    inactivo: { label: "Inactivo", tone: "neutral" },
-  };
-  return map[estado] ?? { label: estado, tone: "neutral" };
-}
 
 export default function PortalPage() {
   const { cliente: authCliente } = useAuth();
@@ -191,7 +183,7 @@ export default function PortalPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {data.contratos.map((c) => {
-                const badge = estadoBadge(c.estado);
+                const badge = estadoContratoBadge(c.estado);
                 return (
                   <div
                     key={c.id_contrato}
