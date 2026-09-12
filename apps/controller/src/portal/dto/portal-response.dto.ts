@@ -81,3 +81,17 @@ export interface CrearTicketResponseDto {
   id_ticket: number;
   codigo_seguimiento: string;
 }
+
+// ─── CU-32: Solicitud de cambio de contrasena de la red WiFi ────────────────
+// El portal solo registra la solicitud: la ejecucion en el equipo del cliente
+// es CU-33 y corre por cuenta del CRM. Por eso la respuesta confirma la
+// creacion de la solicitud y no un cambio ya aplicado.
+//
+// La clave nunca vuelve en la respuesta: se guarda hasheada y el cliente ya
+// la conoce, no hay motivo para devolverla.
+export interface SolicitudContrasenaWifiResponseDto {
+  id_solicitud: number;
+  id_contrato: number;
+  estado: string;
+  fecha_solicitud: string | null;
+}

@@ -42,6 +42,12 @@ describe('PortalController', () => {
         .fn()
         .mockResolvedValue({ total: 0, tiene_tickets: false, tickets: [] }),
       getCategoriasTicket: jest.fn().mockResolvedValue([]),
+      solicitarCambioContrasenaWifi: jest.fn().mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'pendiente',
+        fecha_solicitud: '2024-01-15T00:00:00.000Z',
+      }),
       crearTicket: jest.fn().mockResolvedValue({
         id_ticket: 42,
         codigo_seguimiento: 'FIN-2026-000042',
@@ -99,5 +105,21 @@ describe('PortalController', () => {
     await controller.crearTicket(CLIENTE_MOCK as any, body);
 
     expect(service.crearTicket).toHaveBeenCalledWith(1, body);
+  });
+
+  // CU-31 + CU-32: el endpoint solo registra la solicitud; la ejecucion en el
+  // equipo del cliente es CU-33 y la hace el CRM.
+  it('POST /portal/wifi/password registra la solicitud del cliente autenticado', async () => {
+    const body = { id_contrato: 1, password: 'MiRedNueva2026' };
+
+    const respuesta = await controller.solicitarCambioContrasenaWifi(
+      CLIENTE_MOCK as any,
+      body,
+    );
+
+    expect(service.solicitarCambioContrasenaWifi).toHaveBeenCalledWith(1, body);
+    expect(respuesta).toEqual(
+      expect.objectContaining({ estado: 'pendiente', id_solicitud: 7 }),
+    );
   });
 });

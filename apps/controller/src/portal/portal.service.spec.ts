@@ -1,7 +1,9 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
+import * as bcrypt from 'bcrypt';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
+  ConflictException,
   NotFoundException,
   InternalServerErrorException,
   ServiceUnavailableException,
@@ -41,7 +43,7 @@ describe('PortalService', () => {
 
   beforeEach(async () => {
     const mockPrisma = {
-      contrato: { findMany: jest.fn() },
+      contrato: { findMany: jest.fn(), findFirst: jest.fn() },
       cliente: { findUnique: jest.fn() },
       factura: { findMany: jest.fn() },
       categoria_falla: { findMany: jest.fn(), findUnique: jest.fn() },
@@ -50,6 +52,7 @@ describe('PortalService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      solicitud_contrasena_wifi: { create: jest.fn() },
       log_auditoria: { create: jest.fn() },
       log_notificacion: { create: jest.fn() },
       $transaction: jest.fn(),
@@ -168,7 +171,7 @@ describe('PortalService', () => {
   // ─── CU-23: getEstadoContratos ────────────────────────────────────────────
 
   describe('getEstadoContratos', () => {
-    it('retorna contratos con estado y fechas formateadas', async () => {
+    it('devuelve el estado canonico de la tabla 11.15 y las fechas formateadas', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
         CONTRATO_MOCK,
       ]);
@@ -178,7 +181,8 @@ describe('PortalService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].id_contrato).toBe(1);
-      expect(result[0].estado).toBe('activo');
+      // El mock trae 'activo' en minuscula; se devuelve normalizado.
+      expect(result[0].estado).toBe('ACTIVO');
       expect(result[0].fecha_inicio).toBe('2024-01-15');
       expect(result[0].fecha_suspension).toBeNull();
     });
@@ -191,72 +195,70 @@ describe('PortalService', () => {
       );
     });
 
-    it('lanza BadRequestException y registra en log_auditoria si el estado no es reconocido (CU-23 Excepción 3)', async () => {
-      const contratoInvalido = { ...CONTRATO_MOCK, estado: 'cortado' };
+    // El CRM corta el servicio por morosidad (CU-48) y escribe CORTADO. Antes
+    // eso tumbaba el panel del cliente con un 400.
+    it('acepta CORTADO y BAJA, que antes hacian caer el panel', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        contratoInvalido,
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'CORTADO' },
+        { ...CONTRATO_MOCK, id_contrato: 2, estado: 'BAJA' },
+        { ...CONTRATO_MOCK, id_contrato: 3, estado: 'REACTIVADO' },
+      ]);
+
+      const result = await service.getEstadoContratos(1);
+
+      expect(result.map((c) => c.estado)).toEqual([
+        'CORTADO',
+        'BAJA',
+        'REACTIVADO',
+      ]);
+      expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+    });
+
+    it('normaliza los alias historicos que quedaron en la base', async () => {
+      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'en_tramite' },
+        { ...CONTRATO_MOCK, id_contrato: 2, estado: 'inactivo' },
+      ]);
+
+      const result = await service.getEstadoContratos(1);
+
+      expect(result.map((c) => c.estado)).toEqual(['PENDIENTE', 'BAJA']);
+      expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+    });
+
+    // CU-23 Excepcion 3: un estado desconocido se registra, pero no rompe.
+    it('deja pasar un estado desconocido y lo registra en auditoria', async () => {
+      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'activo' },
+        { ...CONTRATO_MOCK, id_contrato: 5, estado: 'HIBERNANDO' },
       ]);
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        'no es reconocido',
-      );
+      const result = await service.getEstadoContratos(1);
 
+      expect(result.map((c) => c.estado)).toEqual(['ACTIVO', 'HIBERNANDO']);
       expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
           entidad_afectada: 'contrato',
-          id_entidad_afectada: 1,
-          valor_anterior: { estado_recibido: 'cortado' },
+          id_entidad_afectada: 5,
         }),
       });
     });
 
-    it('lanza BadRequestException con IDs de contratos afectados cuando hay estados mixtos (CU-23 Excepción 3)', async () => {
-      const contratoValido1 = {
-        ...CONTRATO_MOCK,
-        id_contrato: 1,
-        estado: 'activo',
-      };
-      const contratoInvalido = {
-        ...CONTRATO_MOCK,
-        id_contrato: 5,
-        estado: 'cortado',
-      };
-      const contratoValido2 = {
-        ...CONTRATO_MOCK,
-        id_contrato: 9,
-        estado: 'suspendido',
-      };
+    it('no se cae si falla el registro de auditoria', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        contratoValido1,
-        contratoInvalido,
-        contratoValido2,
+        { ...CONTRATO_MOCK, estado: 'LO_QUE_SEA' },
       ]);
-      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
-
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        '#5 (cortado)',
+      (prisma.log_auditoria.create as jest.Mock).mockRejectedValue(
+        new Error('auditoria caida'),
       );
 
-      // Solo se registra auditoría para el contrato inválido
-      expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
-          id_entidad_afectada: 5,
-          valor_anterior: { estado_recibido: 'cortado' },
-        }),
-      });
+      const result = await service.getEstadoContratos(1);
+
+      expect(result[0].estado).toBe('LO_QUE_SEA');
     });
   });
-
-  // ─── CU-25 / CU-26: getContratosVigentes ─────────────────────────────────
 
   describe('getContratosVigentes', () => {
     it('retorna contratos activos con datos del plan (precio como number)', async () => {
@@ -459,6 +461,152 @@ describe('PortalService', () => {
       await expect(service.getPanelPrincipal(1)).rejects.toThrow(
         'No fue posible obtener la informacion de planes en este momento',
       );
+    });
+  });
+
+  // CU-31 + CU-32: Solicitud de cambio de contrasena de la red WiFi.
+  describe('solicitarCambioContrasenaWifi', () => {
+    const DTO = { id_contrato: 1, password: 'MiRedNueva2026' };
+
+    it('registra la solicitud como pendiente cuando el contrato esta activo', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'activo',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'pendiente',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      const resultado = await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      expect(resultado).toEqual({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'pendiente',
+        fecha_solicitud: FECHA_BASE.toISOString(),
+      });
+    });
+
+    // Pedido de Dani en el review: la clave se guarda hasheada, no legible.
+    it('guarda la clave hasheada con bcrypt y no en texto plano', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'activo',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'pendiente',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
+        .mock.calls[0][0] as {
+        data: { password_nueva_hash: string; estado: string };
+      };
+
+      expect(data.estado).toBe('pendiente');
+      expect(data.password_nueva_hash).not.toBe(DTO.password);
+      expect(data.password_nueva_hash).toMatch(/^\$2[aby]\$/);
+      // El hash tiene que corresponder a la clave que pidio el cliente: es lo
+      // unico que le queda a CU-33 para verificar lo que aplica en el equipo.
+      await expect(
+        bcrypt.compare(DTO.password, data.password_nueva_hash),
+      ).resolves.toBe(true);
+    });
+
+    it('no deja la clave nueva en el log de auditoria', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'activo',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'pendiente',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      const llamada = (prisma.log_auditoria.create as jest.Mock).mock
+        .calls[0][0] as { data: { accion: string; valor_nuevo: unknown } };
+      expect(llamada.data.accion).toBe(
+        'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+      );
+      expect(JSON.stringify(llamada.data.valor_nuevo)).not.toContain(
+        DTO.password,
+      );
+    });
+
+    // Comentario de Dani en el review sobre el estandar de estados: el resto
+    // del servicio normaliza contra la Tabla 11.15 y esta validacion comparaba
+    // el string crudo. Con 'ACTIVO' (lo que escribe el CRM) daba 409.
+    it('acepta el estado canonico ACTIVO de la Tabla 11.15', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'ACTIVO',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'pendiente',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      expect(prisma.solicitud_contrasena_wifi.create).toHaveBeenCalled();
+    });
+
+    it('responde 404 si el contrato no es del cliente autenticado', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
+    });
+
+    // CU-32 Excepcion 2: el plan no esta activo.
+    it('impide crear la solicitud si el contrato no esta activo', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'SUSPENDIDO',
+      });
+
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(ConflictException);
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(
+        'Solo puedes solicitar el cambio de clave en un servicio activo',
+      );
+      expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
+    });
+
+    it('devuelve 503 si falla la persistencia', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'activo',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockRejectedValue(
+        new Error('db caida'),
+      );
+
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(ServiceUnavailableException);
     });
   });
 });

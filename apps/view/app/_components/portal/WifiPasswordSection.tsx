@@ -1,115 +1,309 @@
-'use client';
+"use client";
 
-import { useState, useTransition } from 'react';
-import { Wifi, CheckCircle2, Eye, EyeOff } from 'lucide-react';
-import { changeWifiPassword } from '@/app/portal/_lib/portal-actions';
+import { useId, useState, useTransition } from "react";
+import { Wifi, CheckCircle2, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { changeWifiPassword } from "@/app/portal/_lib/portal-actions";
+import { esContratoActivo } from "@/app/_lib/estado-contrato";
 
-// RF-24: Solo alfanuméricos
-const WIFI_REGEX = /^[a-zA-Z0-9]+$/;
+// CU-31, su Excepcion 2 y RF-24 dicen "unicamente alfanumericos". Se decidio
+// permitir simbolos igual (pedido de Dani, confirmado por Emilio) — diverge
+// del CU escrito, ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md. Se mantienen
+// prohibidos los espacios en blanco.
+const WIFI_REGEX = /^\S+$/;
 const MIN_LEN = 8;
 const MAX_LEN = 63;
 
-function validate(value: string): string {
-  if (!value) return 'Ingresa la nueva contraseña';
-  if (value.length < MIN_LEN) return `Mínimo ${MIN_LEN} caracteres`;
-  if (value.length > MAX_LEN) return `Máximo ${MAX_LEN} caracteres`;
-  if (!WIFI_REGEX.test(value)) return 'Solo se permiten letras y números (sin símbolos ni espacios)';
-  return '';
+export type ContratoWifi = {
+  id_contrato: number;
+  estado: string;
+  plan: { nombre_comercial: string } | null;
+};
+
+// CU-31: valida el formato y devuelve el motivo cuando no se cumple.
+function validarClave(valor: string): string {
+  if (!valor) return "Ingresa la nueva contraseña"; // CU-31 Excepcion 1
+  if (valor.length < MIN_LEN) return `Mínimo ${MIN_LEN} caracteres`;
+  if (valor.length > MAX_LEN) return `Máximo ${MAX_LEN} caracteres`;
+  if (!WIFI_REGEX.test(valor)) {
+    return "No se permiten espacios en blanco";
+  }
+  return "";
 }
 
-export default function WifiPasswordSection() {
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [fieldError, setFieldError] = useState('');
-  const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
+type Props = {
+  /** Contratos del cliente. Solo los activos pueden pedir el cambio (CU-32 Excepcion 2). */
+  contratos: ContratoWifi[];
+};
+
+export default function WifiPasswordSection({ contratos }: Props) {
+  // `/portal/contratos/vigentes` devuelve el estado canónico de la Tabla 11.15
+  // en MAYÚSCULAS (`ACTIVO`), no el "activo" del formato de presentación:
+  // filtrar por minúsculas dejaba `activos` siempre vacío y el formulario no se
+  // renderizaba nunca.
+  const activos = contratos.filter((c) => esContratoActivo(c.estado));
+
+  const selectId = useId();
+  const claveId = useId();
+  const confirmacionId = useId();
+  const errorClaveId = useId();
+  const errorConfirmacionId = useId();
+
+  const [idContrato, setIdContrato] = useState<number | null>(
+    activos.length === 1 ? activos[0].id_contrato : null,
+  );
+  const [clave, setClave] = useState("");
+  const [confirmacion, setConfirmacion] = useState("");
+  const [verClave, setVerClave] = useState(false);
+  const [errorClave, setErrorClave] = useState("");
+  const [errorConfirmacion, setErrorConfirmacion] = useState("");
+  const [errorEnvio, setErrorEnvio] = useState("");
+  const [enviada, setEnviada] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // CU-32 Excepcion 2: sin un servicio activo no se puede crear la solicitud.
+  if (activos.length === 0) {
+    return (
+      <section
+        aria-labelledby={`${selectId}-titulo`}
+        className="border border-border rounded-xl p-6 bg-background"
+      >
+        <div className="flex items-center gap-2">
+          <Wifi size={18} className="text-primary shrink-0" aria-hidden />
+          <h2
+            id={`${selectId}-titulo`}
+            className="text-sm font-semibold text-foreground"
+          >
+            Cambiar contraseña WiFi
+          </h2>
+        </div>
+        <p className="mt-3 text-sm text-muted">
+          Solo puedes solicitar el cambio de clave cuando tienes un servicio
+          activo. Si tu servicio está suspendido, regulariza tu situación para
+          habilitar esta opción.
+        </p>
+      </section>
+    );
+  }
+
+  const reiniciar = () => {
+    setEnviada(false);
+    setClave("");
+    setConfirmacion("");
+    setErrorClave("");
+    setErrorConfirmacion("");
+    setErrorEnvio("");
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const err = validate(password);
-    if (err) {
-      setFieldError(err);
+    setErrorEnvio("");
+
+    const errClave = validarClave(clave);
+    const errConfirmacion =
+      confirmacion !== clave ? "Las contraseñas no coinciden" : "";
+
+    setErrorClave(errClave);
+    setErrorConfirmacion(errConfirmacion);
+    if (errClave || errConfirmacion) return;
+
+    if (idContrato === null) {
+      setErrorEnvio("Selecciona el servicio al que aplicar el cambio");
       return;
     }
-    setFieldError('');
-    setResult(null);
+
     startTransition(async () => {
-      const res = await changeWifiPassword(password);
-      setResult(res);
-      if (res.success) setPassword('');
+      const res = await changeWifiPassword(idContrato, clave);
+      if (res.success) {
+        setEnviada(true);
+        setClave("");
+        setConfirmacion("");
+      } else {
+        setErrorEnvio(res.error ?? "No se pudo registrar la solicitud");
+      }
     });
   };
 
-  if (result?.success) {
+  // CU-32 poscondicion: el cliente recibe confirmacion de que la solicitud fue
+  // creada. Ojo con el texto: la clave todavia NO cambio, la aplica el equipo
+  // tecnico despues (CU-33).
+  if (enviada) {
     return (
-      <div className="rounded-2xl bg-surface p-5 shadow-sm flex flex-col gap-3">
-        <p className="text-sm font-medium text-muted">Cambiar Contraseña WiFi</p>
-        <div className="flex items-center gap-3">
-          <CheckCircle2 className="text-success shrink-0" size={24} />
-          <p className="text-sm font-semibold text-success">
-            Solicitud enviada correctamente. El cambio puede tardar unos minutos.
-          </p>
+      <section className="border border-border rounded-xl p-6 bg-background">
+        <div className="flex items-start gap-3" role="status">
+          <CheckCircle2 size={20} className="text-success shrink-0" aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Solicitud registrada
+            </p>
+            <p className="mt-1 text-sm text-muted">
+              Dejamos tu solicitud de cambio de clave WiFi en curso. Nuestro
+              equipo técnico la aplicará en tu equipo y te avisaremos cuando el
+              cambio esté listo.
+            </p>
+            <button
+              type="button"
+              onClick={reiniciar}
+              className="mt-3 text-sm font-medium text-primary underline underline-offset-2"
+            >
+              Solicitar otro cambio
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => setResult(null)}
-          className="self-start text-xs text-primary underline underline-offset-2"
-        >
-          Realizar otro cambio
-        </button>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="rounded-2xl bg-surface p-5 shadow-sm flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Wifi className="text-primary shrink-0" size={18} />
-        <p className="text-sm font-medium text-muted">Cambiar Contraseña WiFi</p>
+    <section
+      aria-labelledby={`${selectId}-titulo`}
+      className="border border-border rounded-xl p-6 bg-background"
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <Wifi size={18} className="text-primary shrink-0" aria-hidden />
+        <h2
+          id={`${selectId}-titulo`}
+          className="text-sm font-semibold text-foreground"
+        >
+          Cambiar contraseña WiFi
+        </h2>
       </div>
+      <p className="text-sm text-muted mb-4">
+        Registra tu solicitud y nuestro equipo aplicará la nueva clave en tu
+        equipo.
+      </p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3" noValidate>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+        {activos.length > 1 && (
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor={selectId}
+              className="text-xs font-medium text-foreground"
+            >
+              Servicio
+            </label>
+            <select
+              id={selectId}
+              value={idContrato ?? ""}
+              onChange={(e) =>
+                setIdContrato(e.target.value ? Number(e.target.value) : null)
+              }
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <option value="">Selecciona un servicio</option>
+              {activos.map((c) => (
+                <option key={c.id_contrato} value={c.id_contrato}>
+                  Abonado #{c.id_contrato}
+                  {c.plan ? ` — ${c.plan.nombre_comercial}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="wifi-password" className="text-xs font-medium text-muted">
-            Nueva contraseña <span className="text-foreground">(solo letras y números)</span>
+          <label
+            htmlFor={claveId}
+            className="text-xs font-medium text-foreground"
+          >
+            Nueva contraseña{" "}
+            <span className="text-muted">
+              (entre {MIN_LEN} y {MAX_LEN} caracteres, sin espacios)
+            </span>
           </label>
           <div className="relative">
             <input
-              id="wifi-password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
+              id={claveId}
+              type={verClave ? "text" : "password"}
+              value={clave}
               onChange={(e) => {
-                setPassword(e.target.value);
-                if (fieldError) setFieldError(validate(e.target.value));
+                setClave(e.target.value);
+                if (errorClave) setErrorClave(validarClave(e.target.value));
               }}
-              placeholder="Ej: MiRed2024"
+              placeholder="Ej: MiRed2026"
               autoComplete="new-password"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-invalid={errorClave ? true : undefined}
+              aria-describedby={errorClave ? errorClaveId : undefined}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-11 text-sm text-foreground placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             />
             <button
               type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors"
-              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              onClick={() => setVerClave((v) => !v)}
+              aria-label={
+                verClave ? "Ocultar contraseña" : "Mostrar contraseña"
+              }
+              className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
             >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              {verClave ? (
+                <EyeOff size={16} aria-hidden />
+              ) : (
+                <Eye size={16} aria-hidden />
+              )}
             </button>
           </div>
-          {fieldError && (
-            <p className="text-xs text-error">{fieldError}</p>
-          )}
-          {result?.error && !fieldError && (
-            <p className="text-xs text-error">{result.error}</p>
+          {errorClave && (
+            <p
+              id={errorClaveId}
+              role="alert"
+              className="flex items-center gap-1.5 text-xs text-error"
+            >
+              <AlertCircle size={13} className="shrink-0" aria-hidden />
+              {errorClave}
+            </p>
           )}
         </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label
+            htmlFor={confirmacionId}
+            className="text-xs font-medium text-foreground"
+          >
+            Repite la nueva contraseña
+          </label>
+          <input
+            id={confirmacionId}
+            type={verClave ? "text" : "password"}
+            value={confirmacion}
+            onChange={(e) => {
+              setConfirmacion(e.target.value);
+              if (errorConfirmacion) setErrorConfirmacion("");
+            }}
+            autoComplete="new-password"
+            aria-invalid={errorConfirmacion ? true : undefined}
+            aria-describedby={
+              errorConfirmacion ? errorConfirmacionId : undefined
+            }
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          />
+          {errorConfirmacion && (
+            <p
+              id={errorConfirmacionId}
+              role="alert"
+              className="flex items-center gap-1.5 text-xs text-error"
+            >
+              <AlertCircle size={13} className="shrink-0" aria-hidden />
+              {errorConfirmacion}
+            </p>
+          )}
+        </div>
+
+        {errorEnvio && (
+          <p
+            role="alert"
+            className="flex items-center gap-1.5 text-sm text-error"
+          >
+            <AlertCircle size={15} className="shrink-0" aria-hidden />
+            {errorEnvio}
+          </p>
+        )}
 
         <button
           type="submit"
           disabled={isPending}
-          className="self-start rounded-full bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          className="self-start rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isPending ? 'Enviando solicitud...' : 'Solicitar cambio'}
+          {isPending ? "Registrando solicitud..." : "Solicitar cambio"}
         </button>
       </form>
-    </div>
+    </section>
   );
 }

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -7,9 +8,15 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  ESTADOS_CONTRATO_VIGENTES,
+  normalizarEstadoContrato,
+} from '../common/constants/contrato.js';
 import { MailService } from '../mail/mail.service.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
+import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
 import {
   CategoriaTicketDto,
   ContratoEstadoDto,
@@ -18,6 +25,7 @@ import {
   FacturaPendienteDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
+  SolicitudContrasenaWifiResponseDto,
   TicketsResponseDto,
 } from './dto/portal-response.dto.js';
 
@@ -29,13 +37,6 @@ export class PortalService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
   ) {}
-
-  // Estados válidos según RF-20 y CU-23
-  private readonly ESTADOS_CONTRATO_VALIDOS: string[] = [
-    'activo',
-    'suspendido',
-    'en_tramite',
-  ];
 
   //  CU-23: Consultar estado operativo del contrato
   // Retorna el estado de TODOS los contratos del cliente (puede tener varios) y se ve si esta activo, fechas e identificador ;3.
@@ -56,58 +57,61 @@ export class PortalService {
       );
     }
 
-    // CU-23 Excepción 3: validar que todos los estados sean reconocidos
-    const estadosNoReconocidos: { id_contrato: number; estado: string }[] = [];
+    // CU-23 Excepción 3: estado no reconocido.
+    //
+    // Antes esto lanzaba un 400 y dejaba al cliente sin panel. No puede ser: la
+    // base es compartida con los otros equipos y cualquiera puede escribir un
+    // estado que todavía no conocemos. Un valor inesperado se registra para que
+    // alguien lo revise, pero se devuelve tal cual y el portal sigue en pie.
+    const noReconocidos: { id_contrato: number; estado: string }[] = [];
 
-    for (const c of contratos) {
-      if (!this.ESTADOS_CONTRATO_VALIDOS.includes(c.estado)) {
-        estadosNoReconocidos.push({
-          id_contrato: c.id_contrato,
-          estado: c.estado,
-        });
+    const estados = contratos.map((c) => {
+      const canonico = normalizarEstadoContrato(c.estado);
 
-        // Registrar en log de auditoría para revisión administrativa
-        try {
-          await this.prisma.log_auditoria.create({
-            data: {
-              accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
-              entidad_afectada: 'contrato',
-              id_entidad_afectada: c.id_contrato,
-              valor_anterior: { estado_recibido: c.estado },
-              valor_nuevo: {
-                estados_permitidos: this.ESTADOS_CONTRATO_VALIDOS,
-              },
-            },
-          });
-        } catch (auditError) {
-          this.logger.error(
-            `No se pudo registrar auditoría para estado no reconocido del contrato ${c.id_contrato}`,
-            auditError,
-          );
-        }
+      if (!canonico) {
+        noReconocidos.push({ id_contrato: c.id_contrato, estado: c.estado });
       }
-    }
 
-    if (estadosNoReconocidos.length > 0) {
-      const ids = estadosNoReconocidos
+      return {
+        id_contrato: c.id_contrato,
+        // El canónico de la tabla 11.15 cuando se reconoce; si no, el valor
+        // crudo, para que el cliente vea algo y no un hueco.
+        estado: canonico ?? c.estado,
+        fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
+        fecha_suspension: c.fecha_suspension
+          ? c.fecha_suspension.toISOString().split('T')[0]
+          : null,
+      };
+    });
+
+    if (noReconocidos.length > 0) {
+      const detalle = noReconocidos
         .map((e) => `#${e.id_contrato} (${e.estado})`)
         .join(', ');
       this.logger.warn(
-        `Estados de contrato no reconocidos para cliente ${idCliente}: ${ids}`,
+        `Estados de contrato fuera de la tabla 11.15 para el cliente ${idCliente}: ${detalle}`,
       );
-      throw new BadRequestException(
-        `El estado operativo de algunos contratos no es reconocido por el sistema. Contacte al administrador. Contratos afectados: ${ids}`,
-      );
+
+      // La auditoría no puede tumbar la consulta: si falla, se registra y sigue.
+      try {
+        await this.prisma.log_auditoria.create({
+          data: {
+            accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
+            entidad_afectada: 'contrato',
+            id_entidad_afectada: noReconocidos[0].id_contrato,
+            valor_anterior: { estados_recibidos: noReconocidos },
+            valor_nuevo: { estados_canonicos: ESTADOS_CONTRATO_VIGENTES },
+          },
+        });
+      } catch (auditError) {
+        this.logger.error(
+          'No se pudo registrar la auditoría de estados no reconocidos',
+          auditError,
+        );
+      }
     }
 
-    return contratos.map((c) => ({
-      id_contrato: c.id_contrato,
-      estado: c.estado,
-      fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
-      fecha_suspension: c.fecha_suspension
-        ? c.fecha_suspension.toISOString().split('T')[0]
-        : null,
-    }));
+    return estados;
   }
 
   // ─── CU-24: Panel principal del Portal Cliente ─────────────────────────────
@@ -159,7 +163,14 @@ export class PortalService {
       .findMany({
         where: {
           id_cliente: idCliente,
-          estado: { in: ['activo', 'suspendido'] },
+          // Se listan todos los estados en los que el servicio sigue siendo del
+          // cliente, incluidos SUSPENDIDO y CORTADO: si el CRM corta por
+          // morosidad, el cliente tiene que verlo en su portal. Queda fuera
+          // solo BAJA. Se comparan ambas capitalizaciones porque en la base
+          // conviven valores viejos en minúscula con los de la tabla 11.15.
+          estado: {
+            in: ESTADOS_CONTRATO_VIGENTES.flatMap((e) => [e, e.toLowerCase()]),
+          },
         },
         include: {
           plan: {
@@ -183,7 +194,7 @@ export class PortalService {
 
     return contratos.map((c) => ({
       id_contrato: c.id_contrato,
-      estado: c.estado,
+      estado: normalizarEstadoContrato(c.estado) ?? c.estado,
       fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
       dia_vencimiento: c.dia_vencimiento,
       plan: c.plan
@@ -466,6 +477,110 @@ export class PortalService {
       this.logger.error(
         `No se pudo registrar la notificacion del ticket ${ticket.id_ticket}`,
         error,
+      );
+    }
+  }
+
+  //  CU-31 + CU-32: Solicitud de cambio de contrasena de la red WiFi
+  //
+  //  El portal NO cambia la clave: solo deja registrada la solicitud para que el
+  //  CRM la ejecute contra el equipo del cliente (CU-33).
+  //
+  //  La clave se guarda hasheada con bcrypt, nunca en texto plano (pedido de
+  //  Dani en el review de esta rama). Ojo con la consecuencia: bcrypt no es
+  //  reversible, asi que CU-33 ya no puede leer de la tabla la clave que tiene
+  //  que aplicar en el equipo — queda pendiente definir por donde la recibe
+  //  quien la aplica. Lo que el hash permite es verificar despues que la clave
+  //  aplicada es la que el cliente pidio.
+  //
+  //  El formato ya viene validado por Zod en el controller (CU-31 / RF-24).
+  async solicitarCambioContrasenaWifi(
+    idCliente: number,
+    dto: SolicitarCambioContrasenaWifiDto,
+  ): Promise<SolicitudContrasenaWifiResponseDto> {
+    // El contrato tiene que ser del cliente autenticado. Si es de otro, se
+    // responde 404 igual que si no existiera: no se confirma su existencia.
+    const contrato = await this.prisma.contrato.findFirst({
+      where: { id_contrato: dto.id_contrato, id_cliente: idCliente },
+      select: { id_contrato: true, estado: true },
+    });
+
+    if (!contrato) {
+      throw new NotFoundException('No encontramos el servicio seleccionado');
+    }
+
+    // CU-32 Excepcion 2: el plan no esta activo -> se impide crear la solicitud
+    // y se informa la restriccion.
+    //
+    // El estado se normaliza a la Tabla 11.15 antes de comparar, igual que el
+    // resto del servicio: la base compartida la escriben cuatro equipos y el CRM
+    // guarda 'ACTIVO' en mayusculas, asi que comparar el string crudo contra
+    // 'activo' le respondia 409 a un cliente con el servicio andando.
+    //
+    // REACTIVADO queda fuera a proposito: la tabla 11.15 lo lista como estado
+    // distinto de ACTIVO y CU-32 pide "activo". Si tras CU-50 el CRM lo deja
+    // fijo en vez de volver a ACTIVO, hay que sumarlo aca.
+    if (normalizarEstadoContrato(contrato.estado) !== 'ACTIVO') {
+      throw new ConflictException(
+        'Solo puedes solicitar el cambio de clave en un servicio activo',
+      );
+    }
+
+    try {
+      // Se hashea recien aca: despues de validar el contrato, para no gastar el
+      // cost de bcrypt en requests que terminan en 404/409, y antes de abrir la
+      // transaccion, para no tenerla esperando el hash. Cost 10, el mismo que
+      // usan auth y perfil.
+      const passwordNuevaHash = await bcrypt.hash(dto.password, 10);
+
+      const solicitud = await this.prisma.$transaction(async (tx) => {
+        const creada = await tx.solicitud_contrasena_wifi.create({
+          data: {
+            id_contrato: contrato.id_contrato,
+            id_cliente: idCliente,
+            password_nueva_hash: passwordNuevaHash,
+            estado: 'pendiente',
+          },
+          select: {
+            id_solicitud: true,
+            id_contrato: true,
+            estado: true,
+            fecha_solicitud: true,
+          },
+        });
+
+        // La clave nueva no se registra en la auditoria, ni hasheada: el log lo
+        // lee mucha mas gente que la solicitud misma y no lo necesita.
+        await tx.log_auditoria.create({
+          data: {
+            accion: 'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+            entidad_afectada: 'solicitud_contrasena_wifi',
+            id_entidad_afectada: creada.id_solicitud,
+            valor_nuevo: {
+              id_contrato: creada.id_contrato,
+              estado: creada.estado,
+              origen: 'portal',
+            },
+          },
+        });
+
+        return creada;
+      });
+
+      return {
+        id_solicitud: solicitud.id_solicitud,
+        id_contrato: solicitud.id_contrato,
+        estado: solicitud.estado,
+        fecha_solicitud: solicitud.fecha_solicitud?.toISOString() ?? null,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `No se pudo registrar la solicitud de cambio de contrasena WiFi del cliente ${idCliente}`,
+        error,
+      );
+      throw new ServiceUnavailableException(
+        'No fue posible registrar tu solicitud. Intenta nuevamente mas tarde.',
       );
     }
   }

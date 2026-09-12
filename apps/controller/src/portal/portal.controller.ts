@@ -6,6 +6,8 @@ import type { cliente } from '../../generated/prisma/client.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
 import { crearTicketSchema } from './dto/crear-ticket.dto.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
+import { solicitarCambioContrasenaWifiSchema } from './dto/solicitud-contrasena-wifi.dto.js';
+import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
 
 /**
  * Todas las rutas requieren sesión activa (JwtAuthGuard).
@@ -170,5 +172,44 @@ export class PortalController {
   ) {
     const limiteNum = limite ? parseInt(limite, 10) : undefined;
     return this.portalService.getTickets(cliente.id_cliente, limiteNum);
+  }
+
+  /**
+   * CU-31 + CU-32: Solicitar cambio de contrasena de la red WiFi
+   *
+   * POST /portal/wifi/password
+   * Auth: Bearer <token>
+   *
+   * Este endpoint NO cambia la clave del WiFi. Solo deja registrada la
+   * solicitud para que el CRM la ejecute despues contra el equipo del cliente
+   * (CU-33). La respuesta confirma que la solicitud quedo creada, nada mas.
+   *
+   * Body: { id_contrato: number, password: string }
+   *   - password: 8 a 63 caracteres, sin espacios en blanco. Se permiten
+   *     simbolos (decision del equipo, diverge de CU-31/RF-24 escritos —
+   *     ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md)
+   *   - se guarda hasheada con bcrypt en `solicitud_contrasena_wifi`: no queda
+   *     en texto plano y no se puede recuperar desde la tabla
+   *
+   * Respuesta: SolicitudContrasenaWifiResponseDto
+   *   - id_solicitud, id_contrato, estado ("pendiente"), fecha_solicitud
+   *
+   * Errores:
+   *   400 - La clave no cumple el formato (CU-32 Excepcion 3)
+   *   401 - Sesion expirada por inactividad (CU-32 Excepcion 1)
+   *   404 - El servicio seleccionado no es del cliente o no existe
+   *   409 - El servicio no esta activo (CU-32 Excepcion 2)
+   *   503 - No fue posible registrar la solicitud
+   */
+  @Post('wifi/password')
+  solicitarCambioContrasenaWifi(
+    @CurrentClient() cliente: cliente,
+    @Body(new ZodValidationPipe(solicitarCambioContrasenaWifiSchema))
+    body: SolicitarCambioContrasenaWifiDto,
+  ) {
+    return this.portalService.solicitarCambioContrasenaWifi(
+      cliente.id_cliente,
+      body,
+    );
   }
 }
