@@ -22,10 +22,9 @@ Backend para el portal de clientes basado en NestJS, Prisma y PostgreSQL.
 
 ## Configuración
 
-Crear `apps/controller/.env` a mano — no hay `.env.example` en el repo. La
-plantilla completa y lista para copiar está en el
-[README raíz](../../README.md#backend--appscontrollerenv); el archivo está en
-`.gitignore` y no se commitea.
+Copiar `.env.example` a `.env` y completar los valores. La plantilla completa
+también está en el [README raíz](../../README.md#backend--appscontrollerenv);
+`.env` está en `.gitignore` y no se commitea.
 
 Variables principales:
 
@@ -51,6 +50,59 @@ $ docker compose up -d
 - PostgreSQL: `localhost:5555`
 - Mailpit SMTP: `localhost:1025`
 - Mailpit Web UI: `http://localhost:8025` (todos los emails capturados)
+
+### Probar el correo de recuperación de contraseña
+
+No hace falta ninguna cuenta SMTP real: `SMTP_HOST=localhost` / `SMTP_PORT=1025`
+(los defaults de `.env.example`) apuntan directo a Mailpit, que captura
+cualquier correo que el backend intente mandar sin entregarlo a nadie afuera.
+
+1. **Levantar Mailpit** (si no está corriendo):
+
+   ```bash
+   $ docker compose up -d mailpit
+   ```
+
+2. **Confirmar que la cuenta de prueba tiene email.** `recuperarPassword` solo
+   manda el correo si `cliente.email` no es null; si el cliente no tiene
+   email, la API igual responde 200 con el mensaje genérico (por diseño,
+   RF-03 no revela si el RUT existe) pero no se envía nada — no vas a ver
+   nada en Mailpit y no es un bug.
+
+3. **Pedir la recuperación:**
+
+   ```bash
+   $ curl -X POST http://localhost:4000/api/auth/recuperar-password \
+       -H "Content-Type: application/json" \
+       -d '{"rut": "12345678-5"}'
+   ```
+
+4. **Abrir Mailpit** en <http://localhost:8025> — ahí aparece "Recuperación de
+   contraseña - Portal Clientes". El link apunta a
+   `{FRONTEND_URL}/restablecer-password#token=...`; si `apps/view` está
+   corriendo en `:3000`, se puede abrir tal cual y completar el formulario, o
+   copiar el `token` del fragmento y pegarlo directo en el body de:
+
+   ```bash
+   $ curl -X POST http://localhost:4000/api/auth/restablecer-password \
+       -H "Content-Type: application/json" \
+       -d '{"token": "<token del link>", "password": "NuevaClave1"}'
+   ```
+
+5. Al restablecer, Mailpit recibe un segundo correo, "Contraseña actualizada -
+   Portal Clientes" — confirma que el `UPDATE` a la base salió bien.
+
+**Troubleshooting:**
+
+- **429 en cualquiera de los dos POST** — ambos endpoints están limitados a 3
+  intentos por minuto por IP (ver `docs/auth.md`); espera un minuto entre
+  pruebas.
+- **El login sigue rechazando la contraseña nueva** ("RUT o contraseña
+  incorrectos") — antes de sospechar del flujo de correo, revisar
+  `cliente.estado` en la base: el login exige que sea `'activo'` (normalizado
+  a minúscula desde `auth.service.ts`; si viene de un import con otro casing
+  o valor, ese es el bloqueo, no la contraseña). El log del backend lo dice
+  explícito: `Login rejected: RUT ... estado=<valor>`.
 
 ## Base de datos
 

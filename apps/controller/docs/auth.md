@@ -145,6 +145,9 @@ Si el RUT existe y tiene email registrado, se envia un enlace de recuperacion al
 
 Por seguridad, la respuesta siempre es identica, sin revelar si el RUT existe o no.
 
+> Para probar el envio de correos en dev (Mailpit, sin SMTP real) ver
+> [`../README.md#probar-el-correo-de-recuperación-de-contraseña`](../README.md#probar-el-correo-de-recuperación-de-contraseña).
+
 **Respuesta 200 (siempre la misma):**
 
 ```json

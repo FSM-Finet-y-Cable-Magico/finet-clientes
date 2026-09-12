@@ -30,9 +30,11 @@ finet-clientes/
 # 1. Instalar dependencias de todo el monorepo (desde raíz)
 pnpm install
 
-# 2. Crear los dos archivos .env (ver "Variables de entorno" abajo).
-#    No hay .env.example en el repo: las variables se documentan acá.
-#    Ambos archivos están en .gitignore — nunca se commitean.
+# 2. Copiar los .env.example a .env en cada app (ver "Variables de entorno"
+#    abajo para el detalle de cada variable). Ambos .env están en
+#    .gitignore — nunca se commitean.
+cp apps/controller/.env.example apps/controller/.env
+cp apps/view/.env.example apps/view/.env
 
 # 3. Generar el cliente Prisma (obligatorio antes de correr tests o build)
 pnpm -C apps/controller prisma generate
