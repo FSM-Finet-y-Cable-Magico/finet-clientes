@@ -1,4 +1,3 @@
-import { Search } from 'lucide-react';
 import NavLogo from './NavLogo';
 import NavbarAuthArea from './NavbarAuthArea';
 import ThemeToggle from './ThemeToggle';
@@ -31,13 +30,6 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              aria-label="Buscar"
-              disabled
-              className="flex items-center justify-center w-9 h-9 rounded-md text-muted opacity-50 transition-colors"
-            >
-              <Search size={18} />
-            </button>
             <NavbarAuthArea />
             <MobileMenu items={navItems} />
           </div>
