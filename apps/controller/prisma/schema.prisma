@@ -596,15 +596,16 @@ model sesion_portal {
 }
 
 model solicitud_contrasena_wifi {
-  id_solicitud        Int       @id @default(autoincrement())
-  id_contrato         Int
-  id_cliente          Int
-  password_nueva_hash String    @db.VarChar(72)
-  estado              String    @db.VarChar(20)
-  fecha_solicitud     DateTime? @default(now()) @db.Timestamp(6)
-  fecha_procesada     DateTime? @db.Timestamp(6)
-  cliente             cliente   @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_contrasena_wifi_id_cliente")
-  contrato            contrato  @relation(fields: [id_contrato], references: [id_contrato], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_contrasena_wifi_id_contrato")
+  id_solicitud           Int       @id @default(autoincrement())
+  id_contrato            Int
+  id_cliente             Int
+  password_nueva_hash    String    @db.VarChar(72)
+  password_nueva_cifrada String?   @db.Text
+  estado                 String    @db.VarChar(20)
+  fecha_solicitud        DateTime? @default(now()) @db.Timestamp(6)
+  fecha_procesada        DateTime? @db.Timestamp(6)
+  cliente                cliente   @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_contrasena_wifi_id_cliente")
+  contrato               contrato  @relation(fields: [id_contrato], references: [id_contrato], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_contrasena_wifi_id_contrato")
 }
 
 model stock_consumible {

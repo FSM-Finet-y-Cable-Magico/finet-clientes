@@ -20,12 +20,33 @@
 -- (pedido de Dani en el mismo review). VARCHAR(72) igual que
 -- password_portal_hash y password_tvip_hash: bcrypt ocupa 60.
 --
--- OJO CU-33: bcrypt no es reversible, asi que desde esta tabla ya no se puede
--- leer la clave que el tecnico debe aplicar en el equipo. CU-33 queda
--- necesitando otra via para obtenerla (pedirsela al cliente al aplicar el
--- cambio, o cambiar este campo a cifrado reversible con manejo de llaves).
--- El hash sirve para verificar despues que la clave aplicada es la que el
--- cliente pidio, no para recuperarla.
+-- Las dos columnas de la clave tienen roles distintos y a proposito:
+--
+--   password_nueva_hash     bcrypt. NO se borra nunca. Es el registro
+--                           permanente para verificar despues que la clave
+--                           aplicada es la que el cliente pidio. No sirve
+--                           para recuperarla: bcrypt es de una sola via.
+--
+--   password_nueva_cifrada  la clave cifrada con la llave PUBLICA RSA del CRM
+--                           (RSA-OAEP, base64). Solo el CRM tiene la privada,
+--                           asi que en esta base no hay nada legible: ni para
+--                           el portal, ni para un DBA, ni en un dump. Es la
+--                           via por la que CU-33 obtiene la clave para
+--                           aplicarla en el equipo via Smart OLT, porque el
+--                           equipo necesita la clave en claro (la usa para
+--                           derivar la PSK de WPA2) y el hash no le sirve.
+--
+-- Contrato con el CRM (Grupo 8), ver CAMBIOS-BD-Y-SOLICITUDES.md:
+--   - descifran con su llave privada al aplicar el cambio;
+--   - en el MISMO update donde marcan 'APLICADA' dejan
+--     password_nueva_cifrada en NULL, para que el secreto no quede
+--     envejeciendo en la base;
+--   - si la solicitud queda 'FALLIDA' la columna se mantiene, para reintentar;
+--   - si llega en NULL desde el principio, es que el portal no tenia la llave
+--     publica configurada: en ese caso hay que pedirle la clave al cliente.
+--
+-- TEXT y no VARCHAR(n) porque el largo del ciframiento depende del tamano de
+-- la llave del CRM (una RSA-4096 da 684 caracteres en base64).
 
 -- CreateTable
 CREATE TABLE "solicitud_contrasena_wifi" (
@@ -33,6 +54,7 @@ CREATE TABLE "solicitud_contrasena_wifi" (
     "id_contrato" INTEGER NOT NULL,
     "id_cliente" INTEGER NOT NULL,
     "password_nueva_hash" VARCHAR(72) NOT NULL,
+    "password_nueva_cifrada" TEXT,
     "estado" VARCHAR(20) NOT NULL,
     "fecha_solicitud" TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,
     "fecha_procesada" TIMESTAMP(6),

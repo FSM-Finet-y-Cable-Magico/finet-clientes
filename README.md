@@ -92,6 +92,13 @@ PORT=4000
 CORS_ORIGIN="http://localhost:3000,https://app.tudominio.com"
 FRONTEND_URL="http://localhost:3000"
 
+# Cambio de clave WiFi (CU-32) — llave PUBLICA RSA del CRM, en base64.
+# La genera Grupo 8 y solo ellos tienen la privada. Con esto la clave WiFi que
+# pide el cliente queda cifrada en la base y solo el CRM puede leerla para
+# aplicarla en el equipo. Si falta, la solicitud se registra sin cifrar y el
+# CRM tiene que pedirle la clave al cliente.
+CRM_PUBLIC_KEY=""
+
 # SMTP (Mail)
 SMTP_HOST=localhost
 SMTP_PORT=1025
@@ -111,6 +118,7 @@ MAIL_FROM="Portal Clientes <no-reply@finet.cl>"
 | `CORS_ORIGIN` | Sí | Orígenes permitidos, separados por coma |
 | `FRONTEND_URL` | Sí | URL base del frontend, usada en recuperación de contraseña |
 | `SMTP_*`, `MAIL_FROM` | Sí | Envío de correo (en dev, Mailpit vía `docker compose up -d`) |
+| `CRM_PUBLIC_KEY` | No | Llave pública RSA del CRM (PEM en base64) con la que se cifra la clave WiFi de CU-32. Sin ella el endpoint sigue funcionando, pero la solicitud queda sin la clave cifrada — ver `portal.service.ts` |
 | `POSTGRES_*` | No | Solo los consume el `docker-compose` de desarrollo |
 
 ### Frontend — `apps/view/.env`

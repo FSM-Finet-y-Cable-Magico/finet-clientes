@@ -9,6 +9,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { constants, publicEncrypt } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   ESTADOS_CONTRATO_VIGENTES,
@@ -36,6 +38,7 @@ export class PortalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) {}
 
   //  CU-23: Consultar estado operativo del contrato
@@ -486,12 +489,19 @@ export class PortalService {
   //  El portal NO cambia la clave: solo deja registrada la solicitud para que el
   //  CRM la ejecute contra el equipo del cliente (CU-33).
   //
-  //  La clave se guarda hasheada con bcrypt, nunca en texto plano (pedido de
-  //  Dani en el review de esta rama). Ojo con la consecuencia: bcrypt no es
-  //  reversible, asi que CU-33 ya no puede leer de la tabla la clave que tiene
-  //  que aplicar en el equipo — queda pendiente definir por donde la recibe
-  //  quien la aplica. Lo que el hash permite es verificar despues que la clave
-  //  aplicada es la que el cliente pidio.
+  //  La clave se guarda de dos formas y ninguna es texto plano:
+  //
+  //    password_nueva_hash     bcrypt. Queda para siempre y sirve para
+  //                            verificar despues que la clave aplicada es la
+  //                            que el cliente pidio. No se puede revertir.
+  //
+  //    password_nueva_cifrada  cifrada con la llave publica del CRM. Es la via
+  //                            por la que CU-33 obtiene la clave para
+  //                            escribirla en el equipo: el router necesita la
+  //                            clave en claro para derivar la PSK de WPA2, y
+  //                            un hash no le sirve. Solo Grupo 8 tiene la
+  //                            privada, asi que en nuestra base no hay nada
+  //                            legible. Ellos la borran al marcar APLICADA.
   //
   //  El formato ya viene validado por Zod en el controller (CU-31 / RF-24).
   async solicitarCambioContrasenaWifi(
@@ -527,11 +537,12 @@ export class PortalService {
     }
 
     try {
-      // Se hashea recien aca: despues de validar el contrato, para no gastar el
-      // cost de bcrypt en requests que terminan en 404/409, y antes de abrir la
-      // transaccion, para no tenerla esperando el hash. Cost 10, el mismo que
-      // usan auth y perfil.
+      // Se hashea y se cifra recien aca: despues de validar el contrato, para
+      // no gastar el cost de bcrypt en requests que terminan en 404/409, y
+      // antes de abrir la transaccion, para no tenerla esperando el hash.
+      // Cost 10, el mismo que usan auth y perfil.
       const passwordNuevaHash = await bcrypt.hash(dto.password, 10);
+      const passwordNuevaCifrada = this.cifrarClaveParaCrm(dto.password);
 
       const solicitud = await this.prisma.$transaction(async (tx) => {
         const creada = await tx.solicitud_contrasena_wifi.create({
@@ -539,6 +550,7 @@ export class PortalService {
             id_contrato: contrato.id_contrato,
             id_cliente: idCliente,
             password_nueva_hash: passwordNuevaHash,
+            password_nueva_cifrada: passwordNuevaCifrada,
             // MAYUSCULAS por la convencion del §11.15 del Documento 0: todo
             // catalogo cerrado se guarda asi (ACTIVO, ABIERTO, MEDIA...).
             estado: 'PENDIENTE',
@@ -584,6 +596,64 @@ export class PortalService {
       throw new ServiceUnavailableException(
         'No fue posible registrar tu solicitud. Intenta nuevamente mas tarde.',
       );
+    }
+  }
+
+  /**
+   * Cifra la clave WiFi con la llave publica RSA del CRM para que solo Grupo 8
+   * pueda leerla (CU-33 la necesita en claro para escribirla en el equipo).
+   *
+   * Se usa RSA y no un cifrado simetrico como AES para no tener que compartir
+   * una llave entre los dos grupos: la publica puede andar en el repo sin
+   * riesgo, la privada no sale del entorno de ellos.
+   *
+   * La llave se configura en `CRM_PUBLIC_KEY`, en base64 (comodo para una
+   * variable de entorno, que no admite saltos de linea) o como PEM tal cual.
+   *
+   * Devuelve `null` si no hay llave o si el cifrado falla, y lo deja en el log
+   * de errores. No lanza a proposito: CU-32 tiene que poder registrar la
+   * solicitud del cliente igual, y el `null` es un contrato explicito con el
+   * CRM — significa "no viene cifrada, pidanle la clave al cliente".
+   */
+  private cifrarClaveParaCrm(clave: string): string | null {
+    const configurada = this.configService
+      .get<string>('CRM_PUBLIC_KEY')
+      ?.trim();
+
+    if (!configurada) {
+      this.logger.error(
+        'CRM_PUBLIC_KEY no esta configurada: la solicitud queda sin la clave cifrada y el CRM tendra que pedirsela al cliente',
+      );
+      return null;
+    }
+
+    try {
+      const pem = configurada.includes('-----BEGIN')
+        ? configurada
+        : Buffer.from(configurada, 'base64').toString('utf8');
+
+      if (!pem.includes('-----BEGIN')) {
+        throw new Error('CRM_PUBLIC_KEY no es un PEM ni un PEM en base64');
+      }
+
+      const cifrada = publicEncrypt(
+        {
+          key: pem,
+          padding: constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
+        },
+        Buffer.from(clave, 'utf8'),
+      );
+
+      return cifrada.toString('base64');
+    } catch (error) {
+      // Llave mal formada, o clave mas larga de lo que aguanta: una RSA-4096
+      // con OAEP-SHA256 admite 446 bytes, una RSA-2048 solo 190.
+      this.logger.error(
+        'No se pudo cifrar la clave WiFi con la llave publica del CRM',
+        error,
+      );
+      return null;
     }
   }
 
