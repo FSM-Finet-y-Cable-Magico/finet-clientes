@@ -18,26 +18,37 @@ export function formatPrecioMensual(precio: number): string {
   return formatPrecio(precio);
 }
 
+/**
+ * Catalogo que lanza si el backend falla, para quien no puede confundir
+ * "backend caido" con "catalogo vacio", como el sitemap (CU-74).
+ */
+export async function fetchLandingPlanes(
+  tipoCliente?: string
+): Promise<PlanBackend[]> {
+  const url = new URL(`${API_URL}/landing/planes`);
+  if (tipoCliente) {
+    url.searchParams.set("tipo_cliente", tipoCliente);
+  }
+
+  const res = await fetch(url.toString(), { next: { revalidate: 300 } });
+
+  if (!res.ok) {
+    if (res.status === 404) return [];
+    throw new Error(`Error al obtener planes: ${res.status}`);
+  }
+
+  return res.json();
+}
+
 export async function getLandingPlanes(
   tipoCliente?: string
 ): Promise<PlanBackend[]> {
   try {
-    const url = new URL(`${API_URL}/landing/planes`);
-    if (tipoCliente) {
-      url.searchParams.set("tipo_cliente", tipoCliente);
-    }
-
-    const res = await fetch(url.toString(), { next: { revalidate: 300 } });
-
-    if (!res.ok) {
-      if (res.status === 404) return [];
-      console.error(`Error al obtener planes: ${res.status}`);
-      return [];
-    }
-
-    return res.json();
-  } catch {
-    console.error("Backend no disponible. Mostrando catalogo vacio.");
+    return await fetchLandingPlanes(tipoCliente);
+  } catch (error) {
+    console.error(
+      `Backend no disponible (${error instanceof Error ? error.message : error}). Mostrando catalogo vacio.`
+    );
     return [];
   }
 }

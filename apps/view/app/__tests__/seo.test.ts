@@ -45,6 +45,14 @@ describe("metadataSeccion (CU-72)", () => {
     });
   });
 
+  // CU-74: el registro de rutas marca estas paginas como no indexables.
+  it("pone noindex y omite el canonical en las rutas no indexables", () => {
+    const meta = metadataSeccion({ path: "/recuperar-password" });
+
+    expect(meta.robots).toEqual({ index: false, follow: true });
+    expect(meta.alternates).toBeUndefined();
+  });
+
   it("no fija titulo en twitter para que lo herede de openGraph", () => {
     expect(metadataSeccion({ path: "/tv", title: "TV" }).twitter).toEqual({
       card: "summary_large_image",

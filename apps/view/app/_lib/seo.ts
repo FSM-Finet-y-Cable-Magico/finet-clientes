@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { formatPrecioMensual, type PlanBackend } from "./api";
 import { COMPANY_BRAND } from "./company";
+import { esIndexable } from "./rutas-publicas";
 
 /**
  * CU-72: etiquetas de indexacion por seccion y plan.
@@ -68,7 +69,11 @@ function construir(
   return {
     title: title ?? { absolute: SEO_DEFAULTS.title },
     description,
-    alternates: { canonical: seccion.path },
+    // CU-74: el registro de rutas decide. Una pagina con noindex no declara
+    // canonical, que le pediria al buscador indexar esa URL.
+    ...(esIndexable(seccion.path)
+      ? { alternates: { canonical: seccion.path } }
+      : { robots: { index: false, follow: true } }),
     openGraph: {
       ...openGraphBase,
       // Si la ruta tiene su propia opengraph-image, la clave `images` no puede
