@@ -24,6 +24,16 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // CU-73: las paginas legales dejaron /legal/*. Ley 21.398 y reclamos pasaron
+  // a ser secciones de Terminos.
+  async redirects() {
+    return [
+      { source: "/legal/terminos", destination: "/terminos", permanent: true },
+      { source: "/legal/privacidad", destination: "/privacidad", permanent: true },
+      { source: "/legal/reclamos", destination: "/terminos#reclamos", permanent: true },
+      { source: "/legal/ley-21398", destination: "/terminos#termino", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

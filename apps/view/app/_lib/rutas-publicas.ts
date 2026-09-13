@@ -36,10 +36,8 @@ export const RUTAS_PUBLICAS: RutaPublica[] = [
   { path: "/ayuda", indexable: true, changeFrequency: "monthly", priority: 0.6 },
   { path: "/consultar-deuda", indexable: true, changeFrequency: "monthly", priority: 0.6 },
   { path: "/inicio-sesion", indexable: true, changeFrequency: "yearly", priority: 0.4 },
-  { path: "/legal/terminos", indexable: true, changeFrequency: "yearly", priority: 0.3 },
-  { path: "/legal/privacidad", indexable: true, changeFrequency: "yearly", priority: 0.3 },
-  { path: "/legal/reclamos", indexable: true, changeFrequency: "yearly", priority: 0.3 },
-  { path: "/legal/ley-21398", indexable: true, changeFrequency: "yearly", priority: 0.3 },
+  { path: "/terminos", indexable: true, changeFrequency: "yearly", priority: 0.3 },
+  { path: "/privacidad", indexable: true, changeFrequency: "yearly", priority: 0.3 },
   // Solo sirven a quien ya llego desde el login o el correo.
   { path: "/recuperar-password", indexable: false },
   { path: "/restablecer-password", indexable: false },

@@ -239,7 +239,7 @@ export default function RegisterForm() {
       <p className="mt-6 text-center text-xs text-muted">
         Al registrarte aceptas nuestros{" "}
         <a
-          href="#"
+          href="/terminos"
           className="text-primary underline hover:opacity-80"
         >
           Términos y Condiciones
