@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { metadataSeccion } from "../_lib/seo";
 import FastSpeedTest from "../_components/FastSpeedTest";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = metadataSeccion({
+  path: "/velocidad",
   title: "Test de velocidad",
   description:
     "Mide la velocidad de bajada, subida y latencia de tu conexion a internet.",
-};
+});
 
 export default function VelocidadPage() {
   return (

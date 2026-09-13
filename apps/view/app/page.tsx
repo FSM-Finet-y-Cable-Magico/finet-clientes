@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { metadataSeccion, resumenPlanes } from "./_lib/seo";
 import { Hero } from "./_components/layout/hero/Hero";
 import PlanCard from "./_components/catalog/PlanCard";
 import PrimaryButton from "./_components/ui/PrimaryButton";
@@ -12,16 +13,19 @@ import {
   MapPinned,
 } from "lucide-react";
 
-export const metadata: Metadata = {
-  title: "Internet Fibra Optica en La Pintana y Puente Alto | Finet",
-  description:
-    "Internet de fibra optica simetrica desde 200 Mbps. Sin limites de datos, instalacion incluida. Planes hogar y empresa en La Pintana, Puente Alto, La Florida y La Granja.",
-  openGraph: {
-    title: "Finet — Internet Fibra Optica | La Pintana y Puente Alto",
-    description:
-      "Fibra optica simetrica de alta velocidad. Planes desde $19.990/mes en la zona sur de Santiago.",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const resumen = resumenPlanes(await getLandingPlanes());
+  const desdeMbps = resumen?.mbpsDesde ? ` desde ${resumen.mbpsDesde} Mbps` : "";
+  const desdePrecio = resumen ? ` desde ${resumen.precioDesde}` : "";
+
+  return metadataSeccion({
+    path: "/",
+    title: "Internet Fibra Optica en La Pintana y Puente Alto | Finet",
+    description: `Internet de fibra optica simetrica${desdeMbps}. Sin limites de datos, instalacion incluida. Planes hogar y empresa en La Pintana, Puente Alto, La Florida y La Granja.`,
+    shareTitle: "Finet — Internet Fibra Optica | La Pintana y Puente Alto",
+    shareDescription: `Fibra optica simetrica de alta velocidad. Planes${desdePrecio} en la zona sur de Santiago.`,
+  });
+}
 
 const beneficios = [
   {

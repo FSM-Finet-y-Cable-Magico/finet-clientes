@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
+import { metadataSeccion } from "../_lib/seo";
 import { MapPinOff } from "lucide-react";
 import VisorCobertura from "../_components/cobertura/VisorCobertura";
 import { getPuntosCobertura, getVisorCoberturaConfig } from "../_lib/api";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = metadataSeccion({
+  path: "/cobertura",
   title: "Consulta de cobertura",
   description:
     "Explora el mapa de cobertura de fibra optica de Finet en La Pintana y Puente Alto.",
-};
+});
 
 export default async function CoberturaPage() {
   const [config, puntos] = await Promise.all([
