@@ -5,6 +5,7 @@ import FormularioContratacion from "../../_components/catalog/FormularioContrata
 import { getLandingPlanes, getPlanById, formatPrecioMensual } from "../../_lib/api";
 import { productJsonLd, breadcrumbJsonLd } from "../../_lib/jsonld";
 import { BASE_URL } from "../../_lib/consts";
+import { metadataPlan } from "../../_lib/seo";
 
 type ContratarPlanPageProps = {
   params: Promise<{
@@ -24,23 +25,7 @@ export async function generateMetadata({
 }: ContratarPlanPageProps): Promise<Metadata> {
   const { planId } = await params;
   const plan = await getPlanById(Number(planId));
-
-  if (!plan) {
-    return { title: "Plan no encontrado" };
-  }
-
-  return {
-    title: `Contratar ${plan.nombre_comercial}`,
-    description: `Solicita la contratacion de ${plan.nombre_comercial} — ${plan.descripcion ?? "Internet fibra optica"} por $${plan.precio_mensual.toLocaleString("es-CL")}/mes. Internet fibra optica en La Pintana y Puente Alto.`,
-    openGraph: {
-      title: `Contratar ${plan.nombre_comercial} | Finet`,
-      description: `${plan.nombre_comercial} por $${plan.precio_mensual.toLocaleString("es-CL")}/mes. Fibra optica en La Pintana.`,
-    },
-    robots: {
-      index: false,
-      follow: false,
-    },
-  };
+  return metadataPlan(plan, `/contratar/${planId}`);
 }
 
 export default async function ContratarPlanPage({ params }: ContratarPlanPageProps) {

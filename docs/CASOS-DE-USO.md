@@ -181,15 +181,57 @@ El orden de dependencia real es el que describe el criterio de agrupación: `deu
 
 ## Incremento 4 — SEO, políticas, privacidad y cierre técnico
 
-5 CU · 6,25% · No iniciado
+5 CU · 6,25% · En curso (rama `seo`)
 
-| Prioridad | CU | Caso de uso |
-|---|---|---|
-| 1 | CU-72 | Generando etiquetas de indexación por sección y plan |
-| 2 | CU-73 | Accediendo a términos, condiciones y políticas de privacidad |
-| 3 | CU-74 | Generando y actualizando archivos de indexación del sitio |
-| 4 | CU-75 | Registrando aceptación de políticas de privacidad en formularios |
-| 5 | CU-76 | Gestionando consentimiento de cookies al primer ingreso |
+| Prioridad | CU | Caso de uso | Estado |
+|---|---|---|---|
+| 1 | CU-72 | Generando etiquetas de indexación por sección y plan | ✅ — `metadataSeccion`/`metadataPlan` en `apps/view/app/_lib/seo.ts` |
+| 2 | CU-73 | Accediendo a términos, condiciones y políticas de privacidad | ✅ — `/terminos` y `/privacidad` publicadas y enlazadas desde el footer. Faltan datos que entrega Finet, ver abajo |
+| 3 | CU-74 | Generando y actualizando archivos de indexación del sitio | ✅ — `sitemap.xml` y `robots.txt` desde `apps/view/app/_lib/rutas-publicas.ts` |
+| 4 | CU-75 | Registrando aceptación de políticas de privacidad en formularios | ✅ — casilla obligatoria en contratación y registro de cuenta (no existe formulario de Contacto). La aceptación se registra en `log_auditoria` (`ACEPTAR_POLITICA_PRIVACIDAD`) dentro de la misma transacción que los datos, sin cambios de schema. Ver `apps/controller/docs/contrataciones.md` |
+| 5 | CU-76 | Gestionando consentimiento de cookies al primer ingreso | ⏳ Pendiente |
+
+### Pendientes del CU-73
+
+Las páginas están publicadas con el contenido de `legales-isp-v2.md`. Donde falta un dato, la página deja el **espacio en blanco** (el lector de pantalla lo anuncia como "dato pendiente"). Al recibir un dato se completa en el archivo indicado, que cambia en todo el sitio, y se tacha de esta lista. No es asesoría legal: si Finet contrata un abogado, estos textos son el punto de partida para su revisión.
+
+**Datos que faltan**
+
+| Dato | Dónde se ve | Dónde se completa | Quién lo entrega |
+|---|---|---|---|
+| RUT de la razón social | Encabezado de Términos, Privacidad §1 | `company.ts` → `COMPANY_RUT` | Administración |
+| Calle y número del domicilio | Encabezado de Términos, Privacidad §1 y §14 | `company.ts` → `COMPANY_STREET_ADDRESS` | Administración |
+| Correo de contacto general | Términos §2, §5 y §6 | `company.ts` → `COMPANY_CONTACT_EMAIL` | Administración |
+| Correo de privacidad | Privacidad §1, §12 y §14 | `company.ts` → `COMPANY_PRIVACY_EMAIL` | Administración |
+| Velocidad mínima garantizada, sobreventa, disponibilidad, latencia y pérdida, direccionamiento IP | Términos §4, tabla de características | `legal.ts` → `CALIDAD_SERVICIO` | Área técnica |
+| Medidas de seguridad de red (p. ej. bloqueo de puertos de abuso) | Términos §4, gestión de tráfico | `legal.ts` → `CALIDAD_SERVICIO.medidasSeguridadRed` | Área técnica |
+| Fecha de la primera medición del tiempo de reposición, y luego una fila por trimestre | Términos §4, indicadores | `legal.ts` → `CALIDAD_SERVICIO.primeraMedicionReposicion` | Área técnica |
+| Mecanismo de descuento por interrupción | Términos §7 | `legal.ts` → `CONDICIONES_CONTRATO.mecanismoCompensacion` | Administración |
+| Comuna de los tribunales competentes | Términos §10 | `legal.ts` → `CONDICIONES_CONTRATO.comunaTribunales` | Administración |
+| Pasarela de pago, facturación electrónica y proveedor de correo | Privacidad §3 y §7 | `legal.ts` → `PROVEEDORES` | Desarrollo + administración |
+| Región de Railway donde se aloja la base | Privacidad §9 | `legal.ts` → `PROVEEDORES.regionAlojamiento` | Desarrollo |
+| Plazos de conservación: registros de red, accesos al Portal, tickets, solicitudes sin contrato | Privacidad §6 | `legal.ts` → `PLAZOS_DATOS` | Administración |
+| Plazo de respuesta a solicitudes de derechos | Privacidad §12 | `legal.ts` → `PLAZOS_DATOS.respuestaDerechos` | Administración |
+
+Los archivos están en `apps/view/app/_lib/`.
+
+**Afirmaciones del documento fuente que se publicaron sin poder verificarlas desde el código** (confirmar con Finet y corregir si no aplican):
+
+- Términos §4: que no se aplica gestión de tráfico que priorice o degrade servicios, y que la tecnología es GPON.
+- Términos §5: el plazo de 1 día hábil para dar término al contrato y la confirmación con folio.
+- Privacidad §3: que no se inspecciona ni guarda contenido de comunicaciones ni historial de navegación (depende de si hay logs de DNS o NetFlow).
+- Privacidad §7: SmartOLT como plataforma de gestión de red.
+- Privacidad §10: respaldos periódicos, separación de ambientes y acuerdos de confidencialidad.
+
+**Decisiones que cambian el texto si la respuesta es sí**:
+
+1. ¿Hay Analytics, Pixel, Tag Manager o chat de terceros en el sitio? → hace falta banner de consentimiento (CU-76) y reescribir Privacidad §5.
+2. ¿Se reporta morosidad a Boletín Comercial o Equifax? → declararlo en Privacidad §7.
+3. ¿Se graban las llamadas de soporte? → aviso al inicio de la llamada.
+4. ¿El aliado regional accede a datos de clientes? → declararlo como destinatario en Privacidad §7.
+5. ¿Está configurado Sentry (`NEXT_PUBLIC_SENTRY_DSN`) en producción? → declararlo como destinatario en Privacidad §7.
+
+**Fuera del alcance del sitio** (obligaciones de la empresa, requieren abogado): registro de actividades de tratamiento, contratos con encargados, procedimiento de brechas ante la Agencia de Datos y la ANCI, protocolo de requerimientos de autoridad y revisión del contrato de servicio contra la Ley 19.496 y la normativa de Subtel.
 
 ---
 

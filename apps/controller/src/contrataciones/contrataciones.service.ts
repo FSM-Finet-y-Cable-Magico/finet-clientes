@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
 import {
   ContratacionDto,
   ContratacionResponseDto,
@@ -20,7 +21,10 @@ export class ContratacionesService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async crear(dto: ContratacionDto): Promise<ContratacionResponseDto> {
+  async crear(
+    dto: ContratacionDto,
+    ip: string,
+  ): Promise<ContratacionResponseDto> {
     const hoy = new Date();
 
     try {
@@ -105,6 +109,25 @@ export class ContratacionesService {
               tiempo_conversion_dias: 0,
               fecha_creacion: hoy,
               fecha_conversion: hoy,
+            },
+          });
+
+          // CU-75: dentro de la transaccion, a diferencia de CREAR_CONTRATACION
+          // mas abajo — sin la aceptacion registrada no se procesa la solicitud.
+          await registrarAceptacionPolitica(tx, {
+            formulario: 'CONTRATACION',
+            id_cliente: cliente.id_cliente,
+            version: dto.version_politica_privacidad,
+            ip,
+            datos: {
+              nombre_completo: dto.nombre_completo,
+              rut: dto.rut,
+              email: dto.email,
+              telefono: dto.telefono ?? null,
+              id_plan: dto.id_plan,
+              direccion_completa: dto.direccion_completa,
+              comuna: dto.comuna,
+              ciudad: dto.ciudad ?? null,
             },
           });
 

@@ -144,7 +144,7 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-xs text-muted">
         Al ingresar aceptas nuestros{" "}
-        <a href="#" className="text-primary underline hover:opacity-80">
+        <a href="/terminos" className="text-primary underline hover:opacity-80">
           Términos y Condiciones
         </a>
       </p>

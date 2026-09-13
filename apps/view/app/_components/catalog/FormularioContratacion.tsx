@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import PrimaryButton from "../ui/PrimaryButton";
+import CasillaPoliticaPrivacidad from "../legal/CasillaPoliticaPrivacidad";
 import type { PlanBackend } from "../../_lib/api";
+import {
+  MENSAJE_POLITICA_REQUERIDA,
+  POLITICA_PRIVACIDAD_VERSION,
+} from "../../_lib/legal";
 
 type FormularioContratacionProps = {
   plan: PlanBackend;
@@ -12,18 +17,53 @@ type FormState = "idle" | "loading" | "success" | "error";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+/** El backend responde `{ message, errors?: [{ message }] }`. */
+async function mensajeDeError(res: Response): Promise<string> {
+  const cuerpo = (await res.json().catch(() => null)) as {
+    message?: string;
+    errors?: { message?: string }[];
+  } | null;
+  return (
+    cuerpo?.errors?.[0]?.message ??
+    cuerpo?.message ??
+    `Error del servidor (${res.status})`
+  );
+}
+
 export default function FormularioContratacion({ plan }: FormularioContratacionProps) {
   const [status, setStatus] = useState<FormState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [aceptaPolitica, setAceptaPolitica] = useState(false);
+  const [errorPolitica, setErrorPolitica] = useState("");
+  const casillaRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // CU-75, Excepción 1: sin la casilla no se envía nada.
+    if (!aceptaPolitica) {
+      setErrorPolitica(MENSAJE_POLITICA_REQUERIDA);
+      casillaRef.current?.focus();
+      return;
+    }
+
     setStatus("loading");
     setErrorMessage("");
 
-    const form = e.currentTarget;
-    const data = new FormData(form);
-    const payload = Object.fromEntries(data.entries());
+    const data = new FormData(e.currentTarget);
+    const campo = (nombre: string) => String(data.get(nombre) ?? "").trim();
+    // Los nombres del DTO del backend (ContratacionDto), no los del formulario.
+    const payload = {
+      id_plan: plan.id_plan,
+      nombre_completo: campo("nombreCompleto"),
+      rut: campo("rut"),
+      email: campo("correoElectronico"),
+      telefono: campo("telefonoMovil") || null,
+      direccion_completa: campo("calleNumero"),
+      comuna: campo("comuna"),
+      acepta_politica_privacidad: true,
+      version_politica_privacidad: POLITICA_PRIVACIDAD_VERSION,
+    };
 
     try {
       const res = await fetch(`${API_URL}/contrataciones`, {
@@ -33,11 +73,10 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
       });
 
       if (!res.ok) {
-        throw new Error(`Error del servidor (${res.status})`);
+        throw new Error(await mensajeDeError(res));
       }
 
       setStatus("success");
-      form.reset();
     } catch (err) {
       setStatus("error");
       setErrorMessage(
@@ -55,7 +94,8 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
           Solicitud enviada
         </h2>
         <p className="text-sm text-on-success-container">
-          Tu solicitud para <strong>{plan.nombre_comercial}</strong> ha sido recibida. Te
+          Tu solicitud para <strong>{plan.nombre_comercial}</strong> ha sido recibida
+          y quedó registrada tu aceptación de la Política de Privacidad. Te
           contactaremos pronto al telefono y correo proporcionados.
         </p>
         <a
@@ -73,8 +113,6 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
       onSubmit={handleSubmit}
       className="grid max-w-xl gap-4 border border-border p-6 rounded-lg"
     >
-      <input type="hidden" name="id_plan" value={plan.id_plan} />
-
       <label className="grid gap-1" htmlFor="nombreCompleto">
         Nombre completo
         <input
@@ -155,6 +193,16 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
           />
         </label>
       </fieldset>
+
+      <CasillaPoliticaPrivacidad
+        ref={casillaRef}
+        checked={aceptaPolitica}
+        error={errorPolitica}
+        onChange={(marcada) => {
+          setAceptaPolitica(marcada);
+          if (marcada) setErrorPolitica("");
+        }}
+      />
 
       {status === "error" && (
         <p className="text-sm text-error" role="alert">

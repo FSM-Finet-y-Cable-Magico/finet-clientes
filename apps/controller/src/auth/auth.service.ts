@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { cleanRut } from '../common/utils/rut.js';
+import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
 
 interface IntentoFallidoMemoria {
   rut_intentado: string;
@@ -254,7 +255,8 @@ export class AuthService {
     password: string,
     ip: string,
     email: string,
-    telefono?: string | null,
+    telefono: string | null | undefined,
+    versionPolitica: string,
   ) {
     const rutLimpio = cleanRut(rut);
 
@@ -280,16 +282,35 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const cliente = await this.prisma.cliente.create({
-      data: {
-        rut: rutLimpio,
-        nombre_completo: nombreCompleto,
-        email: email,
-        telefono: telefono || null,
-        password_portal_hash: passwordHash,
-        id_empresa: 1,
-        estado: 'activo',
-      },
+    // CU-75: el cliente y su aceptacion de la Politica de Privacidad se
+    // registran juntos, o no se registra ninguno.
+    const cliente = await this.prisma.$transaction(async (tx) => {
+      const creado = await tx.cliente.create({
+        data: {
+          rut: rutLimpio,
+          nombre_completo: nombreCompleto,
+          email: email,
+          telefono: telefono || null,
+          password_portal_hash: passwordHash,
+          id_empresa: 1,
+          estado: 'activo',
+        },
+      });
+
+      await registrarAceptacionPolitica(tx, {
+        formulario: 'REGISTRO',
+        id_cliente: creado.id_cliente,
+        version: versionPolitica,
+        ip,
+        datos: {
+          rut: rutLimpio,
+          nombre_completo: nombreCompleto,
+          email,
+          telefono: telefono || null,
+        },
+      });
+
+      return creado;
     });
 
     const payload = { sub: cliente.id_cliente, rut: cliente.rut };
