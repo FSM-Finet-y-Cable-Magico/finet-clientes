@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { cleanRut, validateRut } from '../../common/utils/rut.js';
+import { aceptacionPoliticaShape } from '../../common/politica-privacidad.js';
 
 export const ContratacionDto = z.object({
+  ...aceptacionPoliticaShape,
   nombre_completo: z.string().min(1).max(120),
   rut: z
     .string()

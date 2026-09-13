@@ -188,7 +188,7 @@ El orden de dependencia real es el que describe el criterio de agrupación: `deu
 | 1 | CU-72 | Generando etiquetas de indexación por sección y plan | ✅ — `metadataSeccion`/`metadataPlan` en `apps/view/app/_lib/seo.ts` |
 | 2 | CU-73 | Accediendo a términos, condiciones y políticas de privacidad | ✅ — `/terminos` y `/privacidad` publicadas y enlazadas desde el footer. Faltan datos que entrega Finet, ver abajo |
 | 3 | CU-74 | Generando y actualizando archivos de indexación del sitio | ✅ — `sitemap.xml` y `robots.txt` desde `apps/view/app/_lib/rutas-publicas.ts` |
-| 4 | CU-75 | Registrando aceptación de políticas de privacidad en formularios | ⏳ Pendiente |
+| 4 | CU-75 | Registrando aceptación de políticas de privacidad en formularios | ✅ — casilla obligatoria en contratación y registro de cuenta (no existe formulario de Contacto). La aceptación se registra en `log_auditoria` (`ACEPTAR_POLITICA_PRIVACIDAD`) dentro de la misma transacción que los datos, sin cambios de schema. Ver `apps/controller/docs/contrataciones.md` |
 | 5 | CU-76 | Gestionando consentimiento de cookies al primer ingreso | ⏳ Pendiente |
 
 ### Pendientes del CU-73

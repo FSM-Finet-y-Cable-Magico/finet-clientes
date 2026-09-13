@@ -93,6 +93,8 @@ describe('AuthController', () => {
           password_confirmation: 'Password1',
           email: 'nuevo@test.cl',
           telefono: '',
+          acepta_politica_privacidad: true,
+          version_politica_privacidad: '1.1',
         },
         { ip: '127.0.0.1' } as Request,
         { cookie: jest.fn() } as unknown as Response,
@@ -106,6 +108,7 @@ describe('AuthController', () => {
         '127.0.0.1',
         'nuevo@test.cl',
         '',
+        '1.1',
       );
     });
   });

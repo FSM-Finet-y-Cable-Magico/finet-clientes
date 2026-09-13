@@ -1,4 +1,5 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
+import type { Request } from 'express';
 import { Test } from '@nestjs/testing';
 import { ContratacionesController } from './contrataciones.controller.js';
 import { ContratacionesService } from './contrataciones.service.js';
@@ -15,6 +16,8 @@ const DTO_VALIDO: ContratacionDto = {
   direccion_completa: 'Av. Siempre Viva 742',
   comuna: 'Providencia',
   ciudad: 'Santiago',
+  acepta_politica_privacidad: true,
+  version_politica_privacidad: '1.1',
 };
 
 const RESPUESTA_MOCK = { id_cliente: 10, id_contrato: 20, id_ot: 30 };
@@ -37,9 +40,11 @@ describe('ContratacionesController', () => {
 
   describe('POST /contrataciones', () => {
     it('llama al service.crear con el DTO validado y retorna 201', async () => {
-      const result = await controller.crear(DTO_VALIDO);
+      const result = await controller.crear(DTO_VALIDO, {
+        ip: '203.0.113.7',
+      } as Request);
 
-      expect(service.crear).toHaveBeenCalledWith(DTO_VALIDO);
+      expect(service.crear).toHaveBeenCalledWith(DTO_VALIDO, '203.0.113.7');
       expect(result).toEqual(RESPUESTA_MOCK);
     });
 
@@ -101,6 +106,8 @@ describe('ContratacionesController', () => {
         id_plan: 1,
         direccion_completa: 'Av. Siempre Viva 742',
         comuna: 'Providencia',
+        acepta_politica_privacidad: true,
+        version_politica_privacidad: '1.1',
       });
       expect(result.success).toBe(true);
     });
@@ -115,6 +122,8 @@ describe('ContratacionesController', () => {
         direccion_completa: 'Av. Siempre Viva 742',
         comuna: 'Providencia',
         ciudad: null,
+        acepta_politica_privacidad: true,
+        version_politica_privacidad: '1.1',
       });
       expect(result.success).toBe(true);
     });
@@ -125,6 +134,36 @@ describe('ContratacionesController', () => {
         rut: '11.111.111-1',
       });
       expect(result.rut).toBe(RUT_VALIDO);
+    });
+  });
+
+  // CU-75, Excepcion 1: sin la casilla marcada no se procesa el formulario.
+  describe('Aceptación de la Política de Privacidad (CU-75)', () => {
+    it.each([
+      ['sin la casilla', undefined],
+      ['con la casilla desmarcada', false],
+    ])('rechaza la solicitud %s e informa que debe aceptarla', (_, valor) => {
+      const result = ContratacionDto.safeParse({
+        ...DTO_VALIDO,
+        acepta_politica_privacidad: valor,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues).toEqual([
+        expect.objectContaining({
+          path: ['acepta_politica_privacidad'],
+          message: 'Debes aceptar la Política de Privacidad para continuar',
+        }),
+      ]);
+    });
+
+    it('rechaza la solicitud sin la versión de la política aceptada', () => {
+      const result = ContratacionDto.safeParse({
+        ...DTO_VALIDO,
+        version_politica_privacidad: '',
+      });
+
+      expect(result.success).toBe(false);
     });
   });
 });

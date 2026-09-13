@@ -123,6 +123,8 @@ export class AuthController {
       telefono?: string;
       password: string;
       password_confirmation: string;
+      acepta_politica_privacidad: true;
+      version_politica_privacidad: string;
     },
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -134,6 +136,7 @@ export class AuthController {
       req.ip ?? '0.0.0.0',
       body.email,
       body.telefono,
+      body.version_politica_privacidad,
     );
     res.cookie('access_token', result.access_token, {
       httpOnly: true,

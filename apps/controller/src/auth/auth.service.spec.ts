@@ -35,6 +35,8 @@ describe('AuthService', () => {
         {
           provide: PrismaService,
           useValue: {
+            $transaction: jest.fn(),
+            log_auditoria: { create: jest.fn() },
             cliente: {
               findUnique: jest.fn(),
               findFirst: jest.fn(),
@@ -74,6 +76,10 @@ describe('AuthService', () => {
     authService = module.get(AuthService);
     prisma = module.get<PrismaService>(PrismaService);
     jwtService = module.get<JwtService>(JwtService);
+    // La transaccion del registro (CU-75) corre sobre el mismo mock.
+    (prisma.$transaction as unknown as jest.Mock).mockImplementation(
+      (cb: (tx: unknown) => unknown) => cb(prisma),
+    );
   });
 
   describe('login', () => {
@@ -148,6 +154,7 @@ describe('AuthService', () => {
         '127.0.0.1',
         'nuevo@test.cl',
         '998877665',
+        '1.1',
       );
 
       expect(prisma.cliente.create).toHaveBeenCalledWith({
@@ -172,6 +179,71 @@ describe('AuthService', () => {
       });
     });
 
+    // CU-75: el cliente y su aceptación quedan en la misma transacción.
+    it('registra la aceptación de la Política de Privacidad sin la contraseña', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.cliente.create as jest.Mock).mockResolvedValue({
+        ...mockCliente,
+        id_cliente: 6,
+      });
+      (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt');
+
+      await authService.register(
+        '123456785',
+        'Nuevo Cliente',
+        'Password1',
+        '203.0.113.7',
+        'nuevo@test.cl',
+        '998877665',
+        '1.1',
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
+        data: {
+          accion: 'ACEPTAR_POLITICA_PRIVACIDAD',
+          entidad_afectada: 'cliente',
+          id_entidad_afectada: 6,
+          ip_origen: '203.0.113.7',
+          valor_nuevo: {
+            formulario: 'REGISTRO',
+            version_politica: '1.1',
+            datos: {
+              rut: '123456785',
+              nombre_completo: 'Nuevo Cliente',
+              email: 'nuevo@test.cl',
+              telefono: '998877665',
+            },
+          },
+        },
+      });
+    });
+
+    it('no crea la sesión si no se puede registrar la aceptación', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCliente);
+      (prisma.log_auditoria.create as jest.Mock).mockRejectedValue(
+        new Error('insert failed'),
+      );
+
+      await expect(
+        authService.register(
+          '123456785',
+          'Nuevo Cliente',
+          'Password1',
+          '0.0.0.0',
+          'nuevo@test.cl',
+          undefined,
+          '1.1',
+        ),
+      ).rejects.toThrow('insert failed');
+      expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
+    });
+
     it('throw ConflictException when RUT already exists', async () => {
       (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(mockCliente);
 
@@ -182,6 +254,8 @@ describe('AuthService', () => {
           'Password1',
           '0.0.0.0',
           'otro@test.cl',
+          undefined,
+          '1.1',
         ),
       ).rejects.toThrow('No se pudo completar el registro');
     });
@@ -197,6 +271,8 @@ describe('AuthService', () => {
           'Password1',
           '0.0.0.0',
           'juan@test.cl',
+          undefined,
+          '1.1',
         ),
       ).rejects.toThrow('No se pudo completar el registro');
     });
@@ -225,6 +301,8 @@ describe('AuthService', () => {
         'Password1',
         '0.0.0.0',
         'sesion@test.cl',
+        undefined,
+        '1.1',
       );
 
       expect(prisma.sesion_portal.create).toHaveBeenCalledWith({
@@ -260,6 +338,8 @@ describe('AuthService', () => {
         'Password1',
         '0.0.0.0',
         'exp@test.cl',
+        undefined,
+        '1.1',
       );
       const afterCall = Date.now();
 

@@ -16,6 +16,7 @@ import {
 import {
   LEGAL_ACTUALIZACION,
   PLAZOS_DATOS,
+  POLITICA_PRIVACIDAD_VERSION,
   PROVEEDORES,
 } from "../../_lib/legal";
 import { metadataSeccion } from "../../_lib/seo";
@@ -400,7 +401,7 @@ export default function PrivacidadPage() {
       encabezado={
         <p>
           {COMPANY_LEGAL_NAME} · Última actualización: {LEGAL_ACTUALIZACION} ·
-          Versión 1.1
+          Versión {POLITICA_PRIVACIDAD_VERSION}
         </p>
       }
       secciones={secciones}

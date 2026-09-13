@@ -18,7 +18,11 @@ const DTO_MOCK: ContratacionDto = {
   direccion_completa: 'Av. Siempre Viva 742',
   comuna: 'Providencia',
   ciudad: 'Santiago',
+  acepta_politica_privacidad: true,
+  version_politica_privacidad: '1.1',
 };
+
+const IP = '203.0.113.7';
 
 const RESULTADO_MOCK = { id_cliente: 10, id_contrato: 20, id_ot: 30 };
 
@@ -41,6 +45,9 @@ function mockTx() {
       create: jest.fn(),
     },
     prospecto: {
+      create: jest.fn(),
+    },
+    log_auditoria: {
       create: jest.fn(),
     },
   };
@@ -85,7 +92,7 @@ describe('ContratacionesService', () => {
         id_prospecto: 99,
       });
 
-      const result = await service.crear(DTO_MOCK);
+      const result = await service.crear(DTO_MOCK, IP);
 
       expect(result).toEqual(RESULTADO_MOCK);
 
@@ -149,7 +156,7 @@ describe('ContratacionesService', () => {
         id_prospecto: 99,
       });
 
-      await service.crear(DTO_MOCK);
+      await service.crear(DTO_MOCK, IP);
 
       expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -182,7 +189,7 @@ describe('ContratacionesService', () => {
         new Error('DB audit down'),
       );
 
-      const result = await service.crear(DTO_MOCK);
+      const result = await service.crear(DTO_MOCK, IP);
 
       expect(result).toEqual(RESULTADO_MOCK);
     });
@@ -205,7 +212,7 @@ describe('ContratacionesService', () => {
         id_prospecto: 99,
       });
 
-      const result = await service.crear(dtoSinOpcionales);
+      const result = await service.crear(dtoSinOpcionales, IP);
 
       expect(result).toEqual(RESULTADO_MOCK);
     });
@@ -217,8 +224,10 @@ describe('ContratacionesService', () => {
         id_cliente: 99,
       });
 
-      await expect(service.crear(DTO_MOCK)).rejects.toThrow(ConflictException);
-      await expect(service.crear(DTO_MOCK)).rejects.toThrow(
+      await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(
+        ConflictException,
+      );
+      await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(
         'El RUT ya está registrado',
       );
     });
@@ -229,8 +238,10 @@ describe('ContratacionesService', () => {
       (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
       (tx.plan.findFirst as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.crear(DTO_MOCK)).rejects.toThrow(NotFoundException);
-      await expect(service.crear(DTO_MOCK)).rejects.toThrow(
+      await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(
         'El plan seleccionado no existe o no está disponible',
       );
     });
@@ -242,10 +253,10 @@ describe('ContratacionesService', () => {
         new Error('connection refused'),
       );
 
-      await expect(service.crear(DTO_MOCK)).rejects.toThrow(
+      await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(
         InternalServerErrorException,
       );
-      await expect(service.crear(DTO_MOCK)).rejects.toThrow(
+      await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(
         'No fue posible procesar la contratación en este momento',
       );
     });
@@ -255,9 +266,66 @@ describe('ContratacionesService', () => {
         new Error('TX rollback'),
       );
 
-      await expect(service.crear(DTO_MOCK)).rejects.toThrow(
+      await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(
         InternalServerErrorException,
       );
+    });
+
+    // ─── CU-75: aceptación de la Política de Privacidad ────────────────────
+
+    function mockTransaccionExitosa() {
+      (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      (tx.plan.findFirst as jest.Mock).mockResolvedValue({ id_plan: 1 });
+      (tx.cliente.create as jest.Mock).mockResolvedValue({ id_cliente: 10 });
+      (tx.direccion_servicio.create as jest.Mock).mockResolvedValue({
+        id_direccion: 50,
+      });
+      (tx.contrato.create as jest.Mock).mockResolvedValue({ id_contrato: 20 });
+      (tx.orden_trabajo.create as jest.Mock).mockResolvedValue({ id_ot: 30 });
+      (tx.prospecto.create as jest.Mock).mockResolvedValue({
+        id_prospecto: 99,
+      });
+    }
+
+    it('registra la aceptación junto con los datos capturados, dentro de la transacción (CU-75)', async () => {
+      mockTransaccionExitosa();
+
+      await service.crear(DTO_MOCK, IP);
+
+      expect(tx.log_auditoria.create).toHaveBeenCalledWith({
+        data: {
+          accion: 'ACEPTAR_POLITICA_PRIVACIDAD',
+          entidad_afectada: 'cliente',
+          id_entidad_afectada: 10,
+          ip_origen: IP,
+          valor_nuevo: {
+            formulario: 'CONTRATACION',
+            version_politica: '1.1',
+            datos: {
+              nombre_completo: 'Juan Pérez',
+              rut: '123456789',
+              email: 'juan@example.com',
+              telefono: '+56912345678',
+              id_plan: 1,
+              direccion_completa: 'Av. Siempre Viva 742',
+              comuna: 'Providencia',
+              ciudad: 'Santiago',
+            },
+          },
+        },
+      });
+    });
+
+    it('no procesa la contratación si no se puede registrar la aceptación (CU-75)', async () => {
+      mockTransaccionExitosa();
+      (tx.log_auditoria.create as jest.Mock).mockRejectedValue(
+        new Error('insert failed'),
+      );
+
+      await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
     });
   });
 });

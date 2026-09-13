@@ -11,6 +11,16 @@ type Dato = string | null;
 
 export const LEGAL_ACTUALIZACION = "13 de septiembre de 2026";
 
+/**
+ * Versión publicada en /privacidad. Viaja con cada aceptación (CU-75), así
+ * que al cambiar el texto de la política hay que subirla.
+ */
+export const POLITICA_PRIVACIDAD_VERSION = "1.1";
+
+/** CU-75, Excepción 1. El backend responde lo mismo si llega sin marcar. */
+export const MENSAJE_POLITICA_REQUERIDA =
+  "Debes aceptar la Política de Privacidad para continuar.";
+
 /** Términos §4: calidad del servicio (Decreto 368). Los entrega el área técnica. */
 export const CALIDAD_SERVICIO = {
   velocidadMinimaGarantizada: null,

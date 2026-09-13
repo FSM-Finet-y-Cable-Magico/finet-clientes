@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { validateRut } from '../../common/utils/rut.js';
+import { aceptacionPoliticaShape } from '../../common/politica-privacidad.js';
 
 export const registerSchema = z
   .object({
+    ...aceptacionPoliticaShape,
     rut: z
       .string()
       .min(1, 'RUT es requerido')
