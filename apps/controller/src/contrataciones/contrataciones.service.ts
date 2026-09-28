@@ -116,7 +116,8 @@ export class ContratacionesService {
           // mas abajo — sin la aceptacion registrada no se procesa la solicitud.
           await registrarAceptacionPolitica(tx, {
             formulario: 'CONTRATACION',
-            id_cliente: cliente.id_cliente,
+            entidad: 'cliente',
+            id_entidad: cliente.id_cliente,
             version: dto.version_politica_privacidad,
             ip,
             datos: {

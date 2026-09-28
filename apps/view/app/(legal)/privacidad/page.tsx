@@ -21,6 +21,15 @@ import {
 } from "../../_lib/legal";
 import { metadataSeccion } from "../../_lib/seo";
 
+/**
+ * RNF-56.1: ISR explícito. El contenido son constantes de `_lib/legal.ts` y
+ * `_lib/company.ts`, así que la página nunca depende de la base: esto deja la
+ * ruta como ISR, que es lo que pide el requisito, y absorbe un futuro origen
+ * de datos sin cambiar nada más. Un día, porque el texto solo cambia con un
+ * deploy.
+ */
+export const revalidate = 86400;
+
 export const metadata: Metadata = metadataSeccion({
   path: "/privacidad",
   title: "Política de privacidad",
