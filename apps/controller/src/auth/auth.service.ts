@@ -299,7 +299,8 @@ export class AuthService {
 
       await registrarAceptacionPolitica(tx, {
         formulario: 'REGISTRO',
-        id_cliente: creado.id_cliente,
+        entidad: 'cliente',
+        id_entidad: creado.id_cliente,
         version: versionPolitica,
         ip,
         datos: {

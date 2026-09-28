@@ -23,6 +23,7 @@ const DTO_MOCK: ContratacionDto = {
 };
 
 const IP = '203.0.113.7';
+const IP_ANONIMIZADA = '203.0.113.0/24';
 
 const RESULTADO_MOCK = { id_cliente: 10, id_contrato: 20, id_ot: 30 };
 
@@ -297,7 +298,7 @@ describe('ContratacionesService', () => {
           accion: 'ACEPTAR_POLITICA_PRIVACIDAD',
           entidad_afectada: 'cliente',
           id_entidad_afectada: 10,
-          ip_origen: IP,
+          ip_origen: IP_ANONIMIZADA,
           valor_nuevo: {
             formulario: 'CONTRATACION',
             version_politica: '1.1',
@@ -313,6 +314,16 @@ describe('ContratacionesService', () => {
             },
           },
         },
+      });
+    });
+
+    it('anonimiza también la IPv4 mapeada en IPv6 que entrega Express (RNF-59.1)', async () => {
+      mockTransaccionExitosa();
+
+      await service.crear(DTO_MOCK, '::ffff:203.0.113.7');
+
+      expect(tx.log_auditoria.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ ip_origen: '203.0.113.0/24' }),
       });
     });
 
