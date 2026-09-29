@@ -49,6 +49,22 @@ Cada ruta pública se declara en [`app/_lib/rutas-publicas.ts`](../app/_lib/ruta
 
 Para verificar lo publicado, abrir `<NEXT_PUBLIC_SITE_URL>/sitemap.xml` y `<NEXT_PUBLIC_SITE_URL>/robots.txt`.
 
+## Consentimiento de cookies (CU-76)
+
+`/api/consentimiento-cookies` es un route handler, no una página: le dice al navegador qué
+decidió el visitante para que el gate de seguimiento pueda aplicarlo. Hace falta porque la
+cookie va cifrada (RNF-57.1) y descifrarla necesita la clave, que vive solo en el servidor.
+
+El banner ([`_components/legal/BannerCookies.tsx`](../app/_components/legal/BannerCookies.tsx))
+se monta en el layout raíz y es un componente de cliente: **no vuelve dinámica ninguna página**,
+la tabla de rutas del build es la misma salvo esta ruta nueva. Lee la cookie con
+`useSyncExternalStore`, así que el HTML nunca trae el banner y aparece recién tras hidratar si
+corresponde.
+
+Cualquier seguimiento que se agregue al sitio tiene que preguntarle a `seguimientoPermitido()`
+de [`_lib/cookies-consentimiento.ts`](../app/_lib/cookies-consentimiento.ts). Hoy el único que
+manda datos a un tercero es el envío a Sentry de `_lib/logger.ts`, y ya pasa por ahí.
+
 ## Referencia cruzada
 
 La documentación de contrato de cada endpoint (bodies, respuestas, errores) vive en `apps/controller/docs/*.md`, no aquí — este archivo solo mapea ruta → endpoint → caso de uso para no duplicar contenido que se desactualiza fácil.
