@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -15,10 +16,13 @@ import { ContratacionesModule } from './contrataciones/contrataciones.module.js'
 import { CoberturaModule } from './cobertura/cobertura.module.js';
 import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
 import { ConsentimientoModule } from './consentimiento/consentimiento.module.js';
+import { NotificacionesModule } from './notificaciones/notificaciones.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // CU-67: habilita el @Cron del recordatorio de pago.
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,
@@ -36,6 +40,7 @@ import { ConsentimientoModule } from './consentimiento/consentimiento.module.js'
     CoberturaModule,
     DiagnosticoModule,
     ConsentimientoModule,
+    NotificacionesModule,
   ],
   controllers: [AppController],
   providers: [
