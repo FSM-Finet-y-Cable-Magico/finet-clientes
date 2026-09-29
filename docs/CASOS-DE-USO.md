@@ -7,7 +7,7 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 | Incremento | Alcance | CU | % | Estado |
 |---|---|---|---|---|
 | **Incremento 1** | Experiencia del cliente, sitio web, portal y autoservicio | 34 | 42,5% | ✅ Implementado |
-| **Incremento 2** | Gestión operacional, deuda, soporte y administración interna | 29 | 36,25% | ⏳ **En curso** |
+| **Incremento 2** | Gestión operacional, deuda, soporte y administración interna | 28 | 36,25% | ⏳ **En curso** |
 | **Incremento 3** | Pasarelas de pago y asistente virtual | 12 | 15% | No iniciado |
 | **Incremento 4** | SEO, políticas, privacidad y cierre técnico | 5 | 6,25% | No iniciado |
 
@@ -59,7 +59,13 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 
 ## Incremento 2 — Gestión operacional, deuda, soporte y administración interna
 
-29 CU · 36,25% · **Estado: en curso** (arrancado el 2026-08-20)
+28 CU · 36,25% · **Estado: en curso** (arrancado el 2026-08-20)
+
+> **CU-06 eliminado del Documento 0.** El alcance del Grupo 2 es interfaz web y asistente
+> virtual, no administración interna, así que el historial de IPs bloqueadas y su desbloqueo
+> manual no son nuestros. El módulo `src/admin/` que los implementaba se eliminó el 2026-09-28:
+> ninguna interfaz del portal lo consumía. El bloqueo por IP del RF-05 (CU-05) sigue siendo
+> nuestro y no cambia — lo que se fue es la vista del historial y el desbloqueo manual.
 
 ### Criterio de agrupación (del documento fuente)
 
@@ -99,11 +105,10 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 | 22 | CU-78 | Actualizando estado y cerrando ticket de soporte asignado | Soporte | ⏳ Pendiente — es un flujo de agente/admin, no del portal de cliente |
 | 23 | CU-57 | Generando reporte financiero del período seleccionado | Administración | ⏳ Pendiente |
 | 24 | CU-58 | Descargando reporte financiero generado | Administración | ⏳ Pendiente |
-| 25 | CU-06 | Revisando historial de IPs bloqueadas por intentos fallidos | Administración | 🚧 Parcial/✅ — `GET /admin/intentos-fallidos` (`apps/controller/src/admin/`) ya devuelve exactamente esto, con filtros `bloqueados`/`ip`/`rut` y paginado. Revisar si falta UI de administración o si el endpoint ya cubre el CU |
-| 26 | CU-59 | Accediendo al visor cartográfico de factibilidad técnica | Mapa | ✅ — `/cobertura` monta Leaflet vía `GET /api/cobertura/config` |
-| 27 | CU-60 | Visualizando capa de mapa de calor de cobertura | Mapa | ✅ — `leaflet.heat` sobre `GET /api/cobertura/puntos` (capa estática generada desde el KML de planta externa) |
-| 28 | CU-61 | Aplicando zoom sobre el mapa de factibilidad | Mapa | ✅ — rueda/doble click/pellizco, acotado por `zoom_min`/`zoom_max` del backend |
-| 29 | CU-62 | Desplazándose por el mapa de factibilidad mediante paneo | Mapa | ✅ — arrastre con puntero o táctil, acotado por `maxBounds` |
+| 25 | CU-59 | Accediendo al visor cartográfico de factibilidad técnica | Mapa | ✅ — `/cobertura` monta Leaflet vía `GET /api/cobertura/config` |
+| 26 | CU-60 | Visualizando capa de mapa de calor de cobertura | Mapa | ✅ — `leaflet.heat` sobre `GET /api/cobertura/puntos` (capa estática generada desde el KML de planta externa) |
+| 27 | CU-61 | Aplicando zoom sobre el mapa de factibilidad | Mapa | ✅ — rueda/doble click/pellizco, acotado por `zoom_min`/`zoom_max` del backend |
+| 28 | CU-62 | Desplazándose por el mapa de factibilidad mediante paneo | Mapa | ✅ — arrastre con puntero o táctil, acotado por `maxBounds` |
 
 > **Reparto con el Grupo 8.** El documento `CU_Grupo2_Equivalencias_Grupo8_Incremento2.pdf`
 > cerró el alcance de este incremento: 7 CU son 100% nuestros, 5 se trabajan en conjunto con G8
@@ -145,7 +150,7 @@ Una rama por bloque, todas creadas desde `dev` el 2026-08-20 (ver [CONTRIBUTING.
 | `incremento-2/autogestion` | Autogestión | CU-31, CU-32, CU-33 |
 | `incremento-2/diagnostico` | Diagnóstico | CU-34, CU-36, CU-35 |
 | `incremento-2/soporte` | Soporte | CU-71, CU-78 |
-| `incremento-2/administracion` | Administración | CU-57, CU-58, CU-06 |
+| `incremento-2/administracion` | Administración | CU-57, CU-58 |
 | `incremento-2/mapa` | Mapa | CU-59, CU-60, CU-61, CU-62 |
 
 El orden de dependencia real es el que describe el criterio de agrupación: `deuda` (en especial CU-54) antes que `smartolt`, y `nucleo-pago` puede avanzar en paralelo. `mapa` y `autogestion`/`diagnostico` no dependen de nada del resto del incremento.
@@ -245,7 +250,6 @@ El documento de incrementos no cubre RF-XX — estos números vienen de `apps/co
 | RF-02 | Logout | CU-02 |
 | RF-03 | Recuperación de contraseña vía email, sin revelar si el RUT existe | CU-03 |
 | RF-05 | Bloqueo temporal por intentos fallidos por IP (5 en 5 min → 15 min) | CU-05 |
-| RF-06 | Desbloqueo manual de IP por admin | CU-06 |
 | RF-07 | Cierre de sesión automático por inactividad (15 min) | CU-12 |
 | RF-09 | Política de complejidad de contraseña (mín. 8, 1 mayúscula, 1 número) | CU-03, CU-10, CU-11 |
 | RF-10 | Registro: email obligatorio, confirmación de contraseña, unicidad de RUT/email | CU-04 |

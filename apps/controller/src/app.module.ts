@@ -9,7 +9,6 @@ import { MailModule } from './mail/mail.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DeudaPublicaModule } from './deuda-publica/deuda-publica.module.js';
 import { PortalModule } from './portal/portal.module.js';
-import { AdminModule } from './admin/admin.module.js';
 import { PerfilModule } from './perfil/perfil.module.js';
 import { LandingModule } from './landing/landing.module.js';
 import { ContratacionesModule } from './contrataciones/contrataciones.module.js';
@@ -30,7 +29,6 @@ import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
     AuthModule,
     DeudaPublicaModule,
     PortalModule,
-    AdminModule,
     PerfilModule,
     LandingModule,
     ContratacionesModule,
