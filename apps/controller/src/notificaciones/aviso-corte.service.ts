@@ -4,7 +4,11 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
-import { PASARELA_ACTIVA } from '../common/pendientes.js';
+import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
+import {
+  PASARELA_ACTIVA,
+  SALDO_CLIENTE_DEFINIDO,
+} from '../common/pendientes.js';
 import { conCandado } from './candado.js';
 import {
   DespachoNotificacion,
@@ -15,6 +19,7 @@ import {
 } from './despacho-notificacion.js';
 import {
   CANDADO_AVISO_CORTE,
+  DIAS_GRACIA_CORTE,
   TIPO_EVENTO_AVISO_CORTE,
 } from './aviso-corte.constantes.js';
 import {
@@ -27,6 +32,7 @@ import {
 /** Lo que el aviso necesita y todavía no está en el sistema. Ver `common/pendientes.ts`. */
 export type DatosAvisoCorte = {
   pasarelaActiva: boolean;
+  saldoDefinido: boolean;
 };
 
 export type ResumenAvisoCorte = {
@@ -36,6 +42,8 @@ export type ResumenAvisoCorte = {
   sinCanal: number;
   fallidos: number;
   yaAvisados: number;
+  /** Clientes a los que G8 ya no les registra deuda: no hay corte que avisar. */
+  sinDeuda: number;
   /** false si falta un dato, o si otra instancia tenía el candado. */
   ejecutada: boolean;
   /** Qué falta para que corra. Vacío cuando no falta nada. */
@@ -53,9 +61,9 @@ type Moroso = {
 /**
  * CU-68 / RF-50: aviso de corte inminente por morosidad.
  *
- * **Qué dice:** que el servicio está próximo a cortarse por una deuda vencida, y
- * el enlace directo para pagar. Es lo que piden el CU y el RF-50; ni monto ni
- * fecha de corte: el monto lo ve al abrir el enlace.
+ * **Qué dice:** cuánto debe el cliente, la **fecha de corte** y el enlace
+ * directo para pagar. La fecha de corte es el vencimiento más los 4 días de
+ * prórroga del §6.7.3: se muestra la fecha, no los días.
  *
  * **Cuándo avisa:** el día siguiente al vencimiento de una factura impaga. El CU
  * habla de un "umbral de morosidad" que el Documento 0 no define; así el aviso
@@ -63,9 +71,11 @@ type Moroso = {
  *
  * **Uno por cliente**, aunque tenga varios contratos vencidos el mismo día.
  *
- * **Qué falta para que corra:** una pasarela activa, que es precondición del CU:
- * sin ella el enlace no lleva a ningún lado (ver `common/pendientes.ts`).
- * Mientras falte, la tarea lo registra en el log y no despacha nada.
+ * **Qué falta para que corra** (ver `common/pendientes.ts`), y mientras falte
+ * cualquiera la tarea lo registra en el log y no despacha nada:
+ * - una pasarela activa: es precondición del CU, sin ella el enlace no lleva a
+ *   ningún lado;
+ * - el saldo del cliente, que calcula G8 (acuerdo v2.0 §3 y §5).
  */
 @Injectable()
 export class AvisoCorteService {
@@ -76,6 +86,7 @@ export class AvisoCorteService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly enlaces: EnlacePagoService,
+    private readonly saldos: SaldoClienteService,
     private readonly config: ConfigService,
   ) {
     this.despacho = new DespachoNotificacion(
@@ -97,7 +108,10 @@ export class AvisoCorteService {
 
   async ejecutar(
     ahora: Date,
-    datos: DatosAvisoCorte = { pasarelaActiva: PASARELA_ACTIVA },
+    datos: DatosAvisoCorte = {
+      pasarelaActiva: PASARELA_ACTIVA,
+      saldoDefinido: SALDO_CLIENTE_DEFINIDO,
+    },
   ): Promise<ResumenAvisoCorte> {
     const vacio: ResumenAvisoCorte = {
       detectadas: 0,
@@ -105,13 +119,20 @@ export class AvisoCorteService {
       sinCanal: 0,
       fallidos: 0,
       yaAvisados: 0,
+      sinDeuda: 0,
       ejecutada: false,
       faltan: [],
     };
 
+    const faltan: string[] = [];
     if (!datos.pasarelaActiva) {
-      const faltan = ['una pasarela de pagos activa (precondición del CU-68)'];
-      this.logger.warn(`[CU-68] no se despacha: falta ${faltan[0]}`);
+      faltan.push('una pasarela de pagos activa (precondición del CU-68)');
+    }
+    if (!datos.saldoDefinido) {
+      faltan.push('el saldo del cliente (Grupo 8)');
+    }
+    if (faltan.length > 0) {
+      this.logger.warn(`[CU-68] no se despacha: falta ${faltan.join(', ')}`);
       return { ...vacio, faltan };
     }
 
@@ -146,6 +167,7 @@ export class AvisoCorteService {
 
     const hoy = inicioDelDiaUTC(ahora);
     const ayer = sumarDias(hoy, -1);
+    const fechaCorte = sumarDias(ayer, DIAS_GRACIA_CORTE);
     const idPlantilla = await this.despacho.plantilla();
     const morosos = await this.vencidosAyer(ayer);
 
@@ -167,18 +189,38 @@ export class AvisoCorteService {
           continue;
         }
 
+        // El monto lo da G8. Si ya no le registra deuda, no hay corte que
+        // avisar; si no puede darlo, el despacho queda fallido.
+        const deuda =
+          m.id_cliente === null
+            ? null
+            : await this.saldos.saldoDe({
+                idCliente: m.id_cliente,
+                idContrato: null,
+              });
+        if (deuda !== null && deuda <= 0) {
+          resumen.sinDeuda++;
+          continue;
+        }
+
         const estado = await this.despacho.despachar({
           idCliente: m.id_cliente,
           email: m.email,
           idPlantilla,
           ahora,
           referencia: `cliente ${m.id_cliente}, facturas ${m.facturas.join(', ')}`,
-          enviar: () =>
-            this.mail.sendAvisoCorte(
+          enviar: () => {
+            if (deuda === null) {
+              throw new Error('el saldo del cliente no está disponible');
+            }
+            return this.mail.sendAvisoCorte(
               m.email!,
               m.nombre,
+              deuda,
+              fechaCorte,
               this.enlacePago(sitio, m.id_cliente!),
-            ),
+            );
+          },
         });
 
         if (estado === 'enviado') resumen.enviados++;
@@ -191,7 +233,7 @@ export class AvisoCorteService {
       `[CU-68] avisos de corte por vencimientos del ${ayer.toISOString().slice(0, 10)}: ` +
         `${resumen.detectadas} clientes, ${resumen.enviados} enviados, ` +
         `${resumen.sinCanal} sin canal, ${resumen.fallidos} fallidos, ` +
-        `${resumen.yaAvisados} ya avisados`,
+        `${resumen.yaAvisados} ya avisados, ${resumen.sinDeuda} sin deuda`,
     );
     return resumen;
   }

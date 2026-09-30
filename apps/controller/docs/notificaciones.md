@@ -69,7 +69,7 @@ eso. Corriéndolo dos veces seguidas, la segunda no debe despachar nada.
 
 ## CU-68 / RF-50 — Aviso de corte inminente por morosidad
 
-**Construido, pendiente de la pasarela.** Hoy no despacha nada: ver "Lo que falta".
+**Construido, pendiente de la pasarela y del saldo de G8.** Hoy no despacha nada: ver "Lo que falta".
 
 Tarea programada en `aviso-corte.service.ts`, disparada por `@Cron` a las **09:30 de Chile**:
 media hora después del CU-67, para no pisarse en el SMTP.
@@ -85,9 +85,16 @@ se alinean en el Incremento 4.
 
 ### Qué dice el aviso
 
-Que el servicio está próximo a cortarse por una deuda vencida, y el **enlace directo para pagar**.
-Es lo que piden el CU y el RF-50: ni monto ni fecha de corte. El monto lo ve el cliente al abrir el
-enlace. Por eso el CU-68 no necesita los días de gracia.
+Que el servicio está próximo a cortarse por una deuda vencida, **cuánto debe**, la **fecha de
+corte** y el **enlace directo para pagar** (RF-50).
+
+- **El monto lo da G8** (`common/saldo/saldo-cliente.service.ts`). La deuda la calcula G8, no
+  nosotros: el acuerdo v2.0 pone Factura y Pago de su lado (§3) y dice que G2 consume "el valor
+  persistido" (§5). Si G8 ya no le registra deuda al cliente, no se avisa; si no puede dar el
+  saldo, el despacho queda `fallido` y no se inventa un monto.
+- **La fecha de corte** es el vencimiento más los 4 días de prórroga del §6.7.3 del Documento 0
+  ("ante morosidad, se otorga una prórroga de 4 días antes de efectuar un corte del servicio").
+  Se muestra la fecha, no los días.
 
 ### Qué hace
 
@@ -110,9 +117,13 @@ fecha de vencimiento.
 
 ### Lo que falta
 
-`PASARELA_ACTIVA` en `src/common/pendientes.ts`. Es precondición del CU: sin pasarela el enlace no
-lleva a ningún lado. Al arrancar, el backend deja en el log qué falta
+En `src/common/pendientes.ts`; al arrancar, el backend deja en el log qué falta
 (`[Incremento 3] falta un dato: …`).
+
+| Dato | Quién | Mientras falte |
+|---|---|---|
+| `PASARELA_ACTIVA` — pasarela operativa | Nosotros (CU-42, CU-43) | No despacha: es precondición del CU |
+| `SALDO_CLIENTE_DEFINIDO` — dónde está el saldo | Grupo 8 | No despacha: el aviso informa cuánto debe |
 
 ### Excepciones del CU
 
@@ -139,7 +150,8 @@ necesario para validarlo viaja dentro del enlace, firmado con HMAC-SHA256.
 
 Sembrar facturas impagas con `fecha_limite_pago` = ayer, levantar un receptor SMTP en el 1025 y
 llamar a `AvisoCorteService.ejecutar(new Date())` desde un contexto de aplicación de Nest: no
-despacha, y dice qué falta. Con `ejecutar(new Date(), { pasarelaActiva: true })` despacha;
+despacha, y dice qué falta. Con `ejecutar(new Date(), { pasarelaActiva: true, saldoDefinido: true })`
+y un saldo inyectado despacha;
 corriéndolo dos veces, la segunda no manda nada.
 
 ## CU-69 / RF-51 — Confirmación de pago registrado

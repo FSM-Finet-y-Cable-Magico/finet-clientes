@@ -25,6 +25,16 @@ export const PASARELA_ACTIVA = false;
  */
 export const REGISTRO_PAGO_DEFINIDO = false;
 
+/**
+ * Dónde deja Grupo 8 el saldo que debe cada cliente (tabla y campo). La deuda la
+ * calcula G8, no nosotros: el acuerdo v2.0 pone Factura y Pago de su lado (§3) y
+ * dice que G2 "no debe reconstruir por su cuenta" reglas derivadas, sino "consumir
+ * el valor persistido" (§5). Sin él, el pago no tiene un total que cobrar: la
+ * precondición del CU-42 y del CU-43 es "una deuda pendiente identificada". Y el
+ * aviso de corte (CU-68) informa ese monto.
+ */
+export const SALDO_CLIENTE_DEFINIDO = false;
+
 export type Pendiente = {
   dato: string;
   quien: 'Grupo 2' | 'Grupo 8' | 'Grupo 3';
@@ -44,6 +54,12 @@ export const PENDIENTES: readonly Pendiente[] = [
     quien: 'Grupo 8',
     destraba: 'CU-42, CU-43, CU-69',
     estaVacio: () => !REGISTRO_PAGO_DEFINIDO,
+  },
+  {
+    dato: 'Dónde está el saldo del cliente (tabla y campo)',
+    quien: 'Grupo 8',
+    destraba: 'CU-42, CU-43, CU-68',
+    estaVacio: () => !SALDO_CLIENTE_DEFINIDO,
   },
 ];
 

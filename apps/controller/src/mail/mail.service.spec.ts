@@ -27,6 +27,8 @@ describe('MailService — correos del Incremento 3', () => {
       await mail.sendAvisoCorte(
         'ana@b.cl',
         'Ana <b>',
+        144940,
+        new Date('2026-10-03T00:00:00.000Z'),
         'https://portal.finet.cl/pagar?t=p.1.x.y.z',
       );
     });
@@ -44,9 +46,13 @@ describe('MailService — correos del Incremento 3', () => {
       expect(html()).toContain('próximo a ser cortado por una deuda vencida');
     });
 
-    it('no lleva monto ni fecha de corte: el CU no los pide', () => {
-      expect(html()).not.toMatch(/\$\s?\d/);
-      expect(html()).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
+    it('dice cuánto debe y la fecha de corte en DD/MM/AAAA', () => {
+      expect(html()).toContain('$144.940');
+      expect(html()).toContain('03/10/2026');
+    });
+
+    it('no muestra los días de gracia: son un cálculo interno', () => {
+      expect(html()).not.toMatch(/d[ií]as de gracia/i);
     });
 
     it('RF-50: lleva el enlace directo para pagar', () => {
@@ -106,7 +112,13 @@ describe('MailService — correos del Incremento 3', () => {
       sendMail,
     };
 
-    await conSitio.sendAvisoCorte('a@b.cl', 'Ana', 'https://x/pagar?t=1');
+    await conSitio.sendAvisoCorte(
+      'a@b.cl',
+      'Ana',
+      1000,
+      new Date('2026-10-03T00:00:00.000Z'),
+      'https://x/pagar?t=1',
+    );
 
     expect(html()).toContain(
       'src="https://portal.finet.cl/brand/FinetLogo.png"',

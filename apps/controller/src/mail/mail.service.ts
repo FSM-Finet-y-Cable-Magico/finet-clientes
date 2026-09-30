@@ -2,7 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import { escaparHtml, fechaHoraCliente, pesos } from './formato.js';
+import {
+  escaparHtml,
+  fechaCliente,
+  fechaHoraCliente,
+  pesos,
+} from './formato.js';
 import { comprobante, plantillaCorreo } from './plantilla-correo.js';
 
 @Injectable()
@@ -90,11 +95,17 @@ export class MailService {
   }
 
   /**
-   * CU-68 / RF-50: aviso de corte inminente por morosidad, con el enlace directo
-   * para pagar. Solo eso: el CU no pide monto ni fecha de corte. Lanza si el
-   * despacho falla: quien llama decide si reintenta.
+   * CU-68 / RF-50: aviso de corte inminente por morosidad: la deuda, la fecha
+   * de corte y el enlace directo para pagar. Lanza si el despacho falla: quien
+   * llama decide si reintenta.
    */
-  async sendAvisoCorte(email: string, nombre: string, enlacePago: string) {
+  async sendAvisoCorte(
+    email: string,
+    nombre: string,
+    deuda: number,
+    fechaCorte: Date,
+    enlacePago: string,
+  ) {
     const from =
       this.configService.get<string>('MAIL_FROM') ||
       '"Portal Clientes" <no-reply@finet.cl>';
@@ -103,7 +114,7 @@ export class MailService {
       from,
       to: email,
       subject: 'Aviso de corte de servicio - Portal Clientes',
-      html: this.avisoCorteTemplate(nombre, enlacePago),
+      html: this.avisoCorteTemplate(nombre, deuda, fechaCorte, enlacePago),
     });
 
     this.logger.log('Service cut notice email sent');
@@ -189,16 +200,24 @@ export class MailService {
 </html>`;
   }
 
-  private avisoCorteTemplate(nombre: string, enlacePago: string): string {
+  private avisoCorteTemplate(
+    nombre: string,
+    deuda: number,
+    fechaCorte: Date,
+    enlacePago: string,
+  ): string {
     return plantillaCorreo({
-      resumen:
-        'Tu servicio está próximo a ser cortado. Paga tu deuda para evitarlo.',
+      resumen: `Tienes una deuda de ${pesos(deuda)}. Tu servicio se cortará el ${fechaCliente(fechaCorte)}.`,
       etiqueta: { texto: 'Aviso de corte', tono: 'alerta' },
       titulo: 'Tu servicio está por ser cortado',
       cuerpo:
         `Hola ${escaparHtml(nombre)}: tu servicio está próximo a ser cortado por una deuda vencida. ` +
-        'Para evitarlo, paga tu deuda.' +
-        '<br><span style="font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</span>',
+        'Para evitarlo, paga antes de la fecha de corte.' +
+        comprobante([
+          ['Deuda pendiente', pesos(deuda)],
+          ['Fecha de corte', fechaCliente(fechaCorte)],
+        ]) +
+        '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</p>',
       boton: { texto: 'Pagar mi deuda', enlace: enlacePago },
       sitio: this.sitio(),
     });

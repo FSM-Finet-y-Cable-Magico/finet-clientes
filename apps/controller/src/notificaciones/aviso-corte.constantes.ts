@@ -12,3 +12,11 @@ export const TIPO_EVENTO_AVISO_CORTE = 'AVISO_CORTE';
  * fueran la misma, una tarea bloquearía a la otra.
  */
 export const CANDADO_AVISO_CORTE = 6820260930;
+
+/**
+ * Días entre el vencimiento y el corte. §6.7.3 del Documento 0: "ante
+ * morosidad, se otorga una prórroga de 4 días antes de efectuar un corte del
+ * servicio". Solo sirven para calcular la **fecha de corte** del aviso: al
+ * cliente se le muestra la fecha, no los días.
+ */
+export const DIAS_GRACIA_CORTE = 4;
