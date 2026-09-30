@@ -25,7 +25,7 @@ const DTO_MOCK: ContratacionDto = {
 const IP = '203.0.113.7';
 const IP_ANONIMIZADA = '203.0.113.0/24';
 
-const RESULTADO_MOCK = { id_cliente: 10, id_contrato: 20, id_ot: 30 };
+const RESULTADO_MOCK = { id_prospecto: 99 };
 
 function mockTx() {
   return {
@@ -54,10 +54,20 @@ function mockTx() {
   };
 }
 
+/**
+ * CU-18: el formulario público crea solo el Prospecto (acuerdo v2.0 §4 y
+ * prueba §14.1).
+ */
 describe('ContratacionesService', () => {
   let service: ContratacionesService;
   let prisma: jest.Mocked<PrismaService>;
   let tx: ReturnType<typeof mockTx>;
+
+  function mockTransaccionExitosa() {
+    (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+    (tx.plan.findFirst as jest.Mock).mockResolvedValue({ id_plan: 1 });
+    (tx.prospecto.create as jest.Mock).mockResolvedValue({ id_prospecto: 99 });
+  }
 
   beforeEach(async () => {
     tx = mockTx();
@@ -80,112 +90,71 @@ describe('ContratacionesService', () => {
   // ─── Happy path ───────────────────────────────────────────────────────────
 
   describe('crear', () => {
-    it('crea cliente, dirección, contrato, OT y prospecto en una transacción y retorna IDs', async () => {
-      (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (tx.plan.findFirst as jest.Mock).mockResolvedValue({ id_plan: 1 });
-      (tx.cliente.create as jest.Mock).mockResolvedValue({ id_cliente: 10 });
-      (tx.direccion_servicio.create as jest.Mock).mockResolvedValue({
-        id_direccion: 50,
-      });
-      (tx.contrato.create as jest.Mock).mockResolvedValue({ id_contrato: 20 });
-      (tx.orden_trabajo.create as jest.Mock).mockResolvedValue({ id_ot: 30 });
-      (tx.prospecto.create as jest.Mock).mockResolvedValue({
-        id_prospecto: 99,
-      });
+    it('crea el prospecto en la etapa NUEVO del pipeline (§11.10) y retorna su id', async () => {
+      mockTransaccionExitosa();
 
       const result = await service.crear(DTO_MOCK, IP);
 
       expect(result).toEqual(RESULTADO_MOCK);
-
-      expect(tx.cliente.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          nombre_completo: 'Juan Pérez',
-          rut: '123456789',
-          email: 'juan@example.com',
-          id_empresa: 1,
-          estado: 'pendiente',
-        }),
-      });
-
-      expect(tx.direccion_servicio.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          id_cliente: 10,
-          direccion_completa: 'Av. Siempre Viva 742',
-          comuna: 'Providencia',
-          es_principal: true,
-        }),
-      });
-
-      expect(tx.contrato.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          id_cliente: 10,
-          id_plan: 1,
-          estado: 'PENDIENTE',
-          dia_vencimiento: 5,
-        }),
-      });
-
-      expect(tx.orden_trabajo.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          id_cliente: 10,
-          id_direccion: 50,
-          tipo_ot: 'instalacion',
-          estado: 'pendiente',
-        }),
-      });
-
       expect(tx.prospecto.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          id_cliente: 10,
+          id_empresa: 1,
           rut: '123456789',
-          estado_pipeline: 'ACTIVO',
-          tiempo_conversion_dias: 0,
+          nombre_completo: 'Juan Pérez',
+          email: 'juan@example.com',
+          telefono: '+56912345678',
+          direccion: 'Av. Siempre Viva 742, Providencia, Santiago',
+          estado_pipeline: 'NUEVO',
         }),
+        select: { id_prospecto: true },
       });
     });
 
-    it('registra auditoría después de crear la contratación', async () => {
-      (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (tx.plan.findFirst as jest.Mock).mockResolvedValue({ id_plan: 1 });
-      (tx.cliente.create as jest.Mock).mockResolvedValue({ id_cliente: 10 });
-      (tx.direccion_servicio.create as jest.Mock).mockResolvedValue({
-        id_direccion: 50,
-      });
-      (tx.contrato.create as jest.Mock).mockResolvedValue({ id_contrato: 20 });
-      (tx.orden_trabajo.create as jest.Mock).mockResolvedValue({ id_ot: 30 });
-      (tx.prospecto.create as jest.Mock).mockResolvedValue({
-        id_prospecto: 99,
-      });
+    it('no crea cliente, dirección, contrato ni orden de trabajo (acuerdo v2.0 §14.1)', async () => {
+      mockTransaccionExitosa();
+
+      await service.crear(DTO_MOCK, IP);
+
+      expect(tx.cliente.create).not.toHaveBeenCalled();
+      expect(tx.direccion_servicio.create).not.toHaveBeenCalled();
+      expect(tx.contrato.create).not.toHaveBeenCalled();
+      expect(tx.orden_trabajo.create).not.toHaveBeenCalled();
+    });
+
+    it('el prospecto no queda asociado a un cliente ni convertido', async () => {
+      mockTransaccionExitosa();
+
+      await service.crear(DTO_MOCK, IP);
+
+      const data = (tx.prospecto.create as jest.Mock).mock.calls[0]![0] as {
+        data: Record<string, unknown>;
+      };
+      expect(data.data).not.toHaveProperty('id_cliente');
+      expect(data.data).not.toHaveProperty('fecha_conversion');
+    });
+
+    it('registra la auditoría con el plan de interés, que prospecto no tiene dónde guardar', async () => {
+      mockTransaccionExitosa();
 
       await service.crear(DTO_MOCK, IP);
 
       expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          accion: 'CREAR_CONTRATACION',
-          entidad_afectada: 'cliente',
-          id_entidad_afectada: 10,
-          valor_nuevo: expect.objectContaining({
-            id_contrato: 20,
-            id_ot: 30,
+        data: {
+          accion: 'CREAR_PROSPECTO_PORTAL',
+          entidad_afectada: 'prospecto',
+          id_entidad_afectada: 99,
+          valor_nuevo: {
             rut: '123456789',
-            plan: 1,
-          }),
-        }),
+            id_plan: 1,
+            etapa: 'NUEVO',
+            origen: 'PORTAL',
+          },
+        },
       });
     });
 
     it('no lanza error si falla el registro de auditoría', async () => {
-      (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (tx.plan.findFirst as jest.Mock).mockResolvedValue({ id_plan: 1 });
-      (tx.cliente.create as jest.Mock).mockResolvedValue({ id_cliente: 10 });
-      (tx.direccion_servicio.create as jest.Mock).mockResolvedValue({
-        id_direccion: 50,
-      });
-      (tx.contrato.create as jest.Mock).mockResolvedValue({ id_contrato: 20 });
-      (tx.orden_trabajo.create as jest.Mock).mockResolvedValue({ id_ot: 30 });
-      (tx.prospecto.create as jest.Mock).mockResolvedValue({
-        id_prospecto: 99,
-      });
+      mockTransaccionExitosa();
       (prisma.log_auditoria.create as jest.Mock).mockRejectedValue(
         new Error('DB audit down'),
       );
@@ -201,21 +170,19 @@ describe('ContratacionesService', () => {
         telefono: null as unknown as string,
         ciudad: undefined,
       };
-      (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (tx.plan.findFirst as jest.Mock).mockResolvedValue({ id_plan: 1 });
-      (tx.cliente.create as jest.Mock).mockResolvedValue({ id_cliente: 10 });
-      (tx.direccion_servicio.create as jest.Mock).mockResolvedValue({
-        id_direccion: 50,
-      });
-      (tx.contrato.create as jest.Mock).mockResolvedValue({ id_contrato: 20 });
-      (tx.orden_trabajo.create as jest.Mock).mockResolvedValue({ id_ot: 30 });
-      (tx.prospecto.create as jest.Mock).mockResolvedValue({
-        id_prospecto: 99,
-      });
+      mockTransaccionExitosa();
 
       const result = await service.crear(dtoSinOpcionales, IP);
 
       expect(result).toEqual(RESULTADO_MOCK);
+      expect(tx.prospecto.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            telefono: null,
+            direccion: 'Av. Siempre Viva 742, Providencia',
+          }),
+        }),
+      );
     });
 
     // ─── Error: RUT duplicado ──────────────────────────────────────────────
@@ -274,21 +241,7 @@ describe('ContratacionesService', () => {
 
     // ─── CU-75: aceptación de la Política de Privacidad ────────────────────
 
-    function mockTransaccionExitosa() {
-      (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (tx.plan.findFirst as jest.Mock).mockResolvedValue({ id_plan: 1 });
-      (tx.cliente.create as jest.Mock).mockResolvedValue({ id_cliente: 10 });
-      (tx.direccion_servicio.create as jest.Mock).mockResolvedValue({
-        id_direccion: 50,
-      });
-      (tx.contrato.create as jest.Mock).mockResolvedValue({ id_contrato: 20 });
-      (tx.orden_trabajo.create as jest.Mock).mockResolvedValue({ id_ot: 30 });
-      (tx.prospecto.create as jest.Mock).mockResolvedValue({
-        id_prospecto: 99,
-      });
-    }
-
-    it('registra la aceptación junto con los datos capturados, dentro de la transacción (CU-75)', async () => {
+    it('registra la aceptación a nombre del prospecto, dentro de la transacción (CU-75)', async () => {
       mockTransaccionExitosa();
 
       await service.crear(DTO_MOCK, IP);
@@ -296,8 +249,8 @@ describe('ContratacionesService', () => {
       expect(tx.log_auditoria.create).toHaveBeenCalledWith({
         data: {
           accion: 'ACEPTAR_POLITICA_PRIVACIDAD',
-          entidad_afectada: 'cliente',
-          id_entidad_afectada: 10,
+          entidad_afectada: 'prospecto',
+          id_entidad_afectada: 99,
           ip_origen: IP_ANONIMIZADA,
           valor_nuevo: {
             formulario: 'CONTRATACION',

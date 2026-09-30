@@ -286,7 +286,7 @@ no correcciones de lo marcado. El detalle y el porqué están en la bitácora
 |---|---|---|---|---|
 | 1 | **Cifrado de IPs con llave + índice ciego.** Va junto con la tarea de la clave WiFi, mismo mecanismo (`publicEncrypt` + `CRM_PUBLIC_KEY`) y mismo punto abierto: quién custodia la llave privada. Hoy `sesion_portal.ip_origen`, `intento_fallido.ip_address` y la auditoría de perfil guardan la IP exacta del cliente en la base compartida | I3 o I4, con CU-33 | CU-05, CU-06, CU-75 | **Sí** — autenticación y administración: el flujo suma cifrado, índice ciego y descifrado |
 | 2 | **Endurecer `GET /api/admin/intentos-fallidos`**, que entrega RUT + IP tras una cabecera `x-api-key` estática | I4 | CU-06 | No |
-| 3 | **El formulario público debe persistir solo Prospecto** (§4 del acuerdo v2.0 con G8). Hoy crea Cliente, Contrato y OT en la misma transacción | I4 | CU-18, CU-75 | **Sí** — contratación |
+| 3 | ~~**El formulario público debe persistir solo Prospecto**~~ ✅ Resuelto en I3.2 (30-09-2026): crea solo el prospecto en etapa `NUEVO`; la aceptación queda a su nombre | I4 | CU-18, CU-75 | **Sí** — contratación |
 | 4 | **CU-76, banner de consentimiento de cookies.** La tabla `consentimiento_cookies` ya existe con su columna `ip_anonimizada`, que debe usar el mismo formato que `common/utils/ip.ts` | I4 | CU-76 | No, es CU nuevo |
 
 **Lo que no quedó cerrado del CU-75:** el RNF-59.1 pide la IP del consentimiento
