@@ -81,6 +81,18 @@ describe('RecordatorioPagoService', () => {
     mail = module.get(MailService);
   });
 
+  it('corre a las 9 de Chile, no a la hora del servidor (§11: America/Santiago)', () => {
+    const opciones = Reflect.getMetadata(
+      'SCHEDULE_CRON_OPTIONS',
+      RecordatorioPagoService.prototype.tandaDiaria,
+    ) as { cronTime: string; timeZone: string };
+
+    expect(opciones).toMatchObject({
+      cronTime: '0 9 * * *',
+      timeZone: 'America/Santiago',
+    });
+  });
+
   // ─── RF-49: tres días corridos antes del vencimiento ─────────────────────
 
   it('busca exactamente las facturas que vencen en 3 días', async () => {

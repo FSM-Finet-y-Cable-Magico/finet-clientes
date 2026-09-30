@@ -12,6 +12,7 @@ import {
   PAUSA_ENTRE_TANDAS_MS,
   TANDA_MAXIMA,
   TIPO_EVENTO_RECORDATORIO,
+  ZONA_HORARIA,
 } from './recordatorio-pago.constantes.js';
 
 /** Lo que necesita saber el despacho de una factura por vencer. */
@@ -52,9 +53,10 @@ export class RecordatorioPagoService {
 
   /**
    * Una vez al día. La hora no la fija el RF-49 (solo el "tres días antes"), y
-   * las 9 de la mañana es cuando un aviso de cobro tiene sentido para alguien.
+   * las 9 de la mañana es cuando un aviso de cobro tiene sentido para alguien:
+   * las 9 de Chile, no las del servidor.
    */
-  @Cron('0 9 * * *', { name: TIPO_EVENTO_RECORDATORIO })
+  @Cron('0 9 * * *', { name: TIPO_EVENTO_RECORDATORIO, timeZone: ZONA_HORARIA })
   async tandaDiaria(): Promise<ResumenTanda> {
     return this.ejecutar(new Date());
   }

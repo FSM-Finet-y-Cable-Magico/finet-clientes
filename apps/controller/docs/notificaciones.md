@@ -4,7 +4,7 @@
 
 Tarea programada, no un endpoint: no hay nada que llamar desde el frontend.
 `apps/controller/src/notificaciones/recordatorio-pago.service.ts`, disparada por `@Cron` a
-las **09:00** todos los días. La hora no la fija el RF-49, que solo habla de "tres días
+las **09:00 de Chile** (`America/Santiago`, §11 del Documento 0) todos los días. La hora no la fija el RF-49, que solo habla de "tres días
 corridos antes"; se eligió una a la que un aviso de cobro le sirva a alguien.
 
 ### Qué hace
