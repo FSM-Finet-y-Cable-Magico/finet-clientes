@@ -92,10 +92,7 @@ export class RecordatorioPagoService {
     }
   }
 
-  private async tanda(
-    ahora: Date,
-    vacio: ResumenTanda,
-  ): Promise<ResumenTanda> {
+  private async tanda(ahora: Date, vacio: ResumenTanda): Promise<ResumenTanda> {
     const objetivo = this.fechaObjetivo(ahora);
     const idPlantilla = await this.plantilla();
     const facturas = await this.facturasPorVencer(objetivo);
