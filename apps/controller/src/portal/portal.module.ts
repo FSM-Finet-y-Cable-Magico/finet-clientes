@@ -6,5 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 @Module({
   controllers: [PortalController],
   providers: [PortalService, JwtAuthGuard],
+  // El aviso de corte (CU-68) muestra el mismo saldo que ve el cliente en el portal.
+  exports: [PortalService],
 })
 export class PortalModule {}

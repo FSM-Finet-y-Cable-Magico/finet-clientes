@@ -1,0 +1,57 @@
+/**
+ * Lo que falta para que funcionen los casos de uso del Incremento 3.
+ *
+ * Cada constante es un dato que todavía no tenemos. El código que lo necesita lo
+ * lee desde acá, y mientras esté vacío ese caso de uso **no se ejecuta**: cae en
+ * la excepción o precondición que su tabla del Documento 0 ya define, nunca en un
+ * éxito falso. Cuando respondan, se rellena acá.
+ *
+ * `PENDIENTES` es la lista legible: qué falta, de quién, y qué destraba. Se
+ * muestra en el log al arrancar el backend.
+ */
+
+/**
+ * Días entre el vencimiento de una factura y el corte del servicio.
+ *
+ * RF-35 los llama "días de gracia configurados", el CU-80 (de Grupo 8) es el que
+ * los configura, y el §6.7.3 dice que hoy son 4. Lo que falta es **dónde quedó**
+ * ese valor configurado: si usáramos el 4 del documento y Grupo 8 lo cambia, el
+ * aviso de corte informaría una fecha equivocada.
+ */
+export const DIAS_GRACIA_CORTE: number | null = null;
+
+/**
+ * Si hay una pasarela de pagos operativa. La precondición del CU-68 lo exige: el
+ * aviso de corte lleva un enlace para pagar, y sin pasarela ese enlace no lleva a
+ * ningún lado. Se rellena cuando se construya el pago (CU-42 y CU-43).
+ */
+export const PASARELA_ACTIVA = false;
+
+export type Pendiente = {
+  dato: string;
+  quien: 'Grupo 2' | 'Grupo 8' | 'Grupo 3';
+  destraba: string;
+  estaVacio: () => boolean;
+};
+
+export const PENDIENTES: readonly Pendiente[] = [
+  {
+    dato: 'Días de gracia antes del corte (tabla y campo donde los configuran)',
+    quien: 'Grupo 8',
+    destraba: 'CU-68',
+    estaVacio: () => DIAS_GRACIA_CORTE === null,
+  },
+  {
+    dato: 'Pasarela de pagos operativa',
+    quien: 'Grupo 2',
+    destraba: 'CU-68',
+    estaVacio: () => !PASARELA_ACTIVA,
+  },
+];
+
+/** Los que siguen vacíos, en una línea cada uno, para el log de arranque. */
+export function pendientesVacios(): string[] {
+  return PENDIENTES.filter((p) => p.estaVacio()).map(
+    (p) => `${p.destraba} ← ${p.dato} (${p.quien})`,
+  );
+}
