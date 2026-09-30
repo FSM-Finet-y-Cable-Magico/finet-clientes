@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { escaparHtml, fechaHoraCliente, pesos } from './formato.js';
+import { comprobante, plantillaCorreo } from './plantilla-correo.js';
 
 @Injectable()
 export class MailService {
@@ -189,23 +190,18 @@ export class MailService {
   }
 
   private avisoCorteTemplate(nombre: string, enlacePago: string): string {
-    return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; color: #333;">
-  <div style="max-width: 480px; margin: 0 auto; padding: 24px;">
-    <h2 style="color: #1a56db;">Portal Clientes</h2>
-    <p>Hola ${escaparHtml(nombre)},</p>
-    <p>Tu servicio está próximo a ser cortado por una deuda vencida. Para evitarlo, paga tu deuda:</p>
-    <p style="margin: 24px 0;">
-      <a href="${escaparHtml(enlacePago)}" style="background: #1a56db; color: #fff; padding: 12px 20px; border-radius: 6px; text-decoration: none;">Pagar mi deuda</a>
-    </p>
-    <p>Si ya pagaste, puedes ignorar este mensaje.</p>
-    <p style="font-size: 12px; color: #666;">Este es un aviso automatico, no respondas a este correo.</p>
-  </div>
-</body>
-</html>`;
+    return plantillaCorreo({
+      resumen:
+        'Tu servicio está próximo a ser cortado. Paga tu deuda para evitarlo.',
+      etiqueta: { texto: 'Aviso de corte', tono: 'alerta' },
+      titulo: 'Tu servicio está por ser cortado',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: tu servicio está próximo a ser cortado por una deuda vencida. ` +
+        'Para evitarlo, paga tu deuda.' +
+        '<br><span style="font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</span>',
+      boton: { texto: 'Pagar mi deuda', enlace: enlacePago },
+      sitio: this.sitio(),
+    });
   }
 
   private confirmacionPagoTemplate(
@@ -214,21 +210,24 @@ export class MailService {
     fecha: Date,
     codigoAutorizacion: string,
   ): string {
-    return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; color: #333;">
-  <div style="max-width: 480px; margin: 0 auto; padding: 24px;">
-    <h2 style="color: #1a56db;">Portal Clientes</h2>
-    <p>Hola ${escaparHtml(nombre)},</p>
-    <p>Registramos tu pago de <strong>${pesos(monto)}</strong> el <strong>${fechaHoraCliente(fecha)}</strong>.</p>
-    <p>Código de autorización: <strong>${escaparHtml(codigoAutorizacion)}</strong></p>
-    <p>Guarda este correo como respaldo de tu pago.</p>
-    <p style="font-size: 12px; color: #666;">Este es un aviso automatico, no respondas a este correo.</p>
-  </div>
-</body>
-</html>`;
+    return plantillaCorreo({
+      resumen: `Registramos tu pago de ${pesos(monto)}.`,
+      etiqueta: { texto: 'Pago confirmado', tono: 'exito' },
+      titulo: 'Registramos tu pago',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: tu pago quedó registrado. Guarda este correo como respaldo.` +
+        comprobante([
+          ['Monto pagado', pesos(monto)],
+          ['Fecha', fechaHoraCliente(fecha)],
+          ['Código de autorización', codigoAutorizacion],
+        ]),
+      sitio: this.sitio(),
+    });
+  }
+
+  /** Para el logo de los correos. Sin la URL del sitio va el nombre en texto. */
+  private sitio(): string | undefined {
+    return this.configService.get<string>('FRONTEND_URL') || undefined;
   }
 
   private resetTemplate(nombre: string, link: string): string {

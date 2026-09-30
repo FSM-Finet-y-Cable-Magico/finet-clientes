@@ -55,6 +55,11 @@ describe('MailService — correos del Incremento 3', () => {
       );
     });
 
+    it('sin la URL del sitio, el logo va en texto: no queda una imagen rota', () => {
+      expect(html()).not.toContain('<img');
+      expect(html()).toContain('>FI<');
+    });
+
     it('no interpreta como HTML lo que escribió el cliente', () => {
       expect(html()).toContain('Ana &lt;b&gt;');
       expect(html()).not.toContain('Ana <b>');
@@ -90,5 +95,21 @@ describe('MailService — correos del Incremento 3', () => {
       // 01:30 UTC del 1 de octubre son las 22:30 del 30 de septiembre en Chile.
       expect(html()).toContain('30/09/2026 22:30');
     });
+  });
+
+  it('con la URL del sitio, el logo es el del portal', async () => {
+    const conSitio = new MailService({
+      get: (k: string, porDefecto?: unknown) =>
+        k === 'FRONTEND_URL' ? 'https://portal.finet.cl' : porDefecto,
+    } as unknown as ConfigService);
+    (conSitio as unknown as { transporter: unknown }).transporter = {
+      sendMail,
+    };
+
+    await conSitio.sendAvisoCorte('a@b.cl', 'Ana', 'https://x/pagar?t=1');
+
+    expect(html()).toContain(
+      'src="https://portal.finet.cl/brand/FinetLogo.png"',
+    );
   });
 });

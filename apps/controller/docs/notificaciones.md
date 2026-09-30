@@ -74,6 +74,15 @@ eso. Corriéndolo dos veces seguidas, la segunda no debe despachar nada.
 Tarea programada en `aviso-corte.service.ts`, disparada por `@Cron` a las **09:30 de Chile**:
 media hora después del CU-67, para no pisarse en el SMTP.
 
+### Cómo se ve
+
+El correo del CU-68 y el del CU-69 comparten el molde de `src/mail/plantilla-correo.ts`, que usa
+los colores del portal. Tiene cabecera azul marino con el logo, tarjeta blanca y una etiqueta de
+color según el tipo de aviso. El botón de pagar va en Finet Lime con texto azul pizarra, que es lo
+que el `DESIGN.md` reserva para pagar. Es HTML de correo: tablas y estilos en línea, porque Gmail y Outlook
+ignoran las hojas de estilo. El CU-67 y los correos de contraseña siguen con el formato anterior;
+se alinean en el Incremento 4.
+
 ### Qué dice el aviso
 
 Que el servicio está próximo a cortarse por una deuda vencida, y el **enlace directo para pagar**.
