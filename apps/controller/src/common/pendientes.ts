@@ -27,6 +27,14 @@ export const DIAS_GRACIA_CORTE: number | null = null;
  */
 export const PASARELA_ACTIVA = false;
 
+/**
+ * Dónde queda registrado un pago confirmado (RF-32: fecha, monto y código de
+ * autorización). El registro es de Grupo 8 (§3 del acuerdo v2.0). Sin él no hay
+ * pago registrado, y el CU-69, cuya precondición es justamente ese registro, no
+ * tiene qué confirmar.
+ */
+export const REGISTRO_PAGO_DEFINIDO = false;
+
 export type Pendiente = {
   dato: string;
   quien: 'Grupo 2' | 'Grupo 8' | 'Grupo 3';
@@ -44,8 +52,14 @@ export const PENDIENTES: readonly Pendiente[] = [
   {
     dato: 'Pasarela de pagos operativa',
     quien: 'Grupo 2',
-    destraba: 'CU-68',
+    destraba: 'CU-68, CU-69',
     estaVacio: () => !PASARELA_ACTIVA,
+  },
+  {
+    dato: 'Dónde queda registrado el pago confirmado (tabla y campos)',
+    quien: 'Grupo 8',
+    destraba: 'CU-42, CU-43, CU-69',
+    estaVacio: () => !REGISTRO_PAGO_DEFINIDO,
   },
 ];
 

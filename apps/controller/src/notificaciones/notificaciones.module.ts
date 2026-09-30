@@ -4,11 +4,20 @@ import { pendientesVacios } from '../common/pendientes.js';
 import { PortalModule } from '../portal/portal.module.js';
 import { RecordatorioPagoService } from './recordatorio-pago.service.js';
 import { AvisoCorteService } from './aviso-corte.service.js';
+import { ConfirmacionPagoService } from './confirmacion-pago.service.js';
 
 @Module({
   imports: [EnlacePagoModule, PortalModule],
-  providers: [RecordatorioPagoService, AvisoCorteService],
-  exports: [RecordatorioPagoService, AvisoCorteService],
+  providers: [
+    RecordatorioPagoService,
+    AvisoCorteService,
+    ConfirmacionPagoService,
+  ],
+  exports: [
+    RecordatorioPagoService,
+    AvisoCorteService,
+    ConfirmacionPagoService,
+  ],
 })
 export class NotificacionesModule implements OnModuleInit {
   private readonly logger = new Logger('Incremento 3');

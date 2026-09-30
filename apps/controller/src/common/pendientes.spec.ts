@@ -1,0 +1,21 @@
+import { describe, it, expect } from '@jest/globals';
+import { PENDIENTES, pendientesVacios } from './pendientes.js';
+
+/** Lo que el backend lista al arrancar: qué falta, de quién, y qué destraba. */
+describe('pendientes del Incremento 3', () => {
+  it('hoy faltan los tres datos', () => {
+    expect(pendientesVacios()).toEqual([
+      'CU-68 ← Días de gracia antes del corte (tabla y campo donde los configuran) (Grupo 8)',
+      'CU-68, CU-69 ← Pasarela de pagos operativa (Grupo 2)',
+      'CU-42, CU-43, CU-69 ← Dónde queda registrado el pago confirmado (tabla y campos) (Grupo 8)',
+    ]);
+  });
+
+  it('cada dato dice quién tiene que responder y qué caso de uso destraba', () => {
+    for (const p of PENDIENTES) {
+      expect(p.dato).not.toBe('');
+      expect(p.destraba).toMatch(/^CU-\d+/);
+      expect(['Grupo 2', 'Grupo 3', 'Grupo 8']).toContain(p.quien);
+    }
+  });
+});

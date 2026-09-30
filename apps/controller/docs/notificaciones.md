@@ -138,3 +138,38 @@ Sembrar facturas impagas con `fecha_limite_pago` = ayer, levantar un receptor SM
 llamar a `AvisoCorteService.ejecutar(new Date())` desde un contexto de aplicación de Nest: no
 despacha, y dice qué falta. Con `ejecutar(new Date(), { diasGracia: 4, pasarelaActiva: true })`
 despacha; corriéndolo dos veces, la segunda no manda nada.
+
+## CU-69 / RF-51 — Confirmación de pago registrado
+
+**Construido, pendiente del pago.** Hoy nada lo llama: se conecta al construir el checkout
+(CU-42, CU-43).
+
+`confirmacion-pago.service.ts`. **No es tarea programada**: la dispara el registro del pago,
+apenas la pasarela devuelve un estado exitoso (RNF-51.1: "inmediatamente").
+
+### Qué hace
+
+1. **Recupera los canales de contacto** del cliente que pagó.
+2. **Despacha la confirmación** con los datos que el RF-32 exige guardar de cada pago: monto,
+   fecha y código de autorización. La fecha va en hora de Chile (`DD/MM/AAAA HH:MM`, §11): un
+   pago de las 22:30 ya es el día siguiente en UTC.
+3. **Registra el envío** en `log_notificacion` con la plantilla `CONFIRMACION_PAGO`.
+
+Las excepciones son las mismas del CU-67, con `despacho-notificacion.ts`.
+
+**Nunca lanza.** El pago ya quedó registrado cuando esto corre: si la confirmación falla, queda
+en el log y el pago no se toca. Quien llama puede no esperarla, para no demorar la respuesta a la
+pasarela.
+
+### Una vez por cada pago
+
+Lo asegura quien llama, no este servicio: `log_notificacion` no tiene columna para referenciar
+el pago, así que no puede deduplicar solo. El registro rechaza un código de transacción repetido
+(RF-33) antes de llegar acá, y la confirmación se dispara solo después de un registro nuevo.
+
+### Lo que falta
+
+| Dato | Quién | Mientras falte |
+|---|---|---|
+| `PASARELA_ACTIVA` — pasarela de pagos operativa | Nosotros (CU-42, CU-43) | No hay pagos que confirmar |
+| `REGISTRO_PAGO_DEFINIDO` — dónde queda registrado el pago confirmado | Grupo 8 | No hay pago registrado: la precondición del CU no se cumple |

@@ -2,7 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import { escaparHtml, fechaCliente, pesos } from './formato.js';
+import {
+  escaparHtml,
+  fechaCliente,
+  fechaHoraCliente,
+  pesos,
+} from './formato.js';
 
 @Injectable()
 export class MailService {
@@ -120,6 +125,37 @@ export class MailService {
     this.logger.log('Service cut notice email sent');
   }
 
+  /**
+   * CU-69 / RF-51: confirmación de un pago registrado, con los datos que el
+   * RF-32 exige guardar de cada pago. Lanza si el despacho falla: quien llama
+   * decide si reintenta.
+   */
+  async sendConfirmacionPago(
+    email: string,
+    nombre: string,
+    monto: number,
+    fecha: Date,
+    codigoAutorizacion: string,
+  ) {
+    const from =
+      this.configService.get<string>('MAIL_FROM') ||
+      '"Portal Clientes" <no-reply@finet.cl>';
+
+    await this.transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Confirmación de pago - Portal Clientes',
+      html: this.confirmacionPagoTemplate(
+        nombre,
+        monto,
+        fecha,
+        codigoAutorizacion,
+      ),
+    });
+
+    this.logger.log('Payment confirmation email sent');
+  }
+
   async sendTicketCreated(
     email: string,
     nombre: string,
@@ -190,6 +226,29 @@ export class MailService {
       <a href="${escaparHtml(enlacePago)}" style="background: #1a56db; color: #fff; padding: 12px 20px; border-radius: 6px; text-decoration: none;">Pagar ahora</a>
     </p>
     <p>Si ya pagaste, puedes ignorar este mensaje.</p>
+    <p style="font-size: 12px; color: #666;">Este es un aviso automatico, no respondas a este correo.</p>
+  </div>
+</body>
+</html>`;
+  }
+
+  private confirmacionPagoTemplate(
+    nombre: string,
+    monto: number,
+    fecha: Date,
+    codigoAutorizacion: string,
+  ): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; color: #333;">
+  <div style="max-width: 480px; margin: 0 auto; padding: 24px;">
+    <h2 style="color: #1a56db;">Portal Clientes</h2>
+    <p>Hola ${escaparHtml(nombre)},</p>
+    <p>Registramos tu pago de <strong>${pesos(monto)}</strong> el <strong>${fechaHoraCliente(fecha)}</strong>.</p>
+    <p>Código de autorización: <strong>${escaparHtml(codigoAutorizacion)}</strong></p>
+    <p>Guarda este correo como respaldo de tu pago.</p>
     <p style="font-size: 12px; color: #666;">Este es un aviso automatico, no respondas a este correo.</p>
   </div>
 </body>
