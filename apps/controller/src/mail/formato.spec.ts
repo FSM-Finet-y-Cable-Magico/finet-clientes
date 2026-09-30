@@ -1,26 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
-import {
-  escaparHtml,
-  fechaCliente,
-  fechaHoraCliente,
-  pesos,
-} from './formato.js';
+import { escaparHtml, fechaHoraCliente, pesos } from './formato.js';
 
 /** §11 del Documento 0: formatos de lo que ve el cliente. */
 describe('formato de los correos', () => {
-  it('fecha en DD/MM/AAAA', () => {
-    expect(fechaCliente(new Date('2026-09-29T00:00:00.000Z'))).toBe(
-      '29/09/2026',
-    );
-  });
-
-  it('una fecha de la base no se corre al día anterior', () => {
-    // Medianoche UTC son las 21:00 del día anterior en Chile.
-    expect(fechaCliente(new Date('2026-10-01T00:00:00.000Z'))).toBe(
-      '01/10/2026',
-    );
-  });
-
   it('fecha y hora en DD/MM/AAAA HH:MM, 24 horas', () => {
     expect(fechaHoraCliente(new Date('2026-09-30T17:05:00.000Z'))).toBe(
       '30/09/2026 14:05',

@@ -11,18 +11,6 @@
 const ZONA_HORARIA = 'America/Santiago';
 
 /**
- * §11 "Fecha (display)": DD/MM/AAAA.
- *
- * Para columnas `@db.Date`, que llegan como medianoche UTC: se leen en UTC a
- * propósito. Pasadas a hora de Chile caerían en el día anterior.
- */
-export function fechaCliente(fecha: Date): string {
-  const dia = String(fecha.getUTCDate()).padStart(2, '0');
-  const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
-  return `${dia}/${mes}/${fecha.getUTCFullYear()}`;
-}
-
-/**
  * §11 "Fecha + hora": DD/MM/AAAA HH:MM, 24 horas, en hora de Chile.
  *
  * Para instantes (`@db.Timestamp`): un pago de las 22:30 en Chile ya es el día

@@ -2,12 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import {
-  escaparHtml,
-  fechaCliente,
-  fechaHoraCliente,
-  pesos,
-} from './formato.js';
+import { escaparHtml, fechaHoraCliente, pesos } from './formato.js';
 
 @Injectable()
 export class MailService {
@@ -95,16 +90,10 @@ export class MailService {
 
   /**
    * CU-68 / RF-50: aviso de corte inminente por morosidad, con el enlace directo
-   * para pagar. Lanza si el despacho falla: quien llama decide si reintenta.
+   * para pagar. Solo eso: el CU no pide monto ni fecha de corte. Lanza si el
+   * despacho falla: quien llama decide si reintenta.
    */
-  async sendAvisoCorte(
-    email: string,
-    nombre: string,
-    deuda: number,
-    vencimiento: Date,
-    fechaCorte: Date,
-    enlacePago: string,
-  ) {
+  async sendAvisoCorte(email: string, nombre: string, enlacePago: string) {
     const from =
       this.configService.get<string>('MAIL_FROM') ||
       '"Portal Clientes" <no-reply@finet.cl>';
@@ -113,13 +102,7 @@ export class MailService {
       from,
       to: email,
       subject: 'Aviso de corte de servicio - Portal Clientes',
-      html: this.avisoCorteTemplate(
-        nombre,
-        deuda,
-        vencimiento,
-        fechaCorte,
-        enlacePago,
-      ),
+      html: this.avisoCorteTemplate(nombre, enlacePago),
     });
 
     this.logger.log('Service cut notice email sent');
@@ -205,13 +188,7 @@ export class MailService {
 </html>`;
   }
 
-  private avisoCorteTemplate(
-    nombre: string,
-    deuda: number,
-    vencimiento: Date,
-    fechaCorte: Date,
-    enlacePago: string,
-  ): string {
+  private avisoCorteTemplate(nombre: string, enlacePago: string): string {
     return `
 <!DOCTYPE html>
 <html>
@@ -220,10 +197,9 @@ export class MailService {
   <div style="max-width: 480px; margin: 0 auto; padding: 24px;">
     <h2 style="color: #1a56db;">Portal Clientes</h2>
     <p>Hola ${escaparHtml(nombre)},</p>
-    <p>Tienes una deuda pendiente de <strong>${pesos(deuda)}</strong>. Tu último vencimiento fue el <strong>${fechaCliente(vencimiento)}</strong>.</p>
-    <p>Si no se regulariza, tu servicio se suspenderá el <strong>${fechaCliente(fechaCorte)}</strong>.</p>
+    <p>Tu servicio está próximo a ser cortado por una deuda vencida. Para evitarlo, paga tu deuda:</p>
     <p style="margin: 24px 0;">
-      <a href="${escaparHtml(enlacePago)}" style="background: #1a56db; color: #fff; padding: 12px 20px; border-radius: 6px; text-decoration: none;">Pagar ahora</a>
+      <a href="${escaparHtml(enlacePago)}" style="background: #1a56db; color: #fff; padding: 12px 20px; border-radius: 6px; text-decoration: none;">Pagar mi deuda</a>
     </p>
     <p>Si ya pagaste, puedes ignorar este mensaje.</p>
     <p style="font-size: 12px; color: #666;">Este es un aviso automatico, no respondas a este correo.</p>

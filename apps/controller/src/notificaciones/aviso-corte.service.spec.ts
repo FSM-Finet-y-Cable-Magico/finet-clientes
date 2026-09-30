@@ -5,7 +5,6 @@ import { AvisoCorteService } from './aviso-corte.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
-import { PortalService } from '../portal/portal.service.js';
 import {
   CANAL_CORREO,
   ESTADO_ENVIO,
@@ -17,7 +16,7 @@ import {
 const HOY = new Date('2026-10-05T09:30:00.000Z');
 const AYER = new Date('2026-10-04T00:00:00.000Z');
 const SITIO = 'https://portal.finet.cl';
-const CON_DATOS = { diasGracia: 4, pasarelaActiva: true };
+const CON_DATOS = { pasarelaActiva: true };
 
 function factura(over: Record<string, unknown> = {}) {
   return {
@@ -29,17 +28,6 @@ function factura(over: Record<string, unknown> = {}) {
   };
 }
 
-/** El saldo del portal (CU-27): lo que el cliente ve y lo que el enlace cobra. */
-function saldo(over: Record<string, unknown> = {}) {
-  return {
-    tiene_deuda: true,
-    saldo_total: 57980,
-    saldo_confirmado: true,
-    facturas_pendientes: [],
-    ...over,
-  };
-}
-
 /**
  * CU-68 / RF-50. Cada test nombra la condición del caso de uso que comprueba.
  */
@@ -47,14 +35,12 @@ describe('AvisoCorteService', () => {
   let service: AvisoCorteService;
   let prisma: jest.Mocked<PrismaService>;
   let mail: jest.Mocked<MailService>;
-  let portal: { getResumenDeuda: jest.Mock };
   let enlaces: EnlacePagoService;
   let candado: jest.Mock;
   let entorno: Record<string, string | undefined>;
 
   beforeEach(async () => {
     candado = jest.fn().mockResolvedValue([{ tomado: true }]);
-    portal = { getResumenDeuda: jest.fn().mockResolvedValue(saldo()) };
     entorno = { FRONTEND_URL: SITIO, ENLACE_PAGO_SECRET: 'clave' };
     const mockPrisma = {
       $transaction: jest.fn(
@@ -87,7 +73,6 @@ describe('AvisoCorteService', () => {
         EnlacePagoService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: MailService, useValue: { sendAvisoCorte: jest.fn() } },
-        { provide: PortalService, useValue: portal },
         { provide: ConfigService, useValue: config },
       ],
     }).compile();
@@ -109,47 +94,22 @@ describe('AvisoCorteService', () => {
     });
   });
 
-  // ─── Lo que falta: sin estos datos, no se despacha ───────────────────────
+  // ─── Precondición: sin pasarela activa no se despacha ────────────────────
 
-  describe('mientras falten datos', () => {
-    it('sin días de gracia no despacha, y lo dice', async () => {
-      const r = await service.ejecutar(HOY, {
-        diasGracia: null,
-        pasarelaActiva: true,
-      });
-
-      expect(r.ejecutada).toBe(false);
-      expect(r.faltan).toEqual([
-        'los días de gracia antes del corte (Grupo 8)',
-      ]);
-      expect(prisma.factura.findMany).not.toHaveBeenCalled();
-      expect(mail.sendAvisoCorte).not.toHaveBeenCalled();
-    });
-
-    it('sin pasarela activa no despacha: es precondición del CU-68', async () => {
-      const r = await service.ejecutar(HOY, {
-        diasGracia: 4,
-        pasarelaActiva: false,
-      });
+  describe('mientras no haya pasarela', () => {
+    it('no despacha, y dice qué falta: es precondición del CU-68', async () => {
+      const r = await service.ejecutar(HOY, { pasarelaActiva: false });
 
       expect(r.ejecutada).toBe(false);
       expect(r.faltan).toEqual([
         'una pasarela de pagos activa (precondición del CU-68)',
       ]);
+      expect(prisma.factura.findMany).not.toHaveBeenCalled();
       expect(mail.sendAvisoCorte).not.toHaveBeenCalled();
     });
 
-    it('si faltan los dos, informa los dos', async () => {
-      const r = await service.ejecutar(HOY, {
-        diasGracia: null,
-        pasarelaActiva: false,
-      });
-
-      expect(r.faltan).toHaveLength(2);
-    });
-
-    it('sin datos ni siquiera toma el candado', async () => {
-      await service.ejecutar(HOY, { diasGracia: null, pasarelaActiva: false });
+    it('ni siquiera toma el candado', async () => {
+      await service.ejecutar(HOY, { pasarelaActiva: false });
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
@@ -177,7 +137,7 @@ describe('AvisoCorteService', () => {
     );
   });
 
-  it('avisa la deuda, el vencimiento y la fecha de corte (vencimiento + días de gracia)', async () => {
+  it('despacha el aviso con el enlace para pagar: solo lo que pide el CU', async () => {
     (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
 
     const r = await service.ejecutar(HOY, CON_DATOS);
@@ -185,23 +145,12 @@ describe('AvisoCorteService', () => {
     expect(mail.sendAvisoCorte).toHaveBeenCalledWith(
       'ana@b.cl',
       'Ana',
-      57980,
-      AYER,
-      new Date('2026-10-08T00:00:00.000Z'),
-      expect.any(String),
+      expect.stringContaining('/pagar?t='),
     );
     expect(r).toMatchObject({ detectadas: 1, enviados: 1, ejecutada: true });
   });
 
-  it('la deuda es el saldo del portal: lo que el cliente ve y lo que el enlace le cobra', async () => {
-    (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
-
-    await service.ejecutar(HOY, CON_DATOS);
-
-    expect(portal.getResumenDeuda).toHaveBeenCalledWith(10);
-  });
-
-  it('con dos contratos vencidos ayer, un solo aviso con la deuda total', async () => {
+  it('con dos contratos vencidos ayer, un solo aviso', async () => {
     (prisma.factura.findMany as jest.Mock).mockResolvedValue([
       factura({ id_factura: 7 }),
       factura({ id_factura: 8 }),
@@ -210,14 +159,6 @@ describe('AvisoCorteService', () => {
     const r = await service.ejecutar(HOY, CON_DATOS);
 
     expect(mail.sendAvisoCorte).toHaveBeenCalledTimes(1);
-    expect(mail.sendAvisoCorte).toHaveBeenCalledWith(
-      'ana@b.cl',
-      'Ana',
-      57980,
-      AYER,
-      expect.any(Date),
-      expect.any(String),
-    );
     expect(r).toMatchObject({ detectadas: 1, enviados: 1, yaAvisados: 0 });
   });
 
@@ -238,29 +179,13 @@ describe('AvisoCorteService', () => {
     expect(r).toMatchObject({ detectadas: 2, enviados: 2 });
   });
 
-  it('si el saldo no cuadra (CU-27 Excepción 3), no avisa un monto que no es: queda fallido', async () => {
-    (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
-    portal.getResumenDeuda.mockResolvedValue(
-      saldo({ saldo_total: 0, saldo_confirmado: false }),
-    );
-
-    const r = await service.ejecutar(HOY, CON_DATOS);
-
-    expect(mail.sendAvisoCorte).not.toHaveBeenCalled();
-    expect(prisma.log_notificacion.update).toHaveBeenCalledWith({
-      where: { id_notificacion: 1n },
-      data: expect.objectContaining({ estado_envio: ESTADO_ENVIO.FALLIDO }),
-    });
-    expect(r.fallidos).toBe(1);
-  });
-
   it('RF-50: adjunta un enlace directo para pagar, firmado para ese cliente', async () => {
     (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
 
     await service.ejecutar(HOY, CON_DATOS);
 
     const enlace = (mail.sendAvisoCorte as jest.Mock).mock
-      .calls[0]![5] as string;
+      .calls[0]![2] as string;
     expect(enlace.startsWith(`${SITIO}/pagar?t=`)).toBe(true);
     const token = new URL(enlace).searchParams.get('t')!;
     expect(enlaces.verificarEnlacePago(token)).toBe(10);

@@ -69,47 +69,41 @@ eso. Corriéndolo dos veces seguidas, la segunda no debe despachar nada.
 
 ## CU-68 / RF-50 — Aviso de corte inminente por morosidad
 
-**Construido, pendiente de dos datos.** Hoy no despacha nada: ver "Lo que falta".
+**Construido, pendiente de la pasarela.** Hoy no despacha nada: ver "Lo que falta".
 
 Tarea programada en `aviso-corte.service.ts`, disparada por `@Cron` a las **09:30 de Chile**:
 media hora después del CU-67, para no pisarse en el SMTP.
 
-El correo muestra las fechas como pide el §11 (`DD/MM/AAAA`) con los formatos de
-`src/mail/formato.ts`. El del CU-67 todavía las muestra como en la base (`AAAA-MM-DD`): se alinea
-en el Incremento 4.
+### Qué dice el aviso
+
+Que el servicio está próximo a cortarse por una deuda vencida, y el **enlace directo para pagar**.
+Es lo que piden el CU y el RF-50: ni monto ni fecha de corte. El monto lo ve el cliente al abrir el
+enlace. Por eso el CU-68 no necesita los días de gracia.
 
 ### Qué hace
 
-1. **Revisa que no falte nada** (ver abajo). Si falta algo, lo deja en el log y termina.
+1. **Revisa la precondición:** sin pasarela activa lo deja en el log y termina.
 2. **Toma su propio candado de transacción**, distinto del CU-67.
 3. **Comprueba `FRONTEND_URL` y `ENLACE_PAGO_SECRET`** antes de despachar. Sin ellos los
    enlaces saldrían rotos, y cada cliente quedaría como `fallido` por un error de configuración.
 4. **Busca las facturas impagas que vencieron ayer** (`pendiente` o `vencida`) y las agrupa:
    **un aviso por cliente**, aunque tenga varios contratos vencidos el mismo día.
 5. **Salta a quien ya tiene aviso de hoy**, por si la tanda se relanzó.
-6. **El monto es el saldo del portal** (`PortalService.getResumenDeuda`, CU-27), no el de la
-   factura que venció: es lo que el cliente ve al entrar y lo que el enlace le va a cobrar. Si el
-   saldo no cuadra (CU-27 Excepción 3), no se avisa un monto que no es: queda `fallido`.
-7. **Fecha de corte** = vencimiento + días de gracia.
-8. **Enlace directo para pagar** (RF-50, RNF-50.1): `FRONTEND_URL/pagar?t=…`. Ver abajo.
-9. Tandas de 50 (RNF-49.1, por la dependencia con RF-49) y registro en `log_notificacion` con la
+6. **Enlace directo para pagar** (RF-50, RNF-50.1): `FRONTEND_URL/pagar?t=…`. Ver abajo.
+7. Tandas de 50 (RNF-49.1, por la dependencia con RF-49) y registro en `log_notificacion` con la
    plantilla `AVISO_CORTE`, igual que el CU-67.
 
 ### Cuándo avisa
 
 El CU habla de un "umbral de morosidad definido para activar el aviso de corte", pero el
-Documento 0 no lo define. Se avisa **el día siguiente al vencimiento**: así solo depende de los
-días de gracia, que ya se le preguntan a Grupo 8.
+Documento 0 no lo define. Se avisa **el día siguiente al vencimiento**: así solo depende de la
+fecha de vencimiento.
 
 ### Lo que falta
 
-Los dos datos viven en `src/common/pendientes.ts`, con quién tiene que responder cada uno. Al
-arrancar, el backend deja en el log qué falta (`[Incremento 3] falta un dato: …`).
-
-| Dato | Quién | Mientras falte |
-|---|---|---|
-| `DIAS_GRACIA_CORTE` — días de gracia antes del corte | Grupo 8 | No despacha |
-| `PASARELA_ACTIVA` — pasarela de pagos operativa | Nosotros (CU-42, CU-43) | No despacha: es precondición del CU, y sin pasarela el enlace no lleva a ningún lado |
+`PASARELA_ACTIVA` en `src/common/pendientes.ts`. Es precondición del CU: sin pasarela el enlace no
+lleva a ningún lado. Al arrancar, el backend deja en el log qué falta
+(`[Incremento 3] falta un dato: …`).
 
 ### Excepciones del CU
 
@@ -124,7 +118,7 @@ necesario para validarlo viaja dentro del enlace, firmado con HMAC-SHA256.
 
 - Formato `p.<cliente>.<vence>.<nonce>.<firma>`. Nadie puede fabricarlo ni cambiarle el
   cliente sin la clave.
-- Vence a los **7 días**, que cubren los días de gracia hasta el corte.
+- Vence a los **7 días**: una semana para pagar desde que llega el aviso.
 - La firma se compara en tiempo constante y **como texto**, no como bytes: en base64 el último
   carácter lleva bits de relleno, y comparando bytes un mismo enlace tendría varias escrituras
   válidas.
@@ -136,8 +130,8 @@ necesario para validarlo viaja dentro del enlace, firmado con HMAC-SHA256.
 
 Sembrar facturas impagas con `fecha_limite_pago` = ayer, levantar un receptor SMTP en el 1025 y
 llamar a `AvisoCorteService.ejecutar(new Date())` desde un contexto de aplicación de Nest: no
-despacha, y dice qué falta. Con `ejecutar(new Date(), { diasGracia: 4, pasarelaActiva: true })`
-despacha; corriéndolo dos veces, la segunda no manda nada.
+despacha, y dice qué falta. Con `ejecutar(new Date(), { pasarelaActiva: true })` despacha;
+corriéndolo dos veces, la segunda no manda nada.
 
 ## CU-69 / RF-51 — Confirmación de pago registrado
 

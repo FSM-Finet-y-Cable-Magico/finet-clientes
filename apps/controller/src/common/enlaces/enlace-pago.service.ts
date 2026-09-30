@@ -19,7 +19,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
  * pasarela, que todavía no se elige.
  */
 
-/** Siete días: cubre los días de gracia hasta el corte, que hoy son cuatro. */
+/** Siete días: una semana para pagar desde que llega el aviso. */
 export const VIGENCIA_ENLACE_PAGO_MS = 7 * 24 * 60 * 60 * 1000;
 
 const PREFIJO = 'p';

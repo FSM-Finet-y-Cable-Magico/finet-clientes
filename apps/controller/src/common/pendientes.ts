@@ -11,16 +11,6 @@
  */
 
 /**
- * Días entre el vencimiento de una factura y el corte del servicio.
- *
- * RF-35 los llama "días de gracia configurados", el CU-80 (de Grupo 8) es el que
- * los configura, y el §6.7.3 dice que hoy son 4. Lo que falta es **dónde quedó**
- * ese valor configurado: si usáramos el 4 del documento y Grupo 8 lo cambia, el
- * aviso de corte informaría una fecha equivocada.
- */
-export const DIAS_GRACIA_CORTE: number | null = null;
-
-/**
  * Si hay una pasarela de pagos operativa. La precondición del CU-68 lo exige: el
  * aviso de corte lleva un enlace para pagar, y sin pasarela ese enlace no lleva a
  * ningún lado. Se rellena cuando se construya el pago (CU-42 y CU-43).
@@ -44,15 +34,9 @@ export type Pendiente = {
 
 export const PENDIENTES: readonly Pendiente[] = [
   {
-    dato: 'Días de gracia antes del corte (tabla y campo donde los configuran)',
-    quien: 'Grupo 8',
-    destraba: 'CU-68',
-    estaVacio: () => DIAS_GRACIA_CORTE === null,
-  },
-  {
     dato: 'Pasarela de pagos operativa',
     quien: 'Grupo 2',
-    destraba: 'CU-68, CU-69',
+    destraba: 'CU-42, CU-43, CU-68, CU-69',
     estaVacio: () => !PASARELA_ACTIVA,
   },
   {

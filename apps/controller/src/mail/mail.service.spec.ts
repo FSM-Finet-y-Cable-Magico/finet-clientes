@@ -27,9 +27,6 @@ describe('MailService — correos del Incremento 3', () => {
       await mail.sendAvisoCorte(
         'ana@b.cl',
         'Ana <b>',
-        144940,
-        new Date('2026-09-29T00:00:00.000Z'),
-        new Date('2026-10-03T00:00:00.000Z'),
         'https://portal.finet.cl/pagar?t=p.1.x.y.z',
       );
     });
@@ -43,10 +40,13 @@ describe('MailService — correos del Incremento 3', () => {
       );
     });
 
-    it('dice la deuda, el vencimiento y la fecha de corte en DD/MM/AAAA', () => {
-      expect(html()).toContain('$144.940');
-      expect(html()).toContain('29/09/2026');
-      expect(html()).toContain('03/10/2026');
+    it('avisa el corte inminente por deuda vencida', () => {
+      expect(html()).toContain('próximo a ser cortado por una deuda vencida');
+    });
+
+    it('no lleva monto ni fecha de corte: el CU no los pide', () => {
+      expect(html()).not.toMatch(/\$\s?\d/);
+      expect(html()).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
     });
 
     it('RF-50: lleva el enlace directo para pagar', () => {

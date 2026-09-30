@@ -3,9 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
-import { PortalService } from '../portal/portal.service.js';
 import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
-import { DIAS_GRACIA_CORTE, PASARELA_ACTIVA } from '../common/pendientes.js';
+import { PASARELA_ACTIVA } from '../common/pendientes.js';
 import { conCandado } from './candado.js';
 import {
   DespachoNotificacion,
@@ -27,7 +26,6 @@ import {
 
 /** Lo que el aviso necesita y todavía no está en el sistema. Ver `common/pendientes.ts`. */
 export type DatosAvisoCorte = {
-  diasGracia: number | null;
   pasarelaActiva: boolean;
 };
 
@@ -55,22 +53,19 @@ type Moroso = {
 /**
  * CU-68 / RF-50: aviso de corte inminente por morosidad.
  *
- * **Cuándo avisa:** el día siguiente al vencimiento de una factura impaga,
- * informando la fecha de corte (vencimiento más los días de gracia) y un enlace
- * directo para pagar. El Documento 0 no fija con cuánta anticipación avisar; así
- * el aviso depende solo de los días de gracia.
+ * **Qué dice:** que el servicio está próximo a cortarse por una deuda vencida, y
+ * el enlace directo para pagar. Es lo que piden el CU y el RF-50; ni monto ni
+ * fecha de corte: el monto lo ve al abrir el enlace.
  *
- * **Uno por cliente**, aunque tenga varios contratos vencidos el mismo día, y con
- * su deuda total: el mismo saldo que ve en el portal y que el enlace le cobra.
+ * **Cuándo avisa:** el día siguiente al vencimiento de una factura impaga. El CU
+ * habla de un "umbral de morosidad" que el Documento 0 no define; así el aviso
+ * solo depende de la fecha de vencimiento.
  *
- * **Qué falta para que corra** (ver `common/pendientes.ts`):
+ * **Uno por cliente**, aunque tenga varios contratos vencidos el mismo día.
  *
- * - los días de gracia, que configura Grupo 8;
- * - una pasarela activa: la precondición del CU lo exige, porque el aviso lleva
- *   un enlace para pagar y sin pasarela ese enlace no lleva a ningún lado.
- *
- * Mientras falte cualquiera de los dos, la tarea lo registra en el log y no
- * despacha nada.
+ * **Qué falta para que corra:** una pasarela activa, que es precondición del CU:
+ * sin ella el enlace no lleva a ningún lado (ver `common/pendientes.ts`).
+ * Mientras falte, la tarea lo registra en el log y no despacha nada.
  */
 @Injectable()
 export class AvisoCorteService {
@@ -80,7 +75,6 @@ export class AvisoCorteService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
-    private readonly portal: PortalService,
     private readonly enlaces: EnlacePagoService,
     private readonly config: ConfigService,
   ) {
@@ -103,10 +97,7 @@ export class AvisoCorteService {
 
   async ejecutar(
     ahora: Date,
-    datos: DatosAvisoCorte = {
-      diasGracia: DIAS_GRACIA_CORTE,
-      pasarelaActiva: PASARELA_ACTIVA,
-    },
+    datos: DatosAvisoCorte = { pasarelaActiva: PASARELA_ACTIVA },
   ): Promise<ResumenAvisoCorte> {
     const vacio: ResumenAvisoCorte = {
       detectadas: 0,
@@ -118,22 +109,15 @@ export class AvisoCorteService {
       faltan: [],
     };
 
-    const faltan: string[] = [];
-    if (datos.diasGracia === null) {
-      faltan.push('los días de gracia antes del corte (Grupo 8)');
-    }
     if (!datos.pasarelaActiva) {
-      faltan.push('una pasarela de pagos activa (precondición del CU-68)');
-    }
-    if (faltan.length > 0) {
-      this.logger.warn(`[CU-68] no se despacha: falta ${faltan.join(' y ')}`);
+      const faltan = ['una pasarela de pagos activa (precondición del CU-68)'];
+      this.logger.warn(`[CU-68] no se despacha: falta ${faltan[0]}`);
       return { ...vacio, faltan };
     }
 
-    const diasGracia = datos.diasGracia as number;
     try {
       const r = await conCandado(this.prisma, CANDADO_AVISO_CORTE, () =>
-        this.tanda(ahora, diasGracia, vacio),
+        this.tanda(ahora, vacio),
       );
       if (!r.tomado) {
         this.logger.log(
@@ -152,7 +136,6 @@ export class AvisoCorteService {
 
   private async tanda(
     ahora: Date,
-    diasGracia: number,
     vacio: ResumenAvisoCorte,
   ): Promise<ResumenAvisoCorte> {
     // Antes de despachar nada: sin la URL del sitio o sin la clave de los
@@ -163,7 +146,6 @@ export class AvisoCorteService {
 
     const hoy = inicioDelDiaUTC(ahora);
     const ayer = sumarDias(hoy, -1);
-    const fechaCorte = sumarDias(ayer, diasGracia);
     const idPlantilla = await this.despacho.plantilla();
     const morosos = await this.vencidosAyer(ayer);
 
@@ -191,7 +173,12 @@ export class AvisoCorteService {
           idPlantilla,
           ahora,
           referencia: `cliente ${m.id_cliente}, facturas ${m.facturas.join(', ')}`,
-          enviar: () => this.enviarAviso(m, ayer, fechaCorte, sitio),
+          enviar: () =>
+            this.mail.sendAvisoCorte(
+              m.email!,
+              m.nombre,
+              this.enlacePago(sitio, m.id_cliente!),
+            ),
         });
 
         if (estado === 'enviado') resumen.enviados++;
@@ -207,32 +194,6 @@ export class AvisoCorteService {
         `${resumen.yaAvisados} ya avisados`,
     );
     return resumen;
-  }
-
-  /**
-   * El monto es el saldo del portal, no el de la factura que venció: es lo que
-   * el cliente ve al entrar y lo que el enlace le va a cobrar.
-   */
-  private async enviarAviso(
-    m: Moroso,
-    vencimiento: Date,
-    fechaCorte: Date,
-    sitio: string,
-  ): Promise<void> {
-    const deuda = await this.portal.getResumenDeuda(m.id_cliente!);
-    // CU-27 Excepción 3: si el saldo no cuadra, el portal no lo muestra, y el
-    // aviso tampoco. Queda fallido, para revisión manual.
-    if (!deuda.saldo_confirmado) {
-      throw new Error('el saldo del cliente no está confirmado');
-    }
-    await this.mail.sendAvisoCorte(
-      m.email!,
-      m.nombre,
-      deuda.saldo_total,
-      vencimiento,
-      fechaCorte,
-      this.enlacePago(sitio, m.id_cliente!),
-    );
   }
 
   /** Clientes con facturas que vencieron ayer y siguen impagas, uno por cliente. */

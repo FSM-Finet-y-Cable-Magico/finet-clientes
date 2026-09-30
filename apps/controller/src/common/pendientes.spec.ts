@@ -3,10 +3,9 @@ import { PENDIENTES, pendientesVacios } from './pendientes.js';
 
 /** Lo que el backend lista al arrancar: qué falta, de quién, y qué destraba. */
 describe('pendientes del Incremento 3', () => {
-  it('hoy faltan los tres datos', () => {
+  it('hoy faltan los dos datos', () => {
     expect(pendientesVacios()).toEqual([
-      'CU-68 ← Días de gracia antes del corte (tabla y campo donde los configuran) (Grupo 8)',
-      'CU-68, CU-69 ← Pasarela de pagos operativa (Grupo 2)',
+      'CU-42, CU-43, CU-68, CU-69 ← Pasarela de pagos operativa (Grupo 2)',
       'CU-42, CU-43, CU-69 ← Dónde queda registrado el pago confirmado (tabla y campos) (Grupo 8)',
     ]);
   });
