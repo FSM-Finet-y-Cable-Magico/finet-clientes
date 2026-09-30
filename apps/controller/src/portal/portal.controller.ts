@@ -1,5 +1,14 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  ServiceUnavailableException,
+  UseGuards,
+} from '@nestjs/common';
 import { PortalService } from './portal.service.js';
+import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentClient } from '../auth/decorators/current-client.decorator.js';
 import type { cliente } from '../../generated/prisma/client.js';
@@ -24,7 +33,10 @@ import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasen
 @Controller('portal')
 @UseGuards(JwtAuthGuard)
 export class PortalController {
-  constructor(private readonly portalService: PortalService) {}
+  constructor(
+    private readonly portalService: PortalService,
+    private readonly enlaces: EnlacePagoService,
+  ) {}
 
   /**
    * CU-24: Panel principal del Portal Cliente
@@ -212,5 +224,29 @@ export class PortalController {
       cliente.id_cliente,
       body,
     );
+  }
+
+  /**
+   * CU-42 / CU-43 desde el portal: el enlace para pagar la deuda de este
+   * cliente. Es el mismo enlace firmado del aviso de corte (RNF-50.1), así el
+   * RUT no queda en la URL.
+   *
+   * GET /portal/enlace-pago → { enlace: "/pagar?t=…" }
+   *
+   * Errores:
+   *   401 - Sesión expirada por inactividad
+   *   503 - Falta ENLACE_PAGO_SECRET: el pago en línea no está disponible
+   */
+  @Get('enlace-pago')
+  enlacePago(@CurrentClient() cliente: cliente): { enlace: string } {
+    try {
+      return {
+        enlace: `/pagar?t=${this.enlaces.crearEnlacePago(cliente.id_cliente)}`,
+      };
+    } catch {
+      throw new ServiceUnavailableException(
+        'El pago en línea no está disponible por ahora.',
+      );
+    }
   }
 }
