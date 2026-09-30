@@ -206,7 +206,7 @@ describe('AuthService', () => {
           accion: 'ACEPTAR_POLITICA_PRIVACIDAD',
           entidad_afectada: 'cliente',
           id_entidad_afectada: 6,
-          ip_origen: '203.0.113.7',
+          ip_origen: '203.0.113.0/24',
           valor_nuevo: {
             formulario: 'REGISTRO',
             version_politica: '1.1',
@@ -218,6 +218,31 @@ describe('AuthService', () => {
             },
           },
         },
+      });
+    });
+
+    it('mantiene la IP completa en la sesión: solo se anonimiza el consentimiento', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.cliente.create as jest.Mock).mockResolvedValue({
+        ...mockCliente,
+        id_cliente: 7,
+      });
+      (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt');
+
+      await authService.register(
+        '123456785',
+        'Nuevo Cliente',
+        'Password1',
+        '203.0.113.7',
+        'nuevo@test.cl',
+        undefined,
+        '1.1',
+      );
+
+      expect(prisma.sesion_portal.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ ip_origen: '203.0.113.7' }),
       });
     });
 

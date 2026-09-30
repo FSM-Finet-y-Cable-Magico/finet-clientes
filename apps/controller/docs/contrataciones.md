@@ -35,7 +35,9 @@ POST /api/contrataciones
 { "id_cliente": 10, "id_contrato": 20, "id_ot": 30 }
 ```
 
-Crea en una sola transacción el cliente (estado `pendiente`), su dirección, el contrato (`PENDIENTE`), la orden de instalación, el prospecto y la aceptación de la Política de Privacidad. La aceptación es una fila en `log_auditoria` con `accion = 'ACEPTAR_POLITICA_PRIVACIDAD'`, la IP de origen, `fecha_hora` y los datos enviados en `valor_nuevo`. Si no se puede registrar, no se crea nada.
+Crea en una sola transacción el cliente (estado `pendiente`), su dirección, el contrato (`PENDIENTE`), la orden de instalación, el prospecto y la aceptación de la Política de Privacidad. La aceptación es una fila en `log_auditoria` con `accion = 'ACEPTAR_POLITICA_PRIVACIDAD'`, la IP de origen **anonimizada** (`203.0.113.7` se guarda como `203.0.113.0/24`, ver `common/utils/ip.ts`), `fecha_hora` y los datos enviados en `valor_nuevo`. Si no se puede registrar, no se crea nada.
+
+La anonimización no cambia el contrato de este endpoint ni sus mensajes: solo la precisión de ese dato almacenado. Las IPs de seguridad (`intento_fallido`, `sesion_portal`) siguen exactas a propósito, porque el bloqueo del RF-05 y el desbloqueo del CU-06 comparan una IP exacta. Es una medida provisional; el cifrado real está anotado en [la bitácora del 2026-09-28](../../../docs/2026-09-28-ip-consentimiento-y-legales.md).
 
 **Errores:**
 

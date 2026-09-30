@@ -275,6 +275,27 @@ Los archivos están en `apps/view/app/_lib/`.
 
 ---
 
+## Deuda técnica anotada — I3 / I4 (2026-09-28)
+
+Pendientes detectados al revisar el bloque SEO y legales contra el Documento 0
+definitivo. Ninguno cambia el estado de un CU de arriba: son trabajo que falta,
+no correcciones de lo marcado. El detalle y el porqué están en la bitácora
+[2026-09-28-ip-consentimiento-y-legales.md](2026-09-28-ip-consentimiento-y-legales.md).
+
+| # | Pendiente | Incremento | CU que toca | ¿Cambia diagramas de flujo? |
+|---|---|---|---|---|
+| 1 | **Cifrado de IPs con llave + índice ciego.** Va junto con la tarea de la clave WiFi, mismo mecanismo (`publicEncrypt` + `CRM_PUBLIC_KEY`) y mismo punto abierto: quién custodia la llave privada. Hoy `sesion_portal.ip_origen`, `intento_fallido.ip_address` y la auditoría de perfil guardan la IP exacta del cliente en la base compartida | I3 o I4, con CU-33 | CU-05, CU-06, CU-75 | **Sí** — autenticación y administración: el flujo suma cifrado, índice ciego y descifrado |
+| 2 | **Endurecer `GET /api/admin/intentos-fallidos`**, que entrega RUT + IP tras una cabecera `x-api-key` estática | I4 | CU-06 | No |
+| 3 | **El formulario público debe persistir solo Prospecto** (§4 del acuerdo v2.0 con G8). Hoy crea Cliente, Contrato y OT en la misma transacción | I4 | CU-18, CU-75 | **Sí** — contratación |
+| 4 | **CU-76, banner de consentimiento de cookies.** La tabla `consentimiento_cookies` ya existe con su columna `ip_anonimizada`, que debe usar el mismo formato que `common/utils/ip.ts` | I4 | CU-76 | No, es CU nuevo |
+
+**Lo que no quedó cerrado del CU-75:** el RNF-59.1 pide la IP del consentimiento
+anonimizada. Se implementó (se guarda la red, no la IP exacta), pero es una
+medida provisional: ese registro no lo lee ningún flujo, así que anonimizarlo no
+protege las IPs que sí se usan. El pendiente 1 es el que cierra el asunto.
+
+---
+
 ## Requisitos Funcionales (RF)
 
 El documento de incrementos no cubre RF-XX — estos números vienen de `apps/controller/docs/*.md` (contrato de API), fuente distinta y ya vigente desde antes del Incremento 1:

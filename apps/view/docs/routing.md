@@ -14,7 +14,7 @@ Todas las rutas viven en `app/`. Las protegidas por sesión están marcadas 🔒
 | `/cobertura` | Visor cartográfico de factibilidad — `GET /api/cobertura/config`, `GET /api/cobertura/puntos` (CU-59 a CU-62) |
 | `/velocidad` | Test de velocidad |
 | `/ayuda` | Preguntas frecuentes y contacto de soporte |
-| `/terminos`, `/privacidad` | Legal (CU-73). Reclamos y Ley 21.398 son secciones de Términos (`#reclamos`, `#termino`); las URLs viejas `/legal/*` redirigen ahí. Datos pendientes en [CASOS-DE-USO.md](../../../docs/CASOS-DE-USO.md#pendientes-del-cu-73) |
+| `/terminos`, `/privacidad` | Legal (CU-73), servidas con ISR (`revalidate = 86400`, RNF-56.1): contenido estático que se regenera una vez al día. Reclamos y Ley 21.398 son secciones de Términos (`#reclamos`, `#termino`); las URLs viejas `/legal/*` redirigen ahí. Datos pendientes en [CASOS-DE-USO.md](../../../docs/CASOS-DE-USO.md#pendientes-del-cu-73) |
 
 ## Públicas — auth y consulta de deuda
 
