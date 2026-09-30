@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { conCandado } from './candado.js';
 import {
   CANAL_CORREO,
   CANDADO_RECORDATORIO_PAGO,
@@ -72,13 +73,29 @@ export class RecordatorioPagoService {
       ejecutada: false,
     };
 
-    if (!(await this.tomarCandado())) {
-      this.logger.log(
-        '[CU-67] otra instancia ya está despachando los recordatorios: esta no hace nada',
+    try {
+      const r = await conCandado(this.prisma, CANDADO_RECORDATORIO_PAGO, () =>
+        this.tanda(ahora, vacio),
+      );
+      if (!r.tomado) {
+        this.logger.log(
+          '[CU-67] otra instancia ya está despachando los recordatorios: esta no hace nada',
+        );
+        return vacio;
+      }
+      return r.resultado;
+    } catch (error) {
+      this.logger.error(
+        `[CU-67] la tanda no se pudo completar: ${this.mensaje(error)}`,
       );
       return vacio;
     }
+  }
 
+  private async tanda(
+    ahora: Date,
+    vacio: ResumenTanda,
+  ): Promise<ResumenTanda> {
     const objetivo = this.fechaObjetivo(ahora);
     const idPlantilla = await this.plantilla();
     const facturas = await this.facturasPorVencer(objetivo);
@@ -102,29 +119,6 @@ export class RecordatorioPagoService {
         `${resumen.yaAvisados} ya avisados`,
     );
     return resumen;
-  }
-
-  // ─── Candado ──────────────────────────────────────────────────────────────
-
-  /**
-   * Candado de Postgres, no una tabla: si el backend corre en dos instancias
-   * —dos réplicas, o el contenedor viejo y el nuevo durante un deploy— las dos
-   * tienen el mismo cron y el cliente recibiría el correo dos veces.
-   *
-   * `pg_try_advisory_lock` no espera: la instancia que no lo consigue se va.
-   */
-  private async tomarCandado(): Promise<boolean> {
-    try {
-      const filas = await this.prisma.$queryRaw<
-        { pg_try_advisory_lock: boolean }[]
-      >`SELECT pg_try_advisory_lock(${CANDADO_RECORDATORIO_PAGO}::bigint)`;
-      return filas[0]?.pg_try_advisory_lock === true;
-    } catch (error) {
-      this.logger.error(
-        `[CU-67] no se pudo tomar el candado: ${this.mensaje(error)}`,
-      );
-      return false;
-    }
   }
 
   // ─── Detección ────────────────────────────────────────────────────────────
