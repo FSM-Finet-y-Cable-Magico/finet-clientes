@@ -23,7 +23,7 @@ export const registerSchema = z
       .min(1, 'Email es requerido')
       .email('Email inválido')
       .max(120),
-    telefono: z.string().max(21).optional().or(z.literal('')),
+    telefono: z.string().max(20).optional().or(z.literal('')),
     password: z
       .string()
       .min(8, 'Contraseña debe tener al menos 8 caracteres')
