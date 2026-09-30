@@ -9,9 +9,13 @@ corridos antes"; se eligió una a la que un aviso de cobro le sirva a alguien.
 
 ### Qué hace
 
-1. **Toma un candado de Postgres** (`pg_try_advisory_lock`). Si otra instancia del backend ya
-   lo tiene —dos réplicas, o el contenedor viejo y el nuevo durante un deploy— esta se va sin
-   hacer nada. Es un candado, no una tabla: no toca el esquema.
+1. **Toma un candado de Postgres** (`pg_try_advisory_xact_lock`, en `candado.ts`). Si otra
+   instancia del backend ya lo tiene —dos réplicas, o el contenedor viejo y el nuevo durante un
+   deploy— esta se va sin hacer nada. Es un candado, no una tabla: no toca el esquema.
+
+   Es **de transacción**, no de sesión: se suelta solo cuando termina la tanda, aunque falle.
+   El de sesión (`pg_try_advisory_lock`) quedaba tomado en la conexión del pool y la tanda del
+   día siguiente creía que otra instancia estaba despachando.
 2. **Busca las facturas** con `fecha_limite_pago` exactamente a 3 días y `estado` en
    `pendiente` o `vencida`. La precondición del CU es que el pago no se haya realizado, por eso
    las pagadas no entran. Misma convención de estados que `deuda-publica.service.ts`.
