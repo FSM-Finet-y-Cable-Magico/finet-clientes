@@ -157,6 +157,8 @@ El orden de dependencia real es el que describe el criterio de agrupación: `deu
 12 CU · 15% · No iniciado
 
 > **Nota:** el schema de Prisma ya tiene modelado `conversacion_bot`, `mensaje_bot`, `plantilla_notificacion` y `log_notificacion` — el diseño de datos para este incremento ya existe, no arranca de cero cuando llegue el momento. `apps/view/app/portal/_lib/portal-actions.ts` también tiene ya un `initiatePayment()` que llama a `POST /portal/payment/initiate` (endpoint que todavía no existe en el backend) — scaffolding temprano para CU-42/43.
+>
+> **CU-65 en curso** (rama `incremento-3/chatbot`): widget de chat en todo el sitio → `POST /api/asistente/mensajes` → servicio externo `finet-chatbot` (motor LLM). Responde consultas generales; el historial vive en memoria del chatbot, todavía no en `conversacion_bot`/`mensaje_bot`. Ver [`apps/controller/docs/asistente.md`](../apps/controller/docs/asistente.md).
 
 ### Criterio de agrupación (del documento fuente)
 
