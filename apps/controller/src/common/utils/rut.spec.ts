@@ -1,4 +1,4 @@
-import { cleanRut, formatRut, validateRut } from './rut.js';
+import { cleanRut, formatRut, validateRut, variantesRut } from './rut.js';
 
 describe('cleanRut', () => {
   it('remove dots and dash from formatted RUT', () => {
@@ -29,6 +29,25 @@ describe('formatRut', () => {
 
   it('handle K DV', () => {
     expect(formatRut('11111111K')).toBe('11111111-K');
+  });
+});
+
+describe('variantesRut', () => {
+  it('busca el RUT sin guion y con guion', () => {
+    expect(variantesRut('12.345.678-5')).toEqual(['123456785', '12345678-5']);
+  });
+
+  it('acepta la K en mayúscula y en minúscula, con y sin guion', () => {
+    expect(variantesRut('7777777k')).toEqual([
+      '7777777K',
+      '7777777-K',
+      '7777777k',
+      '7777777-k',
+    ]);
+  });
+
+  it('da lo mismo cómo venga escrito', () => {
+    expect(variantesRut('12345678-5')).toEqual(variantesRut('123456785'));
   });
 });
 

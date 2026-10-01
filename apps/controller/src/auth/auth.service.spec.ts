@@ -28,7 +28,15 @@ describe('AuthService', () => {
     estado: 'activo',
   };
 
+  // El cliente se busca por RUT (en sus dos formas, variantesRut) y, en el
+  // registro, también por correo: las dos son findFirst. Cada test fija qué
+  // responde cada búsqueda.
+  let porRut: jest.Mock;
+  let porEmail: jest.Mock;
+
   beforeEach(async () => {
+    porRut = jest.fn();
+    porEmail = jest.fn();
     const module = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -38,8 +46,12 @@ describe('AuthService', () => {
             $transaction: jest.fn(),
             log_auditoria: { create: jest.fn() },
             cliente: {
-              findUnique: jest.fn(),
-              findFirst: jest.fn(),
+              findFirst: jest.fn(
+                (args: { where: { rut?: unknown } }): unknown =>
+                  args.where.rut !== undefined
+                    ? (porRut(args) as unknown)
+                    : (porEmail(args) as unknown),
+              ),
               create: jest.fn(),
               update: jest.fn(),
             },
@@ -85,7 +97,7 @@ describe('AuthService', () => {
   describe('login', () => {
     it('return token and cliente when credentials are valid', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(mockCliente);
+      porRut.mockResolvedValue(mockCliente);
       (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt-token');
 
       const result = await authService.login(
@@ -99,8 +111,19 @@ describe('AuthService', () => {
       expect(result.cliente.rut).toBe('123456785');
     });
 
+    it('encuentra al cliente aunque su RUT esté guardado con guion (G3, 29-09)', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      porRut.mockResolvedValue({ ...mockCliente, rut: '12345678-5' });
+
+      await authService.login('12.345.678-5', 'Password1', '127.0.0.1');
+
+      expect(prisma.cliente.findFirst).toHaveBeenCalledWith({
+        where: { rut: { in: ['123456785', '12345678-5'] } },
+      });
+    });
+
     it('throw UnauthorizedException when cliente not found', async () => {
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
 
       await expect(
         authService.login('999999999', 'password', '127.0.0.1'),
@@ -108,7 +131,7 @@ describe('AuthService', () => {
     });
 
     it('throw UnauthorizedException when cliente has no password', async () => {
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+      porRut.mockResolvedValue({
         ...mockCliente,
         password_portal_hash: null,
       });
@@ -120,7 +143,7 @@ describe('AuthService', () => {
 
     it('throw UnauthorizedException when password is wrong', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(mockCliente);
+      porRut.mockResolvedValue(mockCliente);
 
       await expect(
         authService.login('123456785', 'wrongpassword', '127.0.0.1'),
@@ -142,8 +165,8 @@ describe('AuthService', () => {
       };
 
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
+      porEmail.mockResolvedValue(null);
       (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCreated);
       (jwtService.signAsync as jest.Mock).mockResolvedValue('register-jwt');
 
@@ -182,8 +205,8 @@ describe('AuthService', () => {
     // CU-75: el cliente y su aceptación quedan en la misma transacción.
     it('registra la aceptación de la Política de Privacidad sin la contraseña', async () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
+      porEmail.mockResolvedValue(null);
       (prisma.cliente.create as jest.Mock).mockResolvedValue({
         ...mockCliente,
         id_cliente: 6,
@@ -223,8 +246,8 @@ describe('AuthService', () => {
 
     it('mantiene la IP completa en la sesión: solo se anonimiza el consentimiento', async () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
+      porEmail.mockResolvedValue(null);
       (prisma.cliente.create as jest.Mock).mockResolvedValue({
         ...mockCliente,
         id_cliente: 7,
@@ -248,8 +271,8 @@ describe('AuthService', () => {
 
     it('no crea la sesión si no se puede registrar la aceptación', async () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
+      porEmail.mockResolvedValue(null);
       (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCliente);
       (prisma.log_auditoria.create as jest.Mock).mockRejectedValue(
         new Error('insert failed'),
@@ -269,8 +292,26 @@ describe('AuthService', () => {
       expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
     });
 
+    it('no duplica a un cliente cuyo RUT está guardado con guion (G3, 29-09)', async () => {
+      porRut.mockResolvedValue({ ...mockCliente, rut: '12345678-5' });
+      porEmail.mockResolvedValue(null);
+
+      await expect(
+        authService.register(
+          '12.345.678-5',
+          'Juan',
+          'Password1',
+          '127.0.0.1',
+          'otro@correo.cl',
+          null,
+          '1.1',
+        ),
+      ).rejects.toThrow('No se pudo completar el registro');
+      expect(prisma.cliente.create).not.toHaveBeenCalled();
+    });
+
     it('throw ConflictException when RUT already exists', async () => {
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(mockCliente);
+      porRut.mockResolvedValue(mockCliente);
 
       await expect(
         authService.register(
@@ -286,8 +327,8 @@ describe('AuthService', () => {
     });
 
     it('throw ConflictException when email already exists', async () => {
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(mockCliente);
+      porRut.mockResolvedValue(null);
+      porEmail.mockResolvedValue(mockCliente);
 
       await expect(
         authService.register(
@@ -315,8 +356,8 @@ describe('AuthService', () => {
       };
 
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
+      porEmail.mockResolvedValue(null);
       (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCreated);
       (jwtService.signAsync as jest.Mock).mockResolvedValue('session-jwt');
 
@@ -351,8 +392,8 @@ describe('AuthService', () => {
       };
 
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
+      porEmail.mockResolvedValue(null);
       (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCreated);
       (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt');
 
@@ -384,7 +425,7 @@ describe('AuthService', () => {
 
   describe('recuperarPassword', () => {
     it('return generic message when RUT exists with email', async () => {
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(mockCliente);
+      porRut.mockResolvedValue(mockCliente);
       (jwtService.signAsync as jest.Mock).mockResolvedValue('reset-token');
 
       const result = await authService.recuperarPassword('123456785');
@@ -397,7 +438,7 @@ describe('AuthService', () => {
     });
 
     it('return generic message when RUT not found', async () => {
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
 
       const result = await authService.recuperarPassword('999999999');
 
@@ -478,7 +519,7 @@ describe('AuthService', () => {
       (prisma.intento_fallido.count as jest.Mock)
         .mockResolvedValueOnce(4)
         .mockResolvedValueOnce(0);
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
 
       await expect(
         authService.login('123456785', 'password', '127.0.0.1'),
@@ -494,7 +535,7 @@ describe('AuthService', () => {
       (prisma.intento_fallido.count as jest.Mock)
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(4);
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
 
       await expect(
         authService.login('999999999', 'password', '192.168.1.1'),
@@ -539,7 +580,7 @@ describe('AuthService', () => {
       (prisma.intento_fallido.findFirst as jest.Mock).mockRejectedValue(
         new Error('connection refused'),
       );
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
       // DB también caída al registrar intento
       (prisma.intento_fallido.create as jest.Mock).mockRejectedValue(
         new Error('connection refused'),
@@ -562,7 +603,7 @@ describe('AuthService', () => {
       (prisma.intento_fallido.findFirst as jest.Mock).mockRejectedValue(
         new Error('connection refused'),
       );
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
       (prisma.intento_fallido.create as jest.Mock).mockRejectedValue(
         new Error('connection refused'),
       );
@@ -583,7 +624,7 @@ describe('AuthService', () => {
     it('fallback no produce falsos positivos — login exitoso cuando DB responde normalmente', async () => {
       // DB funcionando normalmente
       (prisma.intento_fallido.findFirst as jest.Mock).mockResolvedValue(null);
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(mockCliente);
+      porRut.mockResolvedValue(mockCliente);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt-token');
 
@@ -600,7 +641,7 @@ describe('AuthService', () => {
       // findFirst de bloqueos funciona (no hay bloqueos)
       (prisma.intento_fallido.findFirst as jest.Mock).mockResolvedValue(null);
       // Cliente no existe
-      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      porRut.mockResolvedValue(null);
       // count funciona pero create falla
       (prisma.intento_fallido.count as jest.Mock).mockResolvedValue(0);
       (prisma.intento_fallido.create as jest.Mock).mockRejectedValue(

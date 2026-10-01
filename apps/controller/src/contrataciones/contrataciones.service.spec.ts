@@ -30,7 +30,7 @@ const RESULTADO_MOCK = { id_prospecto: 99 };
 function mockTx() {
   return {
     cliente: {
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
     plan: {
@@ -64,7 +64,7 @@ describe('ContratacionesService', () => {
   let tx: ReturnType<typeof mockTx>;
 
   function mockTransaccionExitosa() {
-    (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+    (tx.cliente.findFirst as jest.Mock).mockResolvedValue(null);
     (tx.plan.findFirst as jest.Mock).mockResolvedValue({ id_plan: 1 });
     (tx.prospecto.create as jest.Mock).mockResolvedValue({ id_prospecto: 99 });
   }
@@ -187,8 +187,20 @@ describe('ContratacionesService', () => {
 
     // ─── Error: RUT duplicado ──────────────────────────────────────────────
 
+    it('reconoce como cliente a un RUT guardado con guion (G3, 29-09)', async () => {
+      mockTransaccionExitosa();
+
+      await service.crear(DTO_MOCK, IP);
+
+      expect(tx.cliente.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { rut: { in: ['123456789', '12345678-9'] } },
+        }),
+      );
+    });
+
     it('lanza ConflictException si el RUT ya está registrado', async () => {
-      (tx.cliente.findUnique as jest.Mock).mockResolvedValue({
+      (tx.cliente.findFirst as jest.Mock).mockResolvedValue({
         id_cliente: 99,
       });
 
@@ -203,7 +215,7 @@ describe('ContratacionesService', () => {
     // ─── Error: plan no existe ─────────────────────────────────────────────
 
     it('lanza NotFoundException si el plan no existe o no está activo', async () => {
-      (tx.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+      (tx.cliente.findFirst as jest.Mock).mockResolvedValue(null);
       (tx.plan.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(service.crear(DTO_MOCK, IP)).rejects.toThrow(

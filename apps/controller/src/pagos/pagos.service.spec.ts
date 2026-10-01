@@ -19,7 +19,7 @@ const ANA = { id_cliente: 10, nombre_completo: 'Ana Pérez', rut: '123456785' };
 describe('PagosService', () => {
   let service: PagosService;
   let prisma: {
-    cliente: { findUnique: jest.Mock };
+    cliente: { findUnique: jest.Mock; findFirst: jest.Mock };
     contrato: { findUnique: jest.Mock };
   };
   let saldos: { saldoDe: jest.Mock };
@@ -27,7 +27,10 @@ describe('PagosService', () => {
 
   beforeEach(async () => {
     prisma = {
-      cliente: { findUnique: jest.fn().mockResolvedValue(ANA) },
+      cliente: {
+        findUnique: jest.fn().mockResolvedValue(ANA),
+        findFirst: jest.fn().mockResolvedValue(ANA),
+      },
       contrato: {
         findUnique: jest
           .fn()
@@ -54,8 +57,10 @@ describe('PagosService', () => {
     it('por RUT: la cuenta del cliente y el saldo que da G8', async () => {
       const r = await service.resumen({ rut: '12345678-5' });
 
-      expect(prisma.cliente.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { rut: '123456785' } }),
+      expect(prisma.cliente.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { rut: { in: ['123456785', '12345678-5'] } },
+        }),
       );
       expect(saldos.saldoDe).toHaveBeenCalledWith(
         expect.objectContaining({ idCliente: 10, idContrato: null }),
@@ -108,10 +113,11 @@ describe('PagosService', () => {
         medios: [],
       });
       expect(prisma.cliente.findUnique).not.toHaveBeenCalled();
+      expect(prisma.cliente.findFirst).not.toHaveBeenCalled();
     });
 
     it('cuenta que no existe: no encontrado, sin saldo ni medios', async () => {
-      prisma.cliente.findUnique.mockResolvedValue(null);
+      prisma.cliente.findFirst.mockResolvedValue(null);
 
       const r = await service.resumen({ rut: '123456785' });
 
@@ -132,7 +138,7 @@ describe('PagosService', () => {
 
   describe('iniciar', () => {
     it('cuenta que no existe: 404', async () => {
-      prisma.cliente.findUnique.mockResolvedValue(null);
+      prisma.cliente.findFirst.mockResolvedValue(null);
 
       await expect(
         service.iniciar({ rut: '123456785' }, 'webpay'),

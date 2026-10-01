@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
+import { variantesRut } from '../common/utils/rut.js';
 import {
   ContratacionDto,
   ContratacionResponseDto,
@@ -45,8 +46,8 @@ export class ContratacionesService {
     try {
       const id_prospecto = await this.prisma.$transaction(async (tx) => {
         // Si ya es cliente, contrata desde su portal, no como interesado nuevo.
-        const existe = await tx.cliente.findUnique({
-          where: { rut: dto.rut },
+        const existe = await tx.cliente.findFirst({
+          where: { rut: { in: variantesRut(dto.rut) } },
           select: { id_cliente: true },
         });
         if (existe) {

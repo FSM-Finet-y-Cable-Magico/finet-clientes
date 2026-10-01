@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 import { PASARELA_ACTIVA } from '../common/pendientes.js';
-import { cleanRut, formatRut } from '../common/utils/rut.js';
+import { formatRut, variantesRut } from '../common/utils/rut.js';
 import {
   SaldoClienteService,
   type Cuenta,
@@ -122,8 +122,8 @@ export class PagosService {
     const cliente =
       id.t !== undefined
         ? await this.clientePorEnlace(id.t)
-        : await this.prisma.cliente.findUnique({
-            where: { rut: cleanRut(id.rut!) },
+        : await this.prisma.cliente.findFirst({
+            where: { rut: { in: variantesRut(id.rut!) } },
             select: { id_cliente: true, nombre_completo: true, rut: true },
           });
     if (!cliente) return null;
