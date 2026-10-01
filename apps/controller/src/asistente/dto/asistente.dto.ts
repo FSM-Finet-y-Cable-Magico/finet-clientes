@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateRut } from '../../common/utils/rut.js';
 
 /**
  * Largo maximo de un mensaje del visitante. Cada mensaje se cobra en tokens
@@ -28,4 +29,34 @@ export type MensajeAsistenteDto = z.infer<typeof MensajeAsistenteDto>;
 
 export interface RespuestaAsistenteDto {
   respuesta: string;
+}
+
+// CU-63: RUT que finet-chatbot pide verificar al inicio de una conversacion
+export const IdentificarClienteDto = z.object({
+  rut: z
+    .string()
+    .min(1, 'El RUT es requerido')
+    .max(12)
+    .refine((val) => validateRut(val), { message: 'RUT invalido' }),
+});
+export type IdentificarClienteDto = z.infer<typeof IdentificarClienteDto>;
+
+/**
+ * Lo que el asistente sabe del cliente una vez verificado. Solo nombre y
+ * planes: esto viaja al proveedor del motor LLM, asi que no se manda RUT,
+ * correo, telefono, direccion ni deuda (la deuda es CU-64).
+ */
+export interface ClienteIdentificadoDto {
+  encontrado: boolean;
+  cliente: {
+    nombre_completo: string;
+    planes: PlanClienteAsistenteDto[];
+  } | null;
+}
+
+export interface PlanClienteAsistenteDto {
+  nombre_comercial: string;
+  tipo_plan: string;
+  velocidad_mbps: number | null;
+  estado_contrato: string;
 }
