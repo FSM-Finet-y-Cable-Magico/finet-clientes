@@ -15,6 +15,7 @@ import { LandingModule } from './landing/landing.module.js';
 import { ContratacionesModule } from './contrataciones/contrataciones.module.js';
 import { CoberturaModule } from './cobertura/cobertura.module.js';
 import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
+import { AsistenteModule } from './asistente/asistente.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
     ContratacionesModule,
     CoberturaModule,
     DiagnosticoModule,
+    AsistenteModule,
   ],
   controllers: [AppController],
   providers: [
