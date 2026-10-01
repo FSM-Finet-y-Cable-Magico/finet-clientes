@@ -81,7 +81,6 @@ POSTGRES_DB="finet_clientes"
 
 # Autenticación
 JWT_SECRET="tu-jwt-secret-aqui"
-ADMIN_API_KEY="tu-admin-api-key-aqui"
 
 # Sesión
 SESSION_INACTIVITY_MINUTES=15
@@ -115,7 +114,6 @@ MAIL_FROM="Portal Clientes <no-reply@finet.cl>"
 |---|---|---|
 | `DATABASE_URL` | Sí | URL de conexión PostgreSQL. Con `docker compose up -d` el puerto es **5555**, no el 5432 por defecto |
 | `JWT_SECRET` | Sí | Secreto para firmar los JWT. **Debe ser idéntico al del frontend** |
-| `ADMIN_API_KEY` | Sí | Clave del header `X-API-Key` que protege los endpoints administrativos activos del backend |
 | `SESSION_INACTIVITY_MINUTES` | No | Minutos de inactividad para expirar la sesión (default: 15) |
 | `PORT` | No | Puerto del servidor (default: 4000) |
 | `NODE_ENV` | No | `development` o `production` |

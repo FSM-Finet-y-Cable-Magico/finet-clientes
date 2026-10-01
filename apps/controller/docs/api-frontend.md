@@ -16,7 +16,7 @@ POST /api/auth/login
 ```json
 {
   "rut": "12.345.678-5",
-  "password": "MiClave1"
+  "password": "<contraseña>"
 }
 ```
 
@@ -63,8 +63,8 @@ POST /api/auth/register
   "nombre_completo": "Juan Pérez",
   "email": "juan@ejemplo.cl",
   "telefono": "912345678",
-  "password": "Clave123",
-  "password_confirmation": "Clave123"
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>"
 }
 ```
 
@@ -138,7 +138,7 @@ POST /api/auth/restablecer-password
 ```json
 {
   "token": "eyJhbGciOi...",
-  "password": "NuevaClave1"
+  "password": "<contraseña nueva>"
 }
 ```
 
@@ -229,7 +229,7 @@ Content-Type: application/json
 **Body:**
 ```json
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "telefono": "+56987654321"
 }
 ```
@@ -270,7 +270,7 @@ Content-Type: application/json
 **Body:**
 ```json
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "email": "nuevo@correo.cl"
 }
 ```
@@ -312,9 +312,9 @@ Content-Type: application/json
 **Body:**
 ```json
 {
-  "password_actual": "MiClave1",
-  "password_nuevo": "NuevaClave2!",
-  "password_confirmacion": "NuevaClave2!"
+  "password_actual": "<contraseña actual>",
+  "password_nuevo": "<contraseña nueva>",
+  "password_confirmacion": "<contraseña nueva>"
 }
 ```
 
@@ -627,87 +627,12 @@ GET /api/deuda-publica/abonado?codigo_abonado=100
 ```
 
 **Respuesta 200:** Misma estructura que consulta por RUT.
-
----
-
-## 5. Panel Admin (API Key)
-
-Requieren header `X-API-Key: <ADMIN_API_KEY>`.
-
-### 5.1 Historial de intentos fallidos (RF-06)
-
-```
-GET /api/admin/intentos-fallidos?bloqueados=true&ip=192.168.1.50&page=1&limit=20
-X-API-Key: finet-admin-key-2026-dev
-```
-
-**Query params (todos opcionales):**
-
-| Param | Tipo | Descripción |
-|-------|------|-------------|
-| `rut` | string | Filtra por RUT (sin puntos ni guión) |
-| `ip` | string | Filtra por dirección IP |
-| `bloqueados` | `"true"` o `"false"` | Solo con bloqueo activo o inactivos |
-| `desde` | string | Fecha inicio (`YYYY-MM-DD`) |
-| `hasta` | string | Fecha fin (`YYYY-MM-DD`) |
-| `page` | number | Página (default 1) |
-| `limit` | number | Por página (default 20, max 100) |
-
-**Respuesta 200:**
-```json
-{
-  "data": [
-    {
-      "id_intento": "15",
-      "rut_intentado": "123456785",
-      "ip_address": "192.168.1.50",
-      "timestamp": "2026-06-01T14:00:00.000Z",
-      "bloqueado_hasta": "2026-06-01T14:15:00.000Z"
-    }
-  ],
-  "total": 45,
-  "page": 1,
-  "limit": 20
-}
-```
-
----
-
-### 5.2 Desbloquear IP (RF-06)
-
-```
-POST /api/admin/intentos-fallidos/desbloquear-ip
-X-API-Key: finet-admin-key-2026-dev
-Content-Type: application/json
-
-{ "ip": "192.168.1.50" }
-```
-
-**Respuesta 200:**
-```json
-{
-  "desbloqueado": true,
-  "registros_afectados": 3
-}
-```
-
-Si la IP no tiene bloqueos activos:
-```json
-{
-  "desbloqueado": false,
-  "registros_afectados": 0
-}
-```
-
----
-
 ## 6. Mecanismos de autenticación
 
 | Tipo | Cómo se envía | Dónde se usa |
 |------|---------------|--------------|
 | **Público** | Sin auth | Login, register, recuperación, deuda pública, landing |
 | **JWT** | Header `Authorization: Bearer <token>` o cookie `access_token` | Portal, perfil, logout |
-| **API Key** | Header `X-API-Key: <valor>` | Admin |
 
 ---
 
@@ -761,7 +686,7 @@ VITE_API_URL=http://localhost:4000/api
 const loginRes = await fetch(`${API_URL}/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ rut: '12.345.678-5', password: 'MiClave1' }),
+  body: JSON.stringify({ rut: '12.345.678-5', password: '<contraseña>' }),
 });
 const { access_token, cliente } = await loginRes.json();
 
@@ -801,7 +726,7 @@ const resetRes = await fetch(`${API_URL}/auth/restablecer-password`, {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     token: window.location.hash.replace('#token=', ''),
-    password: 'NuevaClave1',
+    password: '<contraseña nueva>',
   }),
 });
 // Si 200 → mostrar "Contraseña actualizada" y redirigir a login

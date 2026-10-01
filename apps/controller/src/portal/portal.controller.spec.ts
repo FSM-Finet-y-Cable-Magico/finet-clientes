@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { PortalController } from './portal.controller.js';
 import { PortalService } from './portal.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 
 const CLIENTE_MOCK = {
   id_cliente: 1,
@@ -27,6 +28,7 @@ const PANEL_MOCK = {
 describe('PortalController', () => {
   let controller: PortalController;
   let service: jest.Mocked<PortalService>;
+  let enlaces: { crearEnlacePago: jest.Mock };
 
   beforeEach(async () => {
     const mockService = {
@@ -55,13 +57,20 @@ describe('PortalController', () => {
     };
     const module = await Test.createTestingModule({
       controllers: [PortalController],
-      providers: [{ provide: PortalService, useValue: mockService }],
+      providers: [
+        { provide: PortalService, useValue: mockService },
+        {
+          provide: EnlacePagoService,
+          useValue: { crearEnlacePago: jest.fn().mockReturnValue('p.a.b.c.d') },
+        },
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({ canActivate: () => true })
       .compile();
     controller = module.get(PortalController);
     service = module.get(PortalService);
+    enlaces = module.get(EnlacePagoService);
   });
 
   it('GET /portal/panel llama getPanelPrincipal con el id del cliente autenticado', async () => {
@@ -120,6 +129,25 @@ describe('PortalController', () => {
     expect(service.solicitarCambioContrasenaWifi).toHaveBeenCalledWith(1, body);
     expect(respuesta).toEqual(
       expect.objectContaining({ estado: 'PENDIENTE', id_solicitud: 7 }),
+    );
+  });
+
+  // ─── CU-42 / CU-43: pagar desde el portal ────────────────────────────────
+
+  it('GET /portal/enlace-pago devuelve el enlace firmado para el cliente autenticado', () => {
+    const r = controller.enlacePago(CLIENTE_MOCK as any);
+
+    expect(enlaces.crearEnlacePago).toHaveBeenCalledWith(1);
+    expect(r).toEqual({ enlace: '/pagar?t=p.a.b.c.d' });
+  });
+
+  it('GET /portal/enlace-pago responde 503 si no se puede firmar el enlace', () => {
+    enlaces.crearEnlacePago.mockImplementation(() => {
+      throw new Error('ENLACE_PAGO_SECRET no está configurada');
+    });
+
+    expect(() => controller.enlacePago(CLIENTE_MOCK as any)).toThrow(
+      'El pago en línea no está disponible por ahora.',
     );
   });
 });

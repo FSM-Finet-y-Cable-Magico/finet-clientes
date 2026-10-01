@@ -12,6 +12,10 @@ import {
 import { PortalService } from './portal.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
+import {
+  ErrorClaveWifiG3,
+  G3WifiService,
+} from '../common/g3/g3-wifi.service.js';
 
 const FECHA_BASE = new Date('2024-01-15T00:00:00.000Z');
 
@@ -64,6 +68,7 @@ describe('PortalService', () => {
   let prisma: jest.Mocked<PrismaService>;
   let mailService: jest.Mocked<MailService>;
   let configService: jest.Mocked<ConfigService>;
+  let g3: { enviarClaveWifi: jest.Mock };
 
   beforeEach(async () => {
     const mockPrisma = {
@@ -87,12 +92,14 @@ describe('PortalService', () => {
         clave === 'CRM_PUBLIC_KEY' ? LLAVE_PUBLICA_CRM : undefined,
       ),
     };
+    g3 = { enviarClaveWifi: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortalService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: MailService, useValue: mockMailService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: G3WifiService, useValue: g3 },
       ],
     }).compile();
     service = module.get(PortalService);
@@ -520,6 +527,9 @@ describe('PortalService', () => {
         estado: 'PENDIENTE',
         fecha_solicitud: FECHA_BASE.toISOString(),
       });
+      // Mientras G8 no defina el ticket corre el v1 (acuerdo v2.0 §6.7): sin
+      // ticket no se llama a G3 (§6.4).
+      expect(g3.enviarClaveWifi).not.toHaveBeenCalled();
     });
 
     // Pedido de Dani en el review: la clave nunca en texto plano.
@@ -688,6 +698,165 @@ describe('PortalService', () => {
       await expect(
         service.solicitarCambioContrasenaWifi(1, DTO),
       ).rejects.toThrow(ServiceUnavailableException);
+    });
+    // Flujo v2, el del acuerdo v2.0 (§6.4): corre cuando G8 defina el ticket
+    // WiFi. La creacion del ticket es justo ese hueco, asi que aca se simula.
+    describe('flujo v2: ticket y envio directo a G3', () => {
+      const UUID_V4 =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+      const RESPUESTA_G3 = {
+        idSolicitud: 2,
+        estado: 'PENDIENTE',
+        fecha: '2026-10-01T21:11:14.370Z',
+        duplicado: false,
+      };
+      let crearTicket: jest.SpiedFunction<PortalService['crearTicketWifi']>;
+      let orden: string[];
+
+      const auditoria = (n: number) =>
+        (
+          (prisma.log_auditoria.create as jest.Mock).mock.calls[n][0] as {
+            data: { accion: string; valor_nuevo: Record<string, unknown> };
+          }
+        ).data;
+
+      beforeEach(() => {
+        orden = [];
+        (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+          id_contrato: 1,
+          estado: 'ACTIVO',
+        });
+        (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+          id_empresa: 1,
+        });
+        crearTicket = jest
+          .spyOn(service, 'crearTicketWifi')
+          .mockImplementation(() => {
+            orden.push('ticket');
+            return Promise.resolve(77);
+          });
+        (prisma.log_auditoria.create as jest.Mock).mockImplementation(() => {
+          orden.push('auditoria');
+          return Promise.resolve({});
+        });
+        g3.enviarClaveWifi.mockImplementation(() => {
+          orden.push('G3');
+          return Promise.resolve(RESPUESTA_G3);
+        });
+      });
+
+      it('primero el ticket y los ids guardados, recien despues G3 (§6.4 y §6.6)', async () => {
+        const resultado = await service.solicitarCambioContrasenaWifi(
+          1,
+          DTO,
+          true,
+        );
+
+        expect(orden).toEqual(['ticket', 'auditoria', 'G3', 'auditoria']);
+        expect(crearTicket).toHaveBeenCalledWith(expect.anything(), {
+          idCliente: 1,
+          idEmpresa: 1,
+          idContrato: 1,
+        });
+        const envio = g3.enviarClaveWifi.mock.calls[0][0] as {
+          requestId: string;
+          traceId: string;
+        };
+        expect(envio).toEqual({
+          clave: DTO.password,
+          idTicket: '77',
+          idContrato: 1,
+          idEmpresa: 1,
+          requestId: expect.stringMatching(UUID_V4),
+          traceId: expect.stringMatching(UUID_V4),
+        });
+        expect(auditoria(0).valor_nuevo).toMatchObject({
+          request_id: envio.requestId,
+          trace_id: envio.traceId,
+        });
+        // CU-32: "la solicitud fue creada", con los datos que devuelve G3.
+        expect(resultado).toEqual({
+          id_solicitud: 2,
+          id_contrato: 1,
+          estado: 'PENDIENTE',
+          fecha_solicitud: '2026-10-01T21:11:14.370Z',
+        });
+      });
+
+      it('la clave no se guarda en ninguna parte (§6.5 y §14.6)', async () => {
+        await service.solicitarCambioContrasenaWifi(1, DTO, true);
+
+        expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
+        for (const [llamada] of (prisma.log_auditoria.create as jest.Mock).mock
+          .calls) {
+          expect(JSON.stringify(llamada)).not.toContain(DTO.password);
+        }
+      });
+
+      it('la respuesta de G3 queda en la auditoria, sin secretos', async () => {
+        await service.solicitarCambioContrasenaWifi(1, DTO, true);
+
+        expect(auditoria(1).accion).toBe('RESPUESTA_G3_CAMBIO_CONTRASENA_WIFI');
+        expect(auditoria(1).valor_nuevo).toEqual({
+          request_id: expect.stringMatching(UUID_V4),
+          resultado: 'REGISTRADA',
+          id_solicitud_g3: 2,
+          estado_g3: 'PENDIENTE',
+          duplicado: false,
+        });
+      });
+
+      it('si G3 no la registra: 503, sin un segundo ticket y sin simular nada (§14.12)', async () => {
+        g3.enviarClaveWifi.mockRejectedValue(
+          new ErrorClaveWifiG3(
+            403,
+            'G3 respondió 403: id_empresa fuera del alcance',
+          ),
+        );
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).rejects.toThrow(ServiceUnavailableException);
+        expect(crearTicket).toHaveBeenCalledTimes(1);
+        expect(auditoria(1).valor_nuevo).toEqual({
+          request_id: expect.stringMatching(UUID_V4),
+          resultado: 'ERROR',
+          status_g3: 403,
+        });
+      });
+
+      it('sin ticket no se llama a G3 (§6.4 paso 3)', async () => {
+        crearTicket.mockRejectedValue(new Error('pendiente de G8'));
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).rejects.toThrow(ServiceUnavailableException);
+        expect(g3.enviarClaveWifi).not.toHaveBeenCalled();
+      });
+
+      it('sin la empresa del cliente no se envia nada (§6.2)', async () => {
+        (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+          id_empresa: null,
+        });
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).rejects.toThrow(ServiceUnavailableException);
+        expect(crearTicket).not.toHaveBeenCalled();
+        expect(g3.enviarClaveWifi).not.toHaveBeenCalled();
+      });
+
+      it('el hueco: el ticket WiFi no se crea hasta que G8 responda', async () => {
+        crearTicket.mockRestore();
+
+        await expect(
+          service.crearTicketWifi({} as never, {
+            idCliente: 1,
+            idEmpresa: 1,
+            idContrato: 1,
+          }),
+        ).rejects.toThrow('pendiente de G8');
+      });
     });
   });
 });

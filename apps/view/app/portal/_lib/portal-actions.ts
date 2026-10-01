@@ -77,22 +77,3 @@ export async function changeWifiPassword(
     return { success: false, error: 'No se pudo conectar con el servidor' };
   }
 }
-
-export async function initiatePayment(): Promise<{
-  success: boolean;
-  redirectUrl?: string;
-  error?: string;
-}> {
-  try {
-    const res = await fetch(apiUrl('/portal/payment/initiate'), {
-      method: 'POST',
-      headers: await authHeaders(),
-      cache: 'no-store',
-    });
-    if (!res.ok) return { success: false, error: 'No se pudo iniciar el proceso de pago' };
-    const data = (await res.json()) as { redirectUrl: string };
-    return { success: true, redirectUrl: data.redirectUrl };
-  } catch {
-    return { success: false, error: 'No se pudo conectar con el servidor' };
-  }
-}

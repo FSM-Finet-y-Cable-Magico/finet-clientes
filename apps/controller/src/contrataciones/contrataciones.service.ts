@@ -8,13 +8,29 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
+import { variantesRut } from '../common/utils/rut.js';
 import {
   ContratacionDto,
   ContratacionResponseDto,
 } from './dto/contratacion.dto.js';
 
-const ESTADO_PIPELINE_CONVERTIDO = 'ACTIVO';
+/** §11.10 del Documento 0: la etapa en que entra un interesado al pipeline. */
+const ETAPA_PIPELINE_INICIAL = 'NUEVO';
 
+/** `prospecto.direccion` es VARCHAR(200). La dirección completa queda también en la auditoría. */
+const LARGO_DIRECCION = 200;
+
+/**
+ * CU-18: solicitud de contratación desde el formulario público.
+ *
+ * Crea **solo el Prospecto** y lo deja en la etapa NUEVO del pipeline, para que G8
+ * siga la gestión comercial (acuerdo v2.0 §4 y prueba §14.1). No crea Cliente,
+ * Dirección, Contrato ni Orden de Trabajo: el cliente se crea en G8 cuando la
+ * instalación de G3 queda completada.
+ *
+ * El plan de interés no tiene dónde ir en `prospecto`, que no tiene `id_plan`.
+ * Queda en la auditoría de la solicitud mientras G8 dice dónde lo quiere.
+ */
 @Injectable()
 export class ContratacionesService {
   private readonly logger = new Logger(ContratacionesService.name);
@@ -28,143 +44,91 @@ export class ContratacionesService {
     const hoy = new Date();
 
     try {
-      const { id_cliente, id_contrato, id_ot } = await this.prisma.$transaction(
-        async (tx) => {
-          const existe = await tx.cliente.findUnique({
-            where: { rut: dto.rut },
-            select: { id_cliente: true },
-          });
+      const id_prospecto = await this.prisma.$transaction(async (tx) => {
+        // Si ya es cliente, contrata desde su portal, no como interesado nuevo.
+        const existe = await tx.cliente.findFirst({
+          where: { rut: { in: variantesRut(dto.rut) } },
+          select: { id_cliente: true },
+        });
+        if (existe) {
+          throw new ConflictException('El RUT ya está registrado');
+        }
 
-          if (existe) {
-            throw new ConflictException('El RUT ya está registrado');
-          }
+        const plan = await tx.plan.findFirst({
+          where: { id_plan: dto.id_plan, activo: true },
+          select: { id_plan: true },
+        });
+        if (!plan) {
+          throw new NotFoundException(
+            'El plan seleccionado no existe o no está disponible',
+          );
+        }
 
-          const plan = await tx.plan.findFirst({
-            where: { id_plan: dto.id_plan, activo: true },
-            select: { id_plan: true },
-          });
+        const prospecto = await tx.prospecto.create({
+          data: {
+            id_empresa: 1,
+            rut: dto.rut,
+            nombre_completo: dto.nombre_completo,
+            email: dto.email,
+            telefono: dto.telefono ?? null,
+            direccion: [dto.direccion_completa, dto.comuna, dto.ciudad]
+              .filter(Boolean)
+              .join(', ')
+              .slice(0, LARGO_DIRECCION),
+            estado_pipeline: ETAPA_PIPELINE_INICIAL,
+            fecha_creacion: hoy,
+          },
+          select: { id_prospecto: true },
+        });
 
-          if (!plan) {
-            throw new NotFoundException(
-              'El plan seleccionado no existe o no está disponible',
-            );
-          }
+        // CU-75: dentro de la transacción, a diferencia de la auditoría de más
+        // abajo — sin la aceptación registrada no se procesa la solicitud.
+        await registrarAceptacionPolitica(tx, {
+          formulario: 'CONTRATACION',
+          entidad: 'prospecto',
+          id_entidad: prospecto.id_prospecto,
+          version: dto.version_politica_privacidad,
+          ip,
+          datos: {
+            nombre_completo: dto.nombre_completo,
+            rut: dto.rut,
+            email: dto.email,
+            telefono: dto.telefono ?? null,
+            id_plan: dto.id_plan,
+            direccion_completa: dto.direccion_completa,
+            comuna: dto.comuna,
+            ciudad: dto.ciudad ?? null,
+          },
+        });
 
-          const cliente = await tx.cliente.create({
-            data: {
-              nombre_completo: dto.nombre_completo,
-              rut: dto.rut,
-              email: dto.email,
-              telefono: dto.telefono ?? null,
-              id_empresa: 1,
-              estado: 'pendiente',
-            },
-          });
+        return prospecto.id_prospecto;
+      });
 
-          const direccion = await tx.direccion_servicio.create({
-            data: {
-              id_cliente: cliente.id_cliente,
-              direccion_completa: dto.direccion_completa,
-              comuna: dto.comuna,
-              ciudad: dto.ciudad ?? null,
-              es_principal: true,
-            },
-          });
-
-          const contrato = await tx.contrato.create({
-            data: {
-              id_cliente: cliente.id_cliente,
-              id_plan: dto.id_plan,
-              id_empresa: 1,
-              // Tabla 11.15 del Documento 0: el contrato nace en PENDIENTE.
-              // Antes se escribia 'en_tramite', que no existe en esa tabla.
-              estado: 'PENDIENTE',
-              fecha_inicio: hoy,
-              dia_vencimiento: 5,
-            },
-          });
-
-          const ot = await tx.orden_trabajo.create({
-            data: {
-              id_cliente: cliente.id_cliente,
-              id_direccion: direccion.id_direccion,
-              id_empresa: 1,
-              tipo_ot: 'instalacion',
-              estado: 'pendiente',
-              prioridad: 'normal',
-              fecha_creacion: hoy,
-            },
-          });
-
-          await tx.prospecto.create({
-            data: {
-              id_empresa: 1,
-              id_cliente: cliente.id_cliente,
-              rut: dto.rut,
-              nombre_completo: dto.nombre_completo,
-              email: dto.email,
-              telefono: dto.telefono ?? null,
-              direccion: dto.direccion_completa,
-              estado_pipeline: ESTADO_PIPELINE_CONVERTIDO,
-              tiempo_conversion_dias: 0,
-              fecha_creacion: hoy,
-              fecha_conversion: hoy,
-            },
-          });
-
-          // CU-75: dentro de la transaccion, a diferencia de CREAR_CONTRATACION
-          // mas abajo — sin la aceptacion registrada no se procesa la solicitud.
-          await registrarAceptacionPolitica(tx, {
-            formulario: 'CONTRATACION',
-            id_cliente: cliente.id_cliente,
-            version: dto.version_politica_privacidad,
-            ip,
-            datos: {
-              nombre_completo: dto.nombre_completo,
-              rut: dto.rut,
-              email: dto.email,
-              telefono: dto.telefono ?? null,
-              id_plan: dto.id_plan,
-              direccion_completa: dto.direccion_completa,
-              comuna: dto.comuna,
-              ciudad: dto.ciudad ?? null,
-            },
-          });
-
-          return {
-            id_cliente: cliente.id_cliente,
-            id_contrato: contrato.id_contrato,
-            id_ot: ot.id_ot,
-          };
-        },
-      );
-
-      this.logger.log(
-        `Contratación creada — cliente=${id_cliente} contrato=${id_contrato} ot=${id_ot}`,
-      );
+      this.logger.log(`Solicitud de contratación: prospecto=${id_prospecto}`);
 
       try {
         await this.prisma.log_auditoria.create({
           data: {
-            accion: 'CREAR_CONTRATACION',
-            entidad_afectada: 'cliente',
-            id_entidad_afectada: id_cliente,
+            accion: 'CREAR_PROSPECTO_PORTAL',
+            entidad_afectada: 'prospecto',
+            id_entidad_afectada: id_prospecto,
             valor_nuevo: {
-              id_contrato,
-              id_ot,
               rut: dto.rut,
-              plan: dto.id_plan,
+              // El plan de interés, mientras G8 dice dónde lo quiere.
+              id_plan: dto.id_plan,
+              etapa: ETAPA_PIPELINE_INICIAL,
+              origen: 'PORTAL',
             },
           },
         });
       } catch (auditError) {
         this.logger.error(
-          `No se pudo registrar auditoría para contratación cliente=${id_cliente}`,
+          `No se pudo registrar auditoría del prospecto ${id_prospecto}`,
           auditError,
         );
       }
 
-      return { id_cliente, id_contrato, id_ot };
+      return { id_prospecto };
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.logger.error('Error inesperado al crear contratación', error);

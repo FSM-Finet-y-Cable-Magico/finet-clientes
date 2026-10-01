@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -9,16 +10,20 @@ import { MailModule } from './mail/mail.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { DeudaPublicaModule } from './deuda-publica/deuda-publica.module.js';
 import { PortalModule } from './portal/portal.module.js';
-import { AdminModule } from './admin/admin.module.js';
 import { PerfilModule } from './perfil/perfil.module.js';
 import { LandingModule } from './landing/landing.module.js';
 import { ContratacionesModule } from './contrataciones/contrataciones.module.js';
 import { CoberturaModule } from './cobertura/cobertura.module.js';
 import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
+import { ConsentimientoModule } from './consentimiento/consentimiento.module.js';
+import { NotificacionesModule } from './notificaciones/notificaciones.module.js';
+import { PagosModule } from './pagos/pagos.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // CU-67: habilita el @Cron del recordatorio de pago.
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,
@@ -30,12 +35,14 @@ import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
     AuthModule,
     DeudaPublicaModule,
     PortalModule,
-    AdminModule,
     PerfilModule,
     LandingModule,
     ContratacionesModule,
     CoberturaModule,
     DiagnosticoModule,
+    ConsentimientoModule,
+    NotificacionesModule,
+    PagosModule,
   ],
   controllers: [AppController],
   providers: [

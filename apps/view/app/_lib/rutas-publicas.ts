@@ -41,6 +41,8 @@ export const RUTAS_PUBLICAS: RutaPublica[] = [
   // Solo sirven a quien ya llego desde el login o el correo.
   { path: "/recuperar-password", indexable: false },
   { path: "/restablecer-password", indexable: false },
+  // CU-42/43: se llega con la cuenta ya identificada (RUT, abonado o enlace).
+  { path: "/pagar", indexable: false },
 ];
 
 /** Las mismas que protege `proxy.ts`; robots.txt las bloquea. */
