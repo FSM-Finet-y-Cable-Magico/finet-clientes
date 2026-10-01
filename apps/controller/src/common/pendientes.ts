@@ -35,6 +35,16 @@ export const REGISTRO_PAGO_DEFINIDO = false;
  */
 export const SALDO_CLIENTE_DEFINIDO = false;
 
+/**
+ * El ticket del cambio de clave WiFi: el literal de su categoría (§6.1 del
+ * acuerdo v2.0) y dónde va el servicio, porque la tabla `ticket` no tiene esa
+ * columna (§6.2). Los define Grupo 8. El §6.4 pide crear el ticket antes de
+ * llamar a G3 y mandarle su id como correlación, así que sin él el CU-32 no
+ * llama a G3: sigue con el flujo v1, que el §6.7 permite conservar mientras
+ * tanto.
+ */
+export const TICKET_WIFI_DEFINIDO = false;
+
 export type Pendiente = {
   dato: string;
   quien: 'Grupo 2' | 'Grupo 8' | 'Grupo 3';
@@ -60,6 +70,12 @@ export const PENDIENTES: readonly Pendiente[] = [
     quien: 'Grupo 8',
     destraba: 'CU-42, CU-43, CU-68',
     estaVacio: () => !SALDO_CLIENTE_DEFINIDO,
+  },
+  {
+    dato: 'Ticket del cambio de clave WiFi: categoría y dónde va el servicio',
+    quien: 'Grupo 8',
+    destraba: 'CU-32 (envío directo a G3)',
+    estaVacio: () => !TICKET_WIFI_DEFINIDO,
   },
 ];
 

@@ -3,11 +3,12 @@ import { PENDIENTES, pendientesVacios } from './pendientes.js';
 
 /** Lo que el backend lista al arrancar: qué falta, de quién, y qué destraba. */
 describe('pendientes del Incremento 3', () => {
-  it('hoy faltan los tres datos', () => {
+  it('hoy faltan los cuatro datos', () => {
     expect(pendientesVacios()).toEqual([
       'CU-42, CU-43, CU-68, CU-69 ← Pasarela de pagos operativa (Grupo 2)',
       'CU-42, CU-43, CU-69 ← Dónde queda registrado el pago confirmado (tabla y campos) (Grupo 8)',
       'CU-42, CU-43, CU-68 ← Dónde está el saldo del cliente (tabla y campo) (Grupo 8)',
+      'CU-32 (envío directo a G3) ← Ticket del cambio de clave WiFi: categoría y dónde va el servicio (Grupo 8)',
     ]);
   });
 

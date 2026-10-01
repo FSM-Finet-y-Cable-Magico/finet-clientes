@@ -193,26 +193,30 @@ export class PortalController {
    * Auth: Bearer <token>
    *
    * Este endpoint NO cambia la clave del WiFi. Solo deja registrada la
-   * solicitud para que el CRM la ejecute despues contra el equipo del cliente
-   * (CU-33). La respuesta confirma que la solicitud quedo creada, nada mas.
+   * solicitud: aplicarla es el CU-33, de Grupo 3. La respuesta confirma que la
+   * solicitud quedo creada, nada mas.
    *
    * Body: { id_contrato: number, password: string }
    *   - password: 8 a 63 caracteres, sin espacios en blanco. Se permiten
    *     simbolos (decision del equipo, diverge de CU-31/RF-24 escritos —
    *     ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md)
-   *   - se guarda cifrada con la llave publica del CRM en
-   *     `solicitud_contrasena_wifi.password_nueva_cifrada`: no queda en texto
-   *     plano y solo el CRM puede leerla (la necesita para aplicarla)
+   *   - nunca queda en texto plano. Hoy (v1) se guarda en
+   *     `solicitud_contrasena_wifi.password_nueva_cifrada`, cifrada con la llave
+   *     publica del CRM. Cuando G8 defina el ticket WiFi (v2, acuerdo v2.0
+   *     §6.4) se crea el ticket y la clave va cifrada con la llave de G3,
+   *     directo a G3, sin guardarse en ninguna parte
    *
    * Respuesta: SolicitudContrasenaWifiResponseDto
-   *   - id_solicitud, id_contrato, estado ("PENDIENTE"), fecha_solicitud
+   *   - id_solicitud, id_contrato, estado ("PENDIENTE"), fecha_solicitud. En el
+   *     v2, id_solicitud, estado y fecha son los que devuelve G3
    *
    * Errores:
    *   400 - La clave no cumple el formato (CU-32 Excepcion 3)
    *   401 - Sesion expirada por inactividad (CU-32 Excepcion 1)
    *   404 - El servicio seleccionado no es del cliente o no existe
    *   409 - El servicio no esta activo (CU-32 Excepcion 2)
-   *   503 - No fue posible registrar la solicitud
+   *   503 - No fue posible registrar la solicitud (en el v2, tambien si G3
+   *         no la registro)
    */
   @Post('wifi/password')
   solicitarCambioContrasenaWifi(
