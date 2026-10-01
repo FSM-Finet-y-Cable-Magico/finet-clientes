@@ -30,8 +30,16 @@ export function variantesRut(rut: string): string[] {
   return [...new Set(formas)];
 }
 
-const FACTORES = [3, 2, 7, 6, 5, 4, 3, 2];
-
+/**
+ * Dígito verificador por módulo 11: los dígitos del cuerpo de derecha a
+ * izquierda, multiplicados por 2, 3, 4, 5, 6 y 7 (y de vuelta al 2), se suman;
+ * el dígito es 11 menos el resto de dividir por 11, con 11 → 0 y 10 → K.
+ *
+ * Antes se multiplicaba de izquierda a derecha por una lista fija
+ * (3, 2, 7, 6, 5, 4, 3, 2), que solo coincide con este cálculo cuando el cuerpo
+ * tiene 8 dígitos: rechazaba los RUT bajo 10 millones (9.345.678-5, el ejemplo
+ * del §11 del Documento 0) y aceptaba algunos inválidos (7.777.777-K).
+ */
 export function validateRut(rut: string): boolean {
   const clean = cleanRut(rut);
   if (!/^\d{1,8}[\dkK]$/.test(clean)) return false;
@@ -40,8 +48,10 @@ export function validateRut(rut: string): boolean {
   const dvIngresado = clean.slice(-1).toUpperCase();
 
   let suma = 0;
-  for (let i = 0; i < body.length; i++) {
-    suma += parseInt(body[i], 10) * FACTORES[i];
+  let factor = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    suma += parseInt(body[i], 10) * factor;
+    factor = factor === 7 ? 2 : factor + 1;
   }
 
   const dvEsperado = 11 - (suma % 11);
