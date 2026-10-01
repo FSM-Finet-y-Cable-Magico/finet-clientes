@@ -54,7 +54,7 @@ Requiere la contrasena actual para autorizar el cambio. El cambio queda registra
 
 ```json
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "telefono": "+56987654321"
 }
 ```
@@ -103,7 +103,7 @@ Requiere la contrasena actual para autorizar el cambio. Rechaza si el nuevo emai
 
 ```json
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "email": "nuevo@correo.cl"
 }
 ```
@@ -149,9 +149,9 @@ Requiere la contrasena actual. La nueva contrasena debe cumplir requisitos de co
 
 ```json
 {
-  "password_actual": "MiClave1",
-  "password_nuevo": "NuevaClave2!",
-  "password_confirmacion": "NuevaClave2!"
+  "password_actual": "<contraseña actual>",
+  "password_nuevo": "<contraseña nueva>",
+  "password_confirmacion": "<contraseña nueva>"
 }
 ```
 
@@ -201,7 +201,7 @@ const res = await fetch(`${API_URL}/auth/perfil/telefono`, {
     Authorization: `Bearer ${token}`,
   },
   body: JSON.stringify({
-    password_actual: 'MiClave1',
+    password_actual: '<contraseña actual>',
     telefono: '+56987654321',
   }),
 });

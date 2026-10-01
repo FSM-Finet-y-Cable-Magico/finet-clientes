@@ -72,8 +72,8 @@ Content-Type: application/json
   "nombre_completo": "Juan Perez",
   "email": "juan@ejemplo.cl",
   "telefono": "912345678",
-  "password": "MiClave1",
-  "password_confirmation": "MiClave1"
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>"
 }
 ```
 
@@ -156,7 +156,7 @@ Content-Type: application/json
 
 {
   "token": "eyJhbGciOi...",
-  "password": "NuevaClave1"
+  "password": "<contraseña nueva>"
 }
 ```
 
@@ -242,7 +242,7 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "telefono": "+56987654321"
 }
 ```
@@ -282,7 +282,7 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "email": "nuevo@correo.cl"
 }
 ```
@@ -321,9 +321,9 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
-  "password_nuevo": "NuevaClave2!",
-  "password_confirmacion": "NuevaClave2!"
+  "password_actual": "<contraseña actual>",
+  "password_nuevo": "<contraseña nueva>",
+  "password_confirmacion": "<contraseña nueva>"
 }
 ```
 
@@ -404,12 +404,12 @@ BASE_URL=http://localhost:4000/api
 # Login
 curl -X POST "$BASE_URL/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"rut":"12.345.678-5","password":"MiClave1"}'
+  -d '{"rut":"12.345.678-5","password":"<contraseña>"}'
 
 # Register
 curl -X POST "$BASE_URL/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"rut":"12.345.678-5","nombre_completo":"Juan Perez","email":"juan@test.cl","password":"MiClave1","password_confirmation":"MiClave1"}'
+  -d '{"rut":"12.345.678-5","nombre_completo":"Juan Perez","email":"juan@test.cl","password":"<contraseña>","password_confirmation":"<contraseña>"}'
 
 # Recuperar password
 curl -X POST "$BASE_URL/auth/recuperar-password" \
@@ -419,7 +419,7 @@ curl -X POST "$BASE_URL/auth/recuperar-password" \
 # Restablecer password
 curl -X POST "$BASE_URL/auth/restablecer-password" \
   -H "Content-Type: application/json" \
-  -d '{"token":"<token>","password":"NuevaClave1"}'
+  -d '{"token":"<token>","password":"<contraseña nueva>"}'
 
 # Perfil
 curl -X GET "$BASE_URL/auth/perfil" \
@@ -429,19 +429,19 @@ curl -X GET "$BASE_URL/auth/perfil" \
 curl -X PATCH "$BASE_URL/auth/perfil/telefono" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","telefono":"+56987654321"}'
+  -d '{"password_actual":"<contraseña actual>","telefono":"+56987654321"}'
 
 # Actualizar email
 curl -X PATCH "$BASE_URL/auth/perfil/email" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","email":"nuevo@correo.cl"}'
+  -d '{"password_actual":"<contraseña actual>","email":"nuevo@correo.cl"}'
 
 # Cambiar contraseña
 curl -X PATCH "$BASE_URL/auth/perfil/password" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","password_nuevo":"NuevaClave2!","password_confirmacion":"NuevaClave2!"}'
+  -d '{"password_actual":"<contraseña actual>","password_nuevo":"<contraseña nueva>","password_confirmacion":"<contraseña nueva>"}'
 
 # Logout
 curl -X POST "$BASE_URL/auth/logout" \

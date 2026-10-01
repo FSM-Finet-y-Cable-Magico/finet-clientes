@@ -16,7 +16,7 @@ POST /api/auth/login
 ```json
 {
   "rut": "12.345.678-5",
-  "password": "MiClave1"
+  "password": "<contraseña>"
 }
 ```
 
@@ -63,8 +63,8 @@ POST /api/auth/register
   "nombre_completo": "Juan Pérez",
   "email": "juan@ejemplo.cl",
   "telefono": "912345678",
-  "password": "Clave123",
-  "password_confirmation": "Clave123"
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>"
 }
 ```
 
@@ -138,7 +138,7 @@ POST /api/auth/restablecer-password
 ```json
 {
   "token": "eyJhbGciOi...",
-  "password": "NuevaClave1"
+  "password": "<contraseña nueva>"
 }
 ```
 
@@ -229,7 +229,7 @@ Content-Type: application/json
 **Body:**
 ```json
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "telefono": "+56987654321"
 }
 ```
@@ -270,7 +270,7 @@ Content-Type: application/json
 **Body:**
 ```json
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "email": "nuevo@correo.cl"
 }
 ```
@@ -312,9 +312,9 @@ Content-Type: application/json
 **Body:**
 ```json
 {
-  "password_actual": "MiClave1",
-  "password_nuevo": "NuevaClave2!",
-  "password_confirmacion": "NuevaClave2!"
+  "password_actual": "<contraseña actual>",
+  "password_nuevo": "<contraseña nueva>",
+  "password_confirmacion": "<contraseña nueva>"
 }
 ```
 
@@ -686,7 +686,7 @@ VITE_API_URL=http://localhost:4000/api
 const loginRes = await fetch(`${API_URL}/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ rut: '12.345.678-5', password: 'MiClave1' }),
+  body: JSON.stringify({ rut: '12.345.678-5', password: '<contraseña>' }),
 });
 const { access_token, cliente } = await loginRes.json();
 
@@ -726,7 +726,7 @@ const resetRes = await fetch(`${API_URL}/auth/restablecer-password`, {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     token: window.location.hash.replace('#token=', ''),
-    password: 'NuevaClave1',
+    password: '<contraseña nueva>',
   }),
 });
 // Si 200 → mostrar "Contraseña actualizada" y redirigir a login
