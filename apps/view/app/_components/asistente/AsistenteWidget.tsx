@@ -9,6 +9,8 @@ type Mensaje = { rol: "usuario" | "asistente"; texto: string };
 
 type Conversacion = { idSesion: string; mensajes: Mensaje[] };
 
+type ConversacionGuardada = Conversacion & { ultimaActividad: number };
+
 type RespuestaAsistente = { respuesta: string };
 
 /** Mismo tope que valida el backend (MAX_LARGO_MENSAJE en apps/controller). */
@@ -16,23 +18,37 @@ const MAX_LARGO_MENSAJE = 1000;
 
 const STORAGE_KEY = "finet-asistente";
 
+/**
+ * CU-63: pasadas 48 horas sin interacción la conversación empieza de nuevo y
+ * el asistente vuelve a pedir el RUT. El chatbot aplica el mismo plazo; acá
+ * solo se evita mostrar una conversación que del otro lado ya no existe.
+ */
+const LIMITE_INACTIVIDAD_MS = 48 * 60 * 60 * 1000;
+
 const BIENVENIDA =
   "¡Hola! Soy el asistente virtual de Finet. ¿En qué te puedo ayudar?";
 
 /**
- * La conversación vive en sessionStorage: sobrevive a una recarga o a cambiar
- * de página, pero muere al cerrar la pestaña. El historial que ve el motor lo
- * guarda el chatbot bajo `idSesion`, así que perderla solo empieza una nueva.
+ * La conversación vive en localStorage para que sobreviva a cerrar la pestaña
+ * y volver dentro de 48 horas (CU-63). El historial que ve el motor y la
+ * identificación del cliente los guarda el chatbot bajo `idSesion`, así que
+ * perderla solo empieza una conversación nueva.
  *
  * Todo acceso va en try/catch: el storage puede estar bloqueado (modo
  * privado, cookies deshabilitadas) y el widget tiene que funcionar igual.
  */
 function leerConversacion(): Conversacion | null {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const data = JSON.parse(raw) as Partial<Conversacion>;
-    if (typeof data.idSesion !== "string" || !Array.isArray(data.mensajes)) {
+    const data = JSON.parse(raw) as Partial<ConversacionGuardada>;
+    if (
+      typeof data.idSesion !== "string" ||
+      !Array.isArray(data.mensajes) ||
+      typeof data.ultimaActividad !== "number" ||
+      Date.now() - data.ultimaActividad > LIMITE_INACTIVIDAD_MS
+    ) {
+      localStorage.removeItem(STORAGE_KEY);
       return null;
     }
     return { idSesion: data.idSesion, mensajes: data.mensajes };
@@ -44,9 +60,13 @@ function leerConversacion(): Conversacion | null {
 function guardarConversacion(conversacion: Conversacion | null) {
   try {
     if (conversacion) {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(conversacion));
+      const guardada: ConversacionGuardada = {
+        ...conversacion,
+        ultimaActividad: Date.now(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(guardada));
     } else {
-      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
     }
   } catch {
     // Sin storage la conversación sigue funcionando, solo no sobrevive a una recarga.
@@ -267,9 +287,9 @@ export default function AsistenteWidget() {
           </form>
 
           <p className="px-3 pb-3 pt-2 text-[11px] leading-snug text-muted">
-            Las respuestas las genera una IA y pueden contener errores. No
-            compartas contraseñas ni datos sensibles. Para trámites, escríbenos
-            por{" "}
+            Las respuestas las genera una IA y pueden contener errores. Solo te
+            pediremos tu RUT para identificarte: nunca compartas contraseñas.
+            Para trámites, escríbenos por{" "}
             <a
               href={WHATSAPP_URL}
               target="_blank"

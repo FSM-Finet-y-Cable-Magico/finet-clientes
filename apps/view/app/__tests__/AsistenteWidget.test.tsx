@@ -18,7 +18,7 @@ const respuestaError = (status: number) => ({
 describe('AsistenteWidget (CU-65)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     global.fetch = jest.fn();
   });
 
@@ -101,9 +101,8 @@ describe('AsistenteWidget (CU-65)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/muy seguido/i);
   });
 
-  it('restaura la conversación de la pestaña al reabrir', async () => {
-    const user = userEvent.setup();
-    sessionStorage.setItem(
+  const guardarConversacion = (horasAtras: number) =>
+    localStorage.setItem(
       'finet-asistente',
       JSON.stringify({
         idSesion: '3f6c8a52-7d1e-4b9a-9c2f-5e8d1a0b7c64',
@@ -111,14 +110,44 @@ describe('AsistenteWidget (CU-65)', () => {
           { rol: 'usuario', texto: 'pregunta anterior' },
           { rol: 'asistente', texto: 'respuesta anterior' },
         ],
+        ultimaActividad: Date.now() - horasAtras * 60 * 60 * 1000,
       }),
     );
+
+  it('restaura una conversación de hace menos de 48 horas (CU-63)', async () => {
+    const user = userEvent.setup();
+    guardarConversacion(47);
     render(<AsistenteWidget />);
 
     await user.click(screen.getByRole('button', { name: /abrir asistente/i }));
 
     expect(screen.getByText('pregunta anterior')).toBeInTheDocument();
     expect(screen.getByText('respuesta anterior')).toBeInTheDocument();
+  });
+
+  it('empieza de nuevo pasadas 48 horas sin actividad (CU-63)', async () => {
+    const user = userEvent.setup();
+    guardarConversacion(49);
+    render(<AsistenteWidget />);
+
+    await user.click(screen.getByRole('button', { name: /abrir asistente/i }));
+
+    expect(screen.queryByText('pregunta anterior')).not.toBeInTheDocument();
+    expect(localStorage.getItem('finet-asistente')).toBeNull();
+  });
+
+  it('guarda la conversación con su última actividad', async () => {
+    const user = userEvent.setup();
+    (global.fetch as jest.Mock).mockResolvedValueOnce(respuestaOk('uno'));
+    render(<AsistenteWidget />);
+
+    await user.click(screen.getByRole('button', { name: /abrir asistente/i }));
+    await user.type(screen.getByLabelText(/escribe tu mensaje/i), 'hola{Enter}');
+    await screen.findByText('uno');
+
+    const guardada = JSON.parse(localStorage.getItem('finet-asistente') ?? '{}');
+    expect(guardada.mensajes).toHaveLength(2);
+    expect(Date.now() - guardada.ultimaActividad).toBeLessThan(5_000);
   });
 
   it('se cierra con Escape y devuelve el foco al botón', async () => {
