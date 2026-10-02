@@ -734,11 +734,12 @@ export class PortalService {
    * §6.4 paso 3: el ticket del cambio de clave WiFi, abierto, con origen PORTAL
    * y asociado al cliente y al servicio (§6.2 y §7).
    *
-   * Es el hueco `TICKET_WIFI_DEFINIDO`: falta que G8 defina el literal de la
-   * categoria (§6.1) y donde va el servicio, porque `ticket` no tiene esa
-   * columna (§6.2). Mientras tanto no se llega aca: el CU-32 sigue con el v1.
-   * Cuando respondan se escribe como `crearTicket`, que crea los tickets
-   * genericos del portal, y devuelve el `id_ticket`.
+   * Es el hueco `TICKET_WIFI_DEFINIDO`. G8 lo definio el 01-10: categoria
+   * `CAMBIO_CREDENCIALES_WIFI` y el servicio en `ticket.id_servicio` (FK a
+   * `servicio_contratado`), que nuestro esquema todavia no tiene. Mientras G8 no
+   * lo despliegue no se llega aca: el CU-32 sigue con el v1. Despues se escribe
+   * como `crearTicket`, que crea los tickets genericos del portal, y devuelve el
+   * `id_ticket`.
    */
   crearTicketWifi(
     tx: Prisma.TransactionClient,
