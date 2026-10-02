@@ -148,8 +148,8 @@ export class PortalController {
    * Auth: Bearer <token>
    *
    * Respuesta: PagosAnterioresDto
-   *   - comprobante_disponible: boolean (false mientras G8 no despliegue su
-   *     endpoint del comprobante: ver COMPROBANTE_G8_DEFINIDO)
+   *   - comprobante_disponible: boolean (false mientras G8 no implemente la
+   *     boleta en su tax-document: ver COMPROBANTE_G8_DEFINIDO)
    *   - pagos: id_pago, fecha_pago (ISO), periodo ("Abril 2026" o null),
    *     monto, pasarela. Del más nuevo al más viejo
    *

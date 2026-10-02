@@ -9,7 +9,7 @@ describe('pendientes del Incremento 3', () => {
       'CU-42, CU-43, CU-69 ← Registro del pago desplegado (POST /api/integrations/g2/payments) (Grupo 8)',
       'CU-42, CU-43, CU-68 ← Saldo del cliente desplegado (GET /api/integrations/g2/invoices) (Grupo 8)',
       'CU-32 (envío directo a G3) ← Ticket WiFi desplegado (categoría, ticket.id_servicio y wifi-result) (Grupo 8)',
-      'CU-52 ← Comprobante desplegado (GET /api/integrations/g2/payments/{id}/comprobante) y su formato (Grupo 8)',
+      'CU-52 ← Boleta del pago (GET /api/integrations/g2/payments/{id}/tax-document) y que Finet confirme la descarga (Grupo 8)',
     ]);
   });
 

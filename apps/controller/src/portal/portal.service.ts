@@ -349,10 +349,11 @@ export class PortalService {
 
   //  CU-52: el comprobante de un pago del cliente.
   //
-  //  Lo genera y lo guarda G8, y la descarga va por su endpoint (acuerdo v2.0
-  //  §9; respuesta de G8, §10). Mientras no lo desplieguen y no den el formato de
-  //  la respuesta (`COMPROBANTE_G8_DEFINIDO`), la llamada no se escribe y el
-  //  cliente cae en la Excepción 2 del CU-52: el comprobante no está disponible.
+  //  El comprobante es la boleta (reunión con G8): la emite G8, y la descarga va
+  //  por su `GET …/payments/{id_pago}/tax-document` (respuesta del 02-10, §10).
+  //  Mientras G8 no lo implemente y Finet no confirme la descarga
+  //  (`COMPROBANTE_G8_DEFINIDO`), la llamada no se escribe y el cliente cae en la
+  //  Excepción 2 del CU-52: el comprobante no está disponible.
   async getComprobante(idCliente: number, idPago: number): Promise<never> {
     // Si el pago es de otro cliente se responde 404, igual que si no existiera:
     // no se confirma su existencia.
