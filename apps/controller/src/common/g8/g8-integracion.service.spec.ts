@@ -140,4 +140,59 @@ describe('G8IntegracionService', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
+
+  describe('informarResultadoWifi (§12)', () => {
+    const INFORME = {
+      idTicket: 77,
+      idEmpresa: 1,
+      requestId: '47fa3f36-9f27-4a77-a3e0-0f602c080426',
+      traceId: 'd80359ef-8999-46d8-80e6-699215f783c2',
+      resultado: 'REQUIERE_ATENCION_MANUAL' as const,
+      detalleSaneado: 'Solicitud registrada para atención por técnico.',
+    };
+
+    it('manda el body del contrato de G8 a la ruta del ticket', async () => {
+      fetchMock.mockResolvedValue(respuesta(200, { success: true }));
+
+      await service.informarResultadoWifi(INFORME);
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect((url as URL).href).toBe(
+        'https://g8.test/api/integrations/g2/tickets/77/wifi-result',
+      );
+      expect(init?.method).toBe('POST');
+      // El request de referencia del §12 de G8, campo por campo.
+      expect(JSON.parse(init?.body as string)).toEqual({
+        request_id: INFORME.requestId,
+        trace_id: INFORME.traceId,
+        id_empresa: 1,
+        resultado: 'REQUIERE_ATENCION_MANUAL',
+        detalle_saneado: 'Solicitud registrada para atención por técnico.',
+      });
+      expect((init?.headers as Record<string, string>)['X-API-KEY']).toBe(
+        API_KEY,
+      );
+    });
+
+    it('tras un corte reintenta con el mismo body (mismo request_id)', async () => {
+      fetchMock
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockResolvedValueOnce(respuesta(200, { success: true }));
+
+      await service.informarResultadoWifi(INFORME);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[1][1]?.body).toBe(
+        fetchMock.mock.calls[0][1]?.body,
+      );
+    });
+
+    it('un rechazo de G8 se informa con su código', async () => {
+      fetchMock.mockResolvedValue(respuesta(409, { message: 'conflicto' }));
+
+      await expect(
+        service.informarResultadoWifi(INFORME),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+  });
 });

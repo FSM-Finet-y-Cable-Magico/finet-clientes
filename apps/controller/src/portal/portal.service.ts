@@ -18,6 +18,10 @@ import {
   type RespuestaClaveWifiG3,
 } from '../common/g3/g3-wifi.service.js';
 import {
+  G8IntegracionService,
+  type ResultadoWifiG8,
+} from '../common/g8/g8-integracion.service.js';
+import {
   COMPROBANTE_G8_DEFINIDO,
   TICKET_WIFI_DEFINIDO,
 } from '../common/pendientes.js';
@@ -54,6 +58,7 @@ export class PortalService {
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly g3Wifi: G3WifiService,
+    private readonly g8: G8IntegracionService,
   ) {}
 
   //  CU-23: Consultar estado operativo del contrato
@@ -714,8 +719,8 @@ export class PortalService {
   //  parte, y G8 no recibe ni la clave ni el ciphertext (§6.5).
   //
   //  El estado del ticket es de G8 (§3 y §6.3): aca se crea abierto y no se
-  //  vuelve a tocar. Informarle a G8 el resultado (paso 8) espera el contrato
-  //  del §11.
+  //  vuelve a tocar. Lo que si se hace es informarle a G8 el resultado (paso 8),
+  //  con el contrato de su respuesta del 02-10 (§12), y G8 mueve el ticket.
   private async enviarCambioWifiAG3(
     idCliente: number,
     idContrato: number,
@@ -787,11 +792,21 @@ export class PortalService {
       this.logger.error(
         `G3 no registro el cambio de clave WiFi del ticket ${idTicket} (request_id ${requestId}): ${error instanceof Error ? error.message : 'error desconocido'}`,
       );
+      const statusG3 = error instanceof ErrorClaveWifiG3 ? error.status : null;
       await this.auditarRespuestaG3(idTicket, {
         request_id: requestId,
         resultado: 'ERROR',
-        status_g3: error instanceof ErrorClaveWifiG3 ? error.status : null,
+        status_g3: statusG3,
       });
+      await this.informarResultadoWifiG8(
+        idTicket,
+        idEmpresa,
+        traceId,
+        'ERROR_TECNICO',
+        statusG3 === null
+          ? 'G3 no respondió a la solicitud.'
+          : `G3 rechazó la solicitud (HTTP ${statusG3}).`,
+      );
       throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
     }
 
@@ -802,6 +817,15 @@ export class PortalService {
       estado_g3: respuesta.estado,
       duplicado: respuesta.duplicado,
     });
+    // G3 la deja registrada para que un tecnico la aplique: todavia no esta
+    // aplicada, asi que no se informa APLICADO (respuesta de G8 del 02-10, §12).
+    await this.informarResultadoWifiG8(
+      idTicket,
+      idEmpresa,
+      traceId,
+      'REQUIERE_ATENCION_MANUAL',
+      'Solicitud registrada para atención por técnico.',
+    );
 
     return {
       id_solicitud: respuesta.idSolicitud,
@@ -831,6 +855,36 @@ export class PortalService {
         `Ticket WiFi del cliente ${datos.idCliente} pendiente de G8: categoria y servicio (acuerdo v2.0, §6.1 y §6.2)`,
       ),
     );
+  }
+
+  /**
+   * §6.4 paso 8: el resultado a G8, para que mueva el ticket (Escalado en los dos
+   * casos de hoy). Lleva su propio `request_id`, la identidad idempotente del
+   * informe, y el `trace_id` de la operacion. No lanza: si G8 no lo recibe, la
+   * solicitud del cliente no se cae, y queda en el log para reintentarlo a mano.
+   */
+  private async informarResultadoWifiG8(
+    idTicket: number,
+    idEmpresa: number,
+    traceId: string,
+    resultado: ResultadoWifiG8,
+    detalleSaneado: string,
+  ): Promise<void> {
+    const requestId = randomUUID();
+    try {
+      await this.g8.informarResultadoWifi({
+        idTicket,
+        idEmpresa,
+        requestId,
+        traceId,
+        resultado,
+        detalleSaneado,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo informar a G8 el resultado ${resultado} del ticket ${idTicket} (request_id ${requestId}): ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+    }
   }
 
   /**

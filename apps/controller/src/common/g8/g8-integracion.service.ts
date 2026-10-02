@@ -5,6 +5,7 @@ import {
   REINTENTOS_G8,
   RUTA_FACTURAS_G8,
   TIMEOUT_G8_MS,
+  rutaResultadoWifiG8,
 } from './g8-integracion.constantes.js';
 
 /**
@@ -30,6 +31,28 @@ const respuestaFacturas = z.object({
     z.object({ idFactura: z.number(), saldoExigible: z.number() }),
   ),
 });
+
+/**
+ * §12: los tres resultados del cambio de clave WiFi. `APLICADO` cierra el ticket
+ * (Resuelto); los otros dos lo dejan Escalado.
+ */
+export type ResultadoWifiG8 =
+  | 'APLICADO'
+  | 'REQUIERE_ATENCION_MANUAL'
+  | 'ERROR_TECNICO';
+
+/**
+ * Lo que se le informa a G8 del ticket WiFi. Nunca lleva la clave, el ciphertext
+ * ni nada técnico de G3 (§12 y acuerdo v2.0 §6.5).
+ */
+export type InformeResultadoWifi = {
+  idTicket: number;
+  idEmpresa: number;
+  requestId: string;
+  traceId: string;
+  resultado: ResultadoWifiG8;
+  detalleSaneado: string;
+};
 
 /**
  * G8 no respondió o rechazó el pedido. `status` es su código HTTP, o `null` si
@@ -71,6 +94,20 @@ export class G8IntegracionService {
       );
     }
     return leido.data.items;
+  }
+
+  /** §12: `POST /api/integrations/g2/tickets/{idTicket}/wifi-result`. */
+  async informarResultadoWifi(informe: InformeResultadoWifi): Promise<void> {
+    const { base, apiKey } = this.configuracion();
+    const url = new URL(rutaResultadoWifiG8(informe.idTicket), base);
+    const body = JSON.stringify({
+      request_id: informe.requestId,
+      trace_id: informe.traceId,
+      id_empresa: informe.idEmpresa,
+      resultado: informe.resultado,
+      detalle_saneado: informe.detalleSaneado,
+    });
+    await this.pedir(url, { method: 'POST', body }, apiKey);
   }
 
   /**

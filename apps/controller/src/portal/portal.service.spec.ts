@@ -16,6 +16,7 @@ import {
   ErrorClaveWifiG3,
   G3WifiService,
 } from '../common/g3/g3-wifi.service.js';
+import { G8IntegracionService } from '../common/g8/g8-integracion.service.js';
 
 const FECHA_BASE = new Date('2024-01-15T00:00:00.000Z');
 
@@ -69,6 +70,7 @@ describe('PortalService', () => {
   let mailService: jest.Mocked<MailService>;
   let configService: jest.Mocked<ConfigService>;
   let g3: { enviarClaveWifi: jest.Mock };
+  let g8: { informarResultadoWifi: jest.Mock };
 
   beforeEach(async () => {
     const mockPrisma = {
@@ -94,6 +96,7 @@ describe('PortalService', () => {
       ),
     };
     g3 = { enviarClaveWifi: jest.fn() };
+    g8 = { informarResultadoWifi: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortalService,
@@ -101,6 +104,7 @@ describe('PortalService', () => {
         { provide: MailService, useValue: mockMailService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: G3WifiService, useValue: g3 },
+        { provide: G8IntegracionService, useValue: g8 },
       ],
     }).compile();
     service = module.get(PortalService);
@@ -829,6 +833,10 @@ describe('PortalService', () => {
           orden.push('G3');
           return Promise.resolve(RESPUESTA_G3);
         });
+        g8.informarResultadoWifi.mockImplementation(() => {
+          orden.push('G8');
+          return Promise.resolve();
+        });
       });
 
       it('primero el ticket y los ids guardados, recien despues G3 (§6.4 y §6.6)', async () => {
@@ -838,7 +846,7 @@ describe('PortalService', () => {
           true,
         );
 
-        expect(orden).toEqual(['ticket', 'auditoria', 'G3', 'auditoria']);
+        expect(orden).toEqual(['ticket', 'auditoria', 'G3', 'auditoria', 'G8']);
         expect(crearTicket).toHaveBeenCalledWith(expect.anything(), {
           idCliente: 1,
           idEmpresa: 1,
@@ -911,6 +919,57 @@ describe('PortalService', () => {
         });
       });
 
+      // §6.4 paso 8, con el contrato de G8 del 02-10 (§12).
+      it('G3 la registro: a G8 se le informa REQUIERE_ATENCION_MANUAL, no APLICADO', async () => {
+        await service.solicitarCambioContrasenaWifi(1, DTO, true);
+
+        const envioG3 = g3.enviarClaveWifi.mock.calls[0][0] as {
+          requestId: string;
+          traceId: string;
+        };
+        expect(g8.informarResultadoWifi).toHaveBeenCalledWith({
+          idTicket: 77,
+          idEmpresa: 1,
+          requestId: expect.stringMatching(UUID_V4),
+          traceId: envioG3.traceId,
+          resultado: 'REQUIERE_ATENCION_MANUAL',
+          detalleSaneado: 'Solicitud registrada para atención por técnico.',
+        });
+        const informe = g8.informarResultadoWifi.mock.calls[0][0] as {
+          requestId: string;
+        };
+        // El informe es otra operacion: su propia identidad idempotente.
+        expect(informe.requestId).not.toBe(envioG3.requestId);
+        expect(JSON.stringify(informe)).not.toContain(DTO.password);
+      });
+
+      it('G3 fallo: a G8 se le informa ERROR_TECNICO y el cliente recibe el 503', async () => {
+        g3.enviarClaveWifi.mockRejectedValue(
+          new ErrorClaveWifiG3(null, 'G3 no respondió (TimeoutError)'),
+        );
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).rejects.toThrow(ServiceUnavailableException);
+        expect(g8.informarResultadoWifi).toHaveBeenCalledWith(
+          expect.objectContaining({
+            idTicket: 77,
+            resultado: 'ERROR_TECNICO',
+            detalleSaneado: 'G3 no respondió a la solicitud.',
+          }),
+        );
+      });
+
+      it('si G8 no recibe el informe, la solicitud del cliente no se cae', async () => {
+        g8.informarResultadoWifi.mockRejectedValue(
+          new Error('G8 respondió 503'),
+        );
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).resolves.toMatchObject({ id_solicitud: 2 });
+      });
+
       it('sin ticket no se llama a G3 (§6.4 paso 3)', async () => {
         crearTicket.mockRejectedValue(new Error('pendiente de G8'));
 
@@ -918,6 +977,7 @@ describe('PortalService', () => {
           service.solicitarCambioContrasenaWifi(1, DTO, true),
         ).rejects.toThrow(ServiceUnavailableException);
         expect(g3.enviarClaveWifi).not.toHaveBeenCalled();
+        expect(g8.informarResultadoWifi).not.toHaveBeenCalled();
       });
 
       it('sin la empresa del cliente no se envia nada (§6.2)', async () => {
