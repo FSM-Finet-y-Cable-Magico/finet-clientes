@@ -27,8 +27,14 @@ export const MensajeAsistenteDto = z.object({
 });
 export type MensajeAsistenteDto = z.infer<typeof MensajeAsistenteDto>;
 
+/**
+ * `derivado`: el asistente derivo al cliente a una persona (WhatsApp) y ya no
+ * responde en esta sesion. La respuesta que deriva trae el texto; las
+ * siguientes llegan con `respuesta: null`.
+ */
 export interface RespuestaAsistenteDto {
-  respuesta: string;
+  respuesta: string | null;
+  derivado: boolean;
 }
 
 // CU-63: RUT que finet-chatbot pide verificar al inicio de una conversacion

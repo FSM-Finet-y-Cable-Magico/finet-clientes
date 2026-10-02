@@ -60,9 +60,15 @@ POST /api/asistente/mensajes
 
 ```json
 {
-  "respuesta": "Tenemos planes de fibra desde 200 Mbps simetricos..."
+  "respuesta": "Tenemos planes de fibra desde 200 Mbps simetricos...",
+  "derivado": false
 }
 ```
+
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `respuesta` | string \| null | Texto del asistente. `null` solo cuando `derivado` es `true` y la conversacion ya habia terminado. |
+| `derivado` | boolean | El asistente derivo al cliente a una persona por WhatsApp y no responde mas en esta sesion. Ver [Derivacion a una persona](#derivacion-a-una-persona). |
 
 **Errores:**
 
@@ -75,6 +81,27 @@ POST /api/asistente/mensajes
 > Si el chatbot falla, no guarda el turno: reenviar el mismo mensaje no lo
 > duplica en el historial. El widget aprovecha esto y devuelve el texto al
 > input para reintentar.
+
+### Derivacion a una persona
+
+Cuando el cliente pide hablar con una persona, o acepta que el asistente lo
+derive, finet-chatbot responde con un texto fijo que recomienda escribir por
+WhatsApp al numero configurado (`WHATSAPP_NUMBER` en finet-chatbot) y marca la
+conversacion como derivada. Desde ahi no contesta ni registra los mensajes de
+esa sesion.
+
+1. La respuesta que deriva llega con el texto y `derivado: true`.
+2. El widget muestra ese texto, quita la entrada de texto y muestra "Esta
+   conversacion termino" con un boton **Iniciar nueva conversacion**. El estado
+   se guarda en `localStorage`, asi que sigue terminada si se recarga la
+   pagina.
+3. El boton limpia el chat y genera un `id_sesion` nuevo. Para finet-chatbot
+   es otra conversacion, asi que vuelve a responder empezando por el pedido de
+   RUT.
+4. Si llega un mensaje a una sesion ya derivada (por ejemplo, si se perdio el
+   `localStorage`), la respuesta es `respuesta: null, derivado: true`. El
+   widget no muestra ese mensaje, porque el chatbot lo descarto, y pasa
+   directo al estado terminado.
 
 ### Flujo de la conversacion (CU-63)
 
@@ -126,7 +153,7 @@ cualquier otra `respuesta`.
 - **El RUT no llega al LLM.** En el historial se reemplaza por `[RUT]`, y los
   logs solo registran si se encontro (`found`, `not_found`, `unavailable`).
 - **Maximo 3 verificaciones fallidas por conversacion**, contra quien pruebe
-  RUTs al azar. Despues el asistente sugiere escribir por WhatsApp.
+  RUTs al azar. Despues el asistente ofrece derivarlo a una persona.
 
 ### Limitaciones conocidas
 
@@ -216,6 +243,7 @@ En el `.env` de finet-chatbot, ademas de `API_KEY` y las variables `OPENAI_*`:
 PORT=3001
 CLIENTES_API_URL=http://localhost:4000/api
 CLIENTES_API_KEY=<mismo valor que ASISTENTE_API_KEY>
+WHATSAPP_NUMBER="+56 9 4500 2319"
 ```
 
 Son dos claves distintas, una por sentido. Para levantarlo en local:

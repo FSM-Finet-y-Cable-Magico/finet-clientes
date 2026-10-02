@@ -7,11 +7,19 @@ import { WHATSAPP_URL } from "../../_lib/company";
 
 type Mensaje = { rol: "usuario" | "asistente"; texto: string };
 
-type Conversacion = { idSesion: string; mensajes: Mensaje[] };
+/**
+ * `terminada`: el asistente derivó a una persona y ya no responde en esta
+ * sesión. Solo queda empezar una conversación nueva.
+ */
+type Conversacion = {
+  idSesion: string;
+  mensajes: Mensaje[];
+  terminada: boolean;
+};
 
 type ConversacionGuardada = Conversacion & { ultimaActividad: number };
 
-type RespuestaAsistente = { respuesta: string };
+type RespuestaAsistente = { respuesta: string | null; derivado?: boolean };
 
 /** Mismo tope que valida el backend (MAX_LARGO_MENSAJE en apps/controller). */
 const MAX_LARGO_MENSAJE = 1000;
@@ -51,7 +59,11 @@ function leerConversacion(): Conversacion | null {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
-    return { idSesion: data.idSesion, mensajes: data.mensajes };
+    return {
+      idSesion: data.idSesion,
+      mensajes: data.mensajes,
+      terminada: data.terminada === true,
+    };
   } catch {
     return null;
   }
@@ -100,14 +112,20 @@ export default function AsistenteWidget() {
   const [borrador, setBorrador] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [terminada, setTerminada] = useState(false);
 
   const botonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const listaRef = useRef<HTMLDivElement>(null);
+  const reiniciarRef = useRef<HTMLButtonElement>(null);
 
+  // El foco sigue a lo que se puede hacer: escribir, o empezar de nuevo
+  // cuando la conversación terminó.
   useEffect(() => {
-    if (abierto) inputRef.current?.focus();
-  }, [abierto]);
+    if (!abierto) return;
+    if (terminada) reiniciarRef.current?.focus();
+    else inputRef.current?.focus();
+  }, [abierto, terminada]);
 
   useEffect(() => {
     const lista = listaRef.current;
@@ -122,6 +140,7 @@ export default function AsistenteWidget() {
       if (guardada) {
         setIdSesion(guardada.idSesion);
         setMensajes(guardada.mensajes);
+        setTerminada(guardada.terminada);
       }
       setCargado(true);
     }
@@ -137,13 +156,14 @@ export default function AsistenteWidget() {
     setIdSesion(null);
     setMensajes([]);
     setError(null);
+    setTerminada(false);
     guardarConversacion(null);
     inputRef.current?.focus();
   }
 
   async function enviar() {
     const texto = borrador.trim();
-    if (!texto || enviando) return;
+    if (!texto || enviando || terminada) return;
 
     const sesion = idSesion ?? crypto.randomUUID();
     const conPregunta: Mensaje[] = [...mensajes, { rol: "usuario", texto }];
@@ -155,16 +175,24 @@ export default function AsistenteWidget() {
     setEnviando(true);
 
     try {
-      const { respuesta } = await api.post<RespuestaAsistente>(
-        "/asistente/mensajes",
-        { id_sesion: sesion, mensaje: texto },
-      );
-      const conRespuesta: Mensaje[] = [
-        ...conPregunta,
-        { rol: "asistente", texto: respuesta },
-      ];
+      const { respuesta, derivado = false } =
+        await api.post<RespuestaAsistente>("/asistente/mensajes", {
+          id_sesion: sesion,
+          mensaje: texto,
+        });
+      // Sin respuesta, la conversación ya estaba derivada y el chatbot
+      // descartó el mensaje: no se muestra como si se hubiera enviado.
+      const conRespuesta: Mensaje[] =
+        respuesta === null
+          ? mensajes
+          : [...conPregunta, { rol: "asistente", texto: respuesta }];
       setMensajes(conRespuesta);
-      guardarConversacion({ idSesion: sesion, mensajes: conRespuesta });
+      setTerminada(derivado);
+      guardarConversacion({
+        idSesion: sesion,
+        mensajes: conRespuesta,
+        terminada: derivado,
+      });
     } catch (e) {
       // El chatbot no guarda un turno que no pudo responder: se saca la
       // pregunta de la lista y vuelve al input, para reenviarla sin duplicarla.
@@ -261,30 +289,46 @@ export default function AsistenteWidget() {
             </p>
           )}
 
-          <form
-            onSubmit={onSubmit}
-            className="flex items-end gap-2 border-t border-border px-3 pt-3"
-          >
-            <textarea
-              ref={inputRef}
-              value={borrador}
-              onChange={(e) => setBorrador(e.target.value)}
-              onKeyDown={onKeyDownInput}
-              rows={1}
-              maxLength={MAX_LARGO_MENSAJE}
-              placeholder="Escribe tu consulta…"
-              aria-label="Escribe tu mensaje"
-              className="max-h-32 min-h-10 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary"
-            />
-            <button
-              type="submit"
-              disabled={enviando || borrador.trim() === ""}
-              aria-label="Enviar mensaje"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-background transition hover:opacity-90 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          {terminada ? (
+            <div className="flex flex-col gap-2 border-t border-border px-3 pt-3">
+              <p className="text-center text-xs text-muted">
+                Esta conversación terminó.
+              </p>
+              <button
+                ref={reiniciarRef}
+                type="button"
+                onClick={nuevaConversacion}
+                className="h-10 rounded-lg bg-primary text-sm font-semibold text-background transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                Iniciar nueva conversación
+              </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={onSubmit}
+              className="flex items-end gap-2 border-t border-border px-3 pt-3"
             >
-              <Send className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </form>
+              <textarea
+                ref={inputRef}
+                value={borrador}
+                onChange={(e) => setBorrador(e.target.value)}
+                onKeyDown={onKeyDownInput}
+                rows={1}
+                maxLength={MAX_LARGO_MENSAJE}
+                placeholder="Escribe tu consulta…"
+                aria-label="Escribe tu mensaje"
+                className="max-h-32 min-h-10 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary"
+              />
+              <button
+                type="submit"
+                disabled={enviando || borrador.trim() === ""}
+                aria-label="Enviar mensaje"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-background transition hover:opacity-90 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                <Send className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </form>
+          )}
 
           <p className="px-3 pb-3 pt-2 text-[11px] leading-snug text-muted">
             Las respuestas las genera una IA y pueden contener errores. Solo te

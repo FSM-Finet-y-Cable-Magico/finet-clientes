@@ -20,6 +20,7 @@ const NO_DISPONIBLE = 'El asistente no esta disponible en este momento';
 
 type RespuestaChatbot = {
   content?: unknown;
+  handedOff?: unknown;
 };
 
 /**
@@ -77,11 +78,16 @@ export class AsistenteService {
       throw new ServiceUnavailableException(NO_DISPONIBLE);
     }
 
-    if (typeof data.content !== 'string' || data.content.trim() === '') {
-      this.logger.error('El chatbot respondio sin contenido');
-      throw new ServiceUnavailableException(NO_DISPONIBLE);
+    const derivado = data.handedOff === true;
+    if (typeof data.content === 'string' && data.content.trim() !== '') {
+      return { respuesta: data.content, derivado };
+    }
+    // Una conversacion derivada no se responde: llegar sin texto es lo esperado.
+    if (derivado) {
+      return { respuesta: null, derivado };
     }
 
-    return { respuesta: data.content };
+    this.logger.error('El chatbot respondio sin contenido');
+    throw new ServiceUnavailableException(NO_DISPONIBLE);
   }
 }

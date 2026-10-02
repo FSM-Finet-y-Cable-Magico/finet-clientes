@@ -51,7 +51,10 @@ describe('AsistenteService', () => {
         mensaje: 'hola',
       });
 
-      expect(result).toEqual({ respuesta: 'Hola, ¿en que te ayudo?' });
+      expect(result).toEqual({
+        respuesta: 'Hola, ¿en que te ayudo?',
+        derivado: false,
+      });
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe('http://chatbot.test/web/messages');
       expect(init?.method).toBe('POST');
@@ -85,6 +88,32 @@ describe('AsistenteService', () => {
       await expect(
         service.responder({ id_sesion: SESION, mensaje: 'hola' }),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
+
+    it('avisa cuando el chatbot deriva la conversacion', async () => {
+      fetchMock.mockResolvedValueOnce(
+        respuestaFetch(201, {
+          content: 'Escribenos por WhatsApp.',
+          handedOff: true,
+        }),
+      );
+
+      await expect(
+        service.responder({ id_sesion: SESION, mensaje: 'quiero una persona' }),
+      ).resolves.toEqual({
+        respuesta: 'Escribenos por WhatsApp.',
+        derivado: true,
+      });
+    });
+
+    it('acepta una conversacion derivada que ya no responde', async () => {
+      fetchMock.mockResolvedValueOnce(
+        respuestaFetch(201, { content: null, handedOff: true }),
+      );
+
+      await expect(
+        service.responder({ id_sesion: SESION, mensaje: 'hola' }),
+      ).resolves.toEqual({ respuesta: null, derivado: true });
     });
 
     it('responde 503 si el chatbot responde sin contenido', async () => {
