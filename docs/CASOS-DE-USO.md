@@ -8,7 +8,7 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 |---|---|---|---|---|
 | **Incremento 1** | Experiencia del cliente, sitio web, portal y autoservicio | 34 | 42,5% | ✅ Implementado |
 | **Incremento 2** | Gestión operacional, deuda, soporte y administración interna | 29 | 36,25% | ⏳ **En curso** |
-| **Incremento 3** | Pasarelas de pago y asistente virtual | 12 | 15% | Iniciado — CU-63 y CU-65 en rama `incremento-3/chatbot` |
+| **Incremento 3** | Pasarelas de pago y asistente virtual | 12 | 15% | Iniciado — CU-63, CU-64 y CU-65 en rama `incremento-3/chatbot` |
 | **Incremento 4** | SEO, políticas, privacidad y cierre técnico | 5 | 6,25% | No iniciado |
 
 > ⚠️ **Discrepancia en el documento fuente:** la tabla de Incremento 1 declara "34 casos de uso" pero solo lista 32 filas — las prioridades 1 y 2 no aparecen en la tabla original. No se inventó contenido para esas dos filas; si alguien tiene la versión completa del documento, hay que completarlas aquí.
@@ -154,13 +154,15 @@ El orden de dependencia real es el que describe el criterio de agrupación: `deu
 
 ## Incremento 3 — Pasarelas de pago y asistente virtual
 
-12 CU · 15% · Iniciado (CU-63 y CU-65 en rama `incremento-3/chatbot`, sin integrar a `dev`)
+12 CU · 15% · Iniciado (CU-63, CU-64 y CU-65 en rama `incremento-3/chatbot`, sin integrar a `dev`)
 
 > **Nota:** el schema de Prisma ya tiene modelado `conversacion_bot`, `mensaje_bot`, `plantilla_notificacion` y `log_notificacion` — el diseño de datos para este incremento ya existe, no arranca de cero cuando llegue el momento. `apps/view/app/portal/_lib/portal-actions.ts` también tiene ya un `initiatePayment()` que llama a `POST /portal/payment/initiate` (endpoint que todavía no existe en el backend) — scaffolding temprano para CU-42/43.
 >
 > **CU-65 en curso** (rama `incremento-3/chatbot`): widget de chat en todo el sitio → `POST /api/asistente/mensajes` → servicio externo `finet-chatbot` (motor LLM). Responde consultas generales; el historial vive en memoria del chatbot, todavía no en `conversacion_bot`/`mensaje_bot`. Ver [`apps/controller/docs/asistente.md`](../apps/controller/docs/asistente.md).
 >
 > **CU-63 en curso** (misma rama): el chatbot pide el RUT al iniciar la conversación (o tras 48 h sin actividad) y lo verifica con `POST /api/asistente/clientes/identificar` (interno, con API key). Si existe, personaliza con nombre y planes; si no, o si el sistema no responde, sigue en modo general. Es solo texto, para reutilizarlo en WhatsApp vía Chatwoot.
+>
+> **CU-64 en curso** (misma rama): con el cliente identificado, el chatbot consulta su saldo y el estado de sus facturas cuando lo pregunta, reutilizando la consulta pública de deuda (`GET /api/deuda-publica/rut`, CU-39). Las peticiones con la clave del chatbot tienen un límite propio de 600/min. El estado que informa es el de las facturas, no el del contrato ni el del equipo (SmartOLT).
 
 ### Criterio de agrupación (del documento fuente)
 

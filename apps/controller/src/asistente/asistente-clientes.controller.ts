@@ -26,8 +26,8 @@ export class AsistenteClientesController {
    *
    * Sin rate limit por IP: todas las llamadas salen de la IP del chatbot, y el
    * limite global (10/min) frenaria a todos los clientes a la vez. Contra
-   * probar RUT al azar, el chatbot corta a los 3 intentos fallidos por
-   * conversacion y /asistente/mensajes ya limita a 10 mensajes/min por IP.
+   * probar RUT al azar, /asistente/mensajes limita a 10 mensajes/min por IP,
+   * lo mismo que la consulta publica de deuda (CU-39).
    */
   @Post('identificar')
   @HttpCode(200)

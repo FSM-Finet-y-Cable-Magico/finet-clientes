@@ -103,6 +103,36 @@ esa sesion.
    widget no muestra ese mensaje, porque el chatbot lo descarto, y pasa
    directo al estado terminado.
 
+### Saldo y facturas (CU-64)
+
+El asistente no tiene un endpoint propio para esto: reutiliza la consulta
+publica de deuda, `GET /api/deuda-publica/rut` (CU-39), con el RUT que guardo
+al identificar al cliente. La consulta se hace cada vez que el cliente
+pregunta por su saldo, sus facturas o sus vencimientos.
+
+- **Estado que se informa: el de las facturas** (`pendiente` o `vencida`, con
+  dias de atraso o para vencer). La consulta publica no trae el estado del
+  contrato, y el estado del equipo depende de SmartOLT (G3).
+- **Limite de peticiones propio.** Todas las consultas del asistente salen de
+  la IP de finet-chatbot, y el limite global (10 por minuto por IP) alcanzaria
+  para todos los clientes del chat juntos. Por eso una peticion con la clave
+  del chatbot en `X-API-Key` (`ASISTENTE_API_KEY`) tiene un limite de 600 por
+  minuto: alto, pero no infinito, por si la clave se filtra. Vale para
+  cualquier ruta con el limite global; las que tienen `@Throttle` propio, como
+  `/asistente/mensajes`, siguen con el suyo. Ver `src/asistente/limite-chatbot.ts`.
+- **Excepcion 1:** si esta API no responde, no encuentra al cliente
+  (`encontrado: false`) o no pudo leer las facturas (`detalle_disponible:
+  false`), el asistente responde con un texto fijo: "No fue posible recuperar
+  tu informacion en este momento…", y sugiere intentarlo mas tarde o escribir
+  a soporte por WhatsApp. Si `informacion_completa` es `false` (excepcion 2
+  del CU-41), avisa que el detalle puede no ser exacto.
+- **Al LLM solo llegan montos, fechas y estados.** El nombre y el RUT que
+  trae la respuesta no se le envian.
+- **Poscondicion:** la respuesta queda en el historial de la sesion, en
+  memoria del chatbot. El registro persistente es CU-79.
+- **El RUT viaja en la query**, como en la consulta del sitio, y puede quedar
+  en logs de acceso. Se acepto para no agregar otro endpoint.
+
 ### Flujo de la conversacion (CU-63)
 
 1. Primer mensaje de una conversacion: el asistente responde pidiendo el RUT
@@ -142,9 +172,9 @@ cualquier otra `respuesta`.
 - **Se puede seguir sin RUT.** El CU no lo contempla, pero muchos visitantes no
   son clientes y preguntan por planes. Responder cualquier otra cosa al pedido
   de RUT pasa a modo general, y el RUT se puede dar mas adelante.
-- **Datos que recibe el asistente: nombre y planes.** La deuda y el estado del
-  servicio quedan para CU-64. Todo lo que recibe el asistente viaja al
-  proveedor del LLM.
+- **Datos que recibe el asistente: nombre y planes al identificar.** El saldo
+  y las facturas los consulta aparte, cuando el cliente pregunta (CU-64).
+  Todo lo que recibe el asistente viaja al proveedor del LLM.
 - **Se pide el RUT aunque el cliente tenga sesion en el portal.** La sesion
   del portal no se reutiliza.
 - **48 h entre visitas.** El widget guarda la conversacion en `localStorage`
@@ -152,15 +182,16 @@ cualquier otra `respuesta`.
   pestana dentro de ese plazo. "Nueva conversacion" la borra antes.
 - **El RUT no llega al LLM.** En el historial se reemplaza por `[RUT]`, y los
   logs solo registran si se encontro (`found`, `not_found`, `unavailable`).
-- **Maximo 3 verificaciones fallidas por conversacion**, contra quien pruebe
-  RUTs al azar. Despues el asistente ofrece derivarlo a una persona.
+- **Sin tope de RUTs por conversacion**, igual que la consulta publica de
+  deuda (CU-39). Contra quien pruebe RUTs al azar esta el limite de
+  `/asistente/mensajes` (10 por minuto por IP). Los mensajes que llegan por
+  Chatwoot no pasan por ese limite.
 
 ### Limitaciones conocidas
 
 - **El RUT identifica, no autentica.** Quien conozca el RUT de otra persona ve
-  su nombre y sus planes. Es menos de lo que ya muestra la consulta publica de
-  deuda (CU-39), pero hay que revisarlo antes de CU-64, que suma deuda y estado
-  del servicio.
+  su nombre, sus planes y su deuda. Es lo mismo que ya muestra la consulta
+  publica de deuda (CU-39) a cualquiera, y por eso se acepto para CU-64.
 - **La identificacion vive en memoria del chatbot.** Si se reinicia, el
   cliente tiene que volver a dar su RUT.
 - **No se registra en `conversacion_bot`** (con `id_cliente`) todavia: queda
@@ -176,8 +207,8 @@ X-API-Key: <ASISTENTE_API_KEY>
 ```
 
 Solo para finet-chatbot. Sin rate limit por IP (todas las llamadas salen de la
-IP del chatbot); contra probar RUTs al azar, el chatbot corta a los 3 intentos
-fallidos por conversacion.
+IP del chatbot); contra probar RUTs al azar, cada mensaje del widget ya paso
+por el limite de `/asistente/mensajes` (10 por minuto por IP).
 
 **Body:**
 
@@ -213,7 +244,7 @@ fallidos por conversacion.
 ```
 
 Solo nombre y planes: esto viaja al proveedor del motor LLM, asi que no se
-devuelve RUT, correo, telefono, direccion ni deuda (la deuda es CU-64). El RUT
+devuelve RUT, correo, telefono, direccion ni deuda (la deuda se consulta aparte, CU-64). El RUT
 identifica pero no autentica, por eso tampoco se entrega nada que la consulta
 publica de deuda (CU-39) no muestre ya.
 

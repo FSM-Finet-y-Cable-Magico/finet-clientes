@@ -9,6 +9,23 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 
 /**
+ * Si `recibida` es la clave del chatbot. Falso si falta cualquiera de las
+ * dos. La comparacion es de tiempo constante, para no filtrar la clave por
+ * lo que tarda en rechazarla.
+ */
+export function esClaveDelChatbot(
+  recibida: unknown,
+  esperada: string | undefined,
+): boolean {
+  if (!esperada || typeof recibida !== 'string' || !recibida) return false;
+
+  // timingSafeEqual lanza si los largos difieren, asi que se descarta antes.
+  const a = Buffer.from(recibida);
+  const b = Buffer.from(esperada);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
  * Deja pasar solo a finet-chatbot: header `X-API-Key` igual a
  * `ASISTENTE_API_KEY`. Sin la variable configurada no pasa nadie.
  */
@@ -31,10 +48,7 @@ export class ChatbotApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('X-API-Key header is required');
     }
 
-    // timingSafeEqual lanza si los largos difieren, asi que se descarta antes.
-    const a = Buffer.from(recibida);
-    const b = Buffer.from(esperada);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    if (!esClaveDelChatbot(recibida, esperada)) {
       throw new UnauthorizedException('Invalid API key');
     }
 

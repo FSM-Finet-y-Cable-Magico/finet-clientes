@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -16,16 +16,22 @@ import { ContratacionesModule } from './contrataciones/contrataciones.module.js'
 import { CoberturaModule } from './cobertura/cobertura.module.js';
 import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
 import { AsistenteModule } from './asistente/asistente.module.js';
+import { limitePorMinuto } from './asistente/limite-chatbot.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60_000,
-        limit: 10,
-      },
-    ]),
+    // 10 por minuto, salvo finet-chatbot, que consulta por todos sus clientes
+    // desde una sola IP (ver limite-chatbot.ts).
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: 60_000,
+          limit: limitePorMinuto(config),
+        },
+      ],
+    }),
     PrismaModule,
     MailModule,
     AuthModule,
