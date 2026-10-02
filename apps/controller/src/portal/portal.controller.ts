@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  ParseIntPipe,
   Post,
   Query,
   ServiceUnavailableException,
@@ -137,6 +139,48 @@ export class PortalController {
   @Get('deuda')
   getResumenDeuda(@CurrentClient() cliente: cliente) {
     return this.portalService.getResumenDeuda(cliente.id_cliente);
+  }
+
+  /**
+   * CU-52: Pagos anteriores del cliente, para descargar su comprobante
+   *
+   * GET /portal/pagos
+   * Auth: Bearer <token>
+   *
+   * Respuesta: PagosAnterioresDto
+   *   - comprobante_disponible: boolean (false mientras G8 no despliegue su
+   *     endpoint del comprobante: ver COMPROBANTE_G8_DEFINIDO)
+   *   - pagos: id_pago, fecha_pago (ISO), periodo ("Abril 2026" o null),
+   *     monto, pasarela. Del más nuevo al más viejo
+   *
+   * Errores:
+   *   401 - Sesión expirada por inactividad / Token JWT inválido
+   */
+  @Get('pagos')
+  getPagosAnteriores(@CurrentClient() cliente: cliente) {
+    return this.portalService.getPagosAnteriores(cliente.id_cliente);
+  }
+
+  /**
+   * CU-52: Comprobante en PDF de un pago del cliente
+   *
+   * GET /portal/pagos/:id/comprobante
+   * Auth: Bearer <token>
+   *
+   * El PDF lo genera G8. Mientras su endpoint no esté desplegado, responde 503
+   * (Excepción 2 del CU-52).
+   *
+   * Errores:
+   *   401 - Sesión expirada por inactividad / Token JWT inválido
+   *   404 - El pago no existe o no es del cliente
+   *   503 - El comprobante no está disponible en este momento
+   */
+  @Get('pagos/:id/comprobante')
+  getComprobante(
+    @CurrentClient() cliente: cliente,
+    @Param('id', ParseIntPipe) idPago: number,
+  ) {
+    return this.portalService.getComprobante(cliente.id_cliente, idPago);
   }
 
   @Get('tickets/categorias')

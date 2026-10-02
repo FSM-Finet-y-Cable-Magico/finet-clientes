@@ -10,6 +10,7 @@ import {
 import { api } from "../../utils/api";
 import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
 import IrAPagarButton from "@/app/_components/portal/IrAPagarButton";
+import PagosAnteriores from "@/app/_components/portal/PagosAnteriores";
 
 type Factura = {
   id_factura: number;
@@ -218,6 +219,9 @@ export default function DeudaPage() {
               </p>
             </div>
           )}
+
+          {/* CU-52: pagos anteriores y su comprobante */}
+          <PagosAnteriores />
         </>
       )}
     </div>

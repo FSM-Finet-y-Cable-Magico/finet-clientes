@@ -82,6 +82,7 @@ describe('PortalService', () => {
         update: jest.fn(),
       },
       solicitud_contrasena_wifi: { create: jest.fn() },
+      pago: { findMany: jest.fn(), findFirst: jest.fn() },
       log_auditoria: { create: jest.fn() },
       log_notificacion: { create: jest.fn() },
       $transaction: jest.fn(),
@@ -498,6 +499,91 @@ describe('PortalService', () => {
       );
       await expect(service.getPanelPrincipal(1)).rejects.toThrow(
         'No fue posible obtener la informacion de planes en este momento',
+      );
+    });
+  });
+
+  // CU-52: pagos anteriores del cliente y la descarga de su comprobante.
+  describe('CU-52: pagos anteriores', () => {
+    const DEL_CLIENTE = {
+      OR: [{ id_cliente: 1 }, { factura: { contrato: { id_cliente: 1 } } }],
+    };
+
+    it('lista los pagos del cliente, por id_cliente o por la factura de su contrato', async () => {
+      (prisma.pago.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.getPagosAnteriores(1);
+
+      expect(prisma.pago.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: DEL_CLIENTE,
+          orderBy: { fecha_pago: 'desc' },
+        }),
+      );
+    });
+
+    it('cada pago trae fecha ISO, período "Mes AAAA", monto y el nombre del medio (el desconocido, tal cual)', async () => {
+      (prisma.pago.findMany as jest.Mock).mockResolvedValue([
+        {
+          id_pago: 9,
+          fecha_pago: new Date('2026-04-08T01:30:00.000Z'),
+          monto: 18990,
+          pasarela: 'webpay',
+          factura: { periodo_mes: 4, periodo_anio: 2026 },
+        },
+        {
+          id_pago: 8,
+          fecha_pago: new Date('2026-03-05T15:00:00.000Z'),
+          monto: 18990,
+          pasarela: 'CAJA',
+          factura: null,
+        },
+      ]);
+
+      const r = await service.getPagosAnteriores(1);
+
+      expect(r.pagos).toEqual([
+        {
+          id_pago: 9,
+          fecha_pago: '2026-04-08T01:30:00.000Z',
+          periodo: 'Abril 2026',
+          monto: 18990,
+          pasarela: 'Webpay',
+        },
+        {
+          id_pago: 8,
+          fecha_pago: '2026-03-05T15:00:00.000Z',
+          periodo: null,
+          monto: 18990,
+          pasarela: 'CAJA',
+        },
+      ]);
+    });
+
+    it('sin el endpoint de G8, el comprobante figura como no disponible', async () => {
+      (prisma.pago.findMany as jest.Mock).mockResolvedValue([]);
+
+      const r = await service.getPagosAnteriores(1);
+
+      expect(r).toEqual({ comprobante_disponible: false, pagos: [] });
+    });
+
+    it('el comprobante de un pago ajeno responde 404', async () => {
+      (prisma.pago.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.getComprobante(1, 99)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.pago.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id_pago: 99, ...DEL_CLIENTE } }),
+      );
+    });
+
+    it('CU-52 Excepción 2: mientras G8 no despliegue, el comprobante no está disponible', async () => {
+      (prisma.pago.findFirst as jest.Mock).mockResolvedValue({ id_pago: 9 });
+
+      await expect(service.getComprobante(1, 9)).rejects.toThrow(
+        ServiceUnavailableException,
       );
     });
   });

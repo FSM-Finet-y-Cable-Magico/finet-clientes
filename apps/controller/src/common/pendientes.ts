@@ -49,6 +49,15 @@ export const SALDO_CLIENTE_DEFINIDO = false;
  */
 export const TICKET_WIFI_DEFINIDO = false;
 
+/**
+ * El comprobante en PDF de un pago (CU-52). Lo genera y lo guarda Grupo 8, y lo
+ * entrega `GET /api/integrations/g2/payments/{id_pago}/comprobante` (su respuesta
+ * del 01-10, §10). Falta que lo desplieguen y el formato de la respuesta. Hasta
+ * entonces el cliente ve sus pagos anteriores, pero la descarga cae en la
+ * Excepción 2 del CU-52: el comprobante no está disponible.
+ */
+export const COMPROBANTE_G8_DEFINIDO = false;
+
 export type Pendiente = {
   dato: string;
   quien: 'Grupo 2' | 'Grupo 8' | 'Grupo 3';
@@ -80,6 +89,12 @@ export const PENDIENTES: readonly Pendiente[] = [
     quien: 'Grupo 8',
     destraba: 'CU-32 (envío directo a G3)',
     estaVacio: () => !TICKET_WIFI_DEFINIDO,
+  },
+  {
+    dato: 'Comprobante desplegado (GET /api/integrations/g2/payments/{id}/comprobante) y su formato',
+    quien: 'Grupo 8',
+    destraba: 'CU-52',
+    estaVacio: () => !COMPROBANTE_G8_DEFINIDO,
   },
 ];
 

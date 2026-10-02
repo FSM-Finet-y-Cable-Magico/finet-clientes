@@ -17,12 +17,16 @@ import {
   G3WifiService,
   type RespuestaClaveWifiG3,
 } from '../common/g3/g3-wifi.service.js';
-import { TICKET_WIFI_DEFINIDO } from '../common/pendientes.js';
+import {
+  COMPROBANTE_G8_DEFINIDO,
+  TICKET_WIFI_DEFINIDO,
+} from '../common/pendientes.js';
 import {
   ESTADOS_CONTRATO_VIGENTES,
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
 import { MailService } from '../mail/mail.service.js';
+import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
 import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
 import {
@@ -31,6 +35,7 @@ import {
   ContratoResumenDto,
   CrearTicketResponseDto,
   FacturaPendienteDto,
+  PagosAnterioresDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
   SolicitudContrasenaWifiResponseDto,
@@ -301,6 +306,82 @@ export class PortalService {
       saldo_total,
       saldo_confirmado: true,
       facturas_pendientes: facturasMapeadas,
+    };
+  }
+
+  //  CU-52: los pagos anteriores del cliente, para descargar su comprobante.
+  //
+  //  Se lee `pago` directo, como permite el §5 del acuerdo v2.0. Un pago es del
+  //  cliente si lo dice su `id_cliente` o si su factura es de un contrato suyo:
+  //  `id_cliente` puede venir vacío. No se lee `comprobante_estado`, que todavía
+  //  no existe: está en la migración pendiente de G8.
+  async getPagosAnteriores(idCliente: number): Promise<PagosAnterioresDto> {
+    const pagos = await this.prisma.pago.findMany({
+      where: this.pagosDelCliente(idCliente),
+      select: {
+        id_pago: true,
+        fecha_pago: true,
+        monto: true,
+        pasarela: true,
+        factura: { select: { periodo_mes: true, periodo_anio: true } },
+      },
+      orderBy: { fecha_pago: 'desc' },
+    });
+
+    return {
+      comprobante_disponible: COMPROBANTE_G8_DEFINIDO,
+      pagos: pagos.map((p) => ({
+        id_pago: p.id_pago,
+        fecha_pago: p.fecha_pago.toISOString(),
+        periodo: p.factura
+          ? this.formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
+          : null,
+        monto: Number(p.monto),
+        pasarela: this.nombreMedio(p.pasarela),
+      })),
+    };
+  }
+
+  //  CU-52: el comprobante de un pago del cliente.
+  //
+  //  Lo genera y lo guarda G8, y la descarga va por su endpoint (acuerdo v2.0
+  //  §9; respuesta de G8, §10). Mientras no lo desplieguen y no den el formato de
+  //  la respuesta (`COMPROBANTE_G8_DEFINIDO`), la llamada no se escribe y el
+  //  cliente cae en la Excepción 2 del CU-52: el comprobante no está disponible.
+  async getComprobante(idCliente: number, idPago: number): Promise<never> {
+    // Si el pago es de otro cliente se responde 404, igual que si no existiera:
+    // no se confirma su existencia.
+    const pago = await this.prisma.pago.findFirst({
+      where: { id_pago: idPago, ...this.pagosDelCliente(idCliente) },
+      select: { id_pago: true },
+    });
+    if (!pago) {
+      throw new NotFoundException('No encontramos ese pago');
+    }
+
+    throw new ServiceUnavailableException(
+      'El comprobante de este pago no está disponible en este momento. Intenta más tarde.',
+    );
+  }
+
+  /**
+   * El nombre del medio, el mismo que muestra `/pagar` (`webpay` → Webpay). El
+   * §11.15 no define un enum de medio de pago, así que un valor que no
+   * conocemos se muestra tal como está guardado.
+   */
+  private nombreMedio(pasarela: string): string {
+    const medio = MEDIOS_PAGO.find(
+      (m) => m.id === pasarela.trim().toLowerCase(),
+    );
+    return medio?.nombre ?? pasarela;
+  }
+
+  private pagosDelCliente(idCliente: number): Prisma.pagoWhereInput {
+    return {
+      OR: [
+        { id_cliente: idCliente },
+        { factura: { contrato: { id_cliente: idCliente } } },
+      ],
     };
   }
 
