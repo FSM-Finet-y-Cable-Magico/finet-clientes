@@ -10,9 +10,10 @@ import type {
 } from './dto/asistente.dto.js';
 
 /**
- * Lo que puede tardar el chatbot. El motor tiene 30 s por intento y hasta 2
- * reintentos (ver `OPENAI_TIMEOUT_MS` y `OPENAI_MAX_RETRIES` en finet-chatbot);
- * pasado este plazo el visitante ve el error en vez de quedar esperando.
+ * Lo que puede tardar el chatbot (CU-65). Su motor tiene 45 s para todo el
+ * turno (`REPLY_TIMEOUT_MS` en finet-chatbot) mas hasta 5 s de verificar el
+ * RUT, asi que normalmente es el chatbot el que avisa y deriva. Pasado este
+ * plazo responde 503 y el widget muestra ese mismo aviso.
  */
 const TIMEOUT_MS = 60_000;
 

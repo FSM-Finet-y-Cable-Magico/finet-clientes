@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, RotateCcw, Send, X } from "lucide-react";
 import { api } from "../../utils/api";
-import { WHATSAPP_URL } from "../../_lib/company";
+import { COMPANY_PHONE_DISPLAY, WHATSAPP_URL } from "../../_lib/company";
 
 type Mensaje = { rol: "usuario" | "asistente"; texto: string };
 
@@ -85,16 +85,37 @@ function guardarConversacion(conversacion: Conversacion | null) {
   }
 }
 
-function mensajeDeError(error: unknown): string {
-  const status =
-    typeof error === "object" && error !== null && "status" in error
-      ? (error as { status: unknown }).status
-      : undefined;
+/**
+ * CU-65, excepción 1: el asistente no respondió o se pasó del tiempo. Mismo
+ * texto que da finet-chatbot cuando falla su motor; acá cubre el caso en que
+ * no responde ni el chatbot. El CU pide decir que un agente humano tomará el
+ * caso, pero todavía no hay ninguno: el texto dice lo que sí existe.
+ */
+const SIN_RESPUESTA =
+  "No pude responder en este momento. Una persona de nuestro equipo puede " +
+  `atenderte por WhatsApp al ${COMPANY_PHONE_DISPLAY}. Desde aquí ya no podré ` +
+  "responder más mensajes en esta conversación.";
 
+function statusDeError(error: unknown): unknown {
+  return typeof error === "object" && error !== null && "status" in error
+    ? (error as { status: unknown }).status
+    : undefined;
+}
+
+/**
+ * Errores del lado del visitante, que se arreglan reenviando: ir muy rápido
+ * (429) o un mensaje que el backend rechazó (400). Cualquier otro es el
+ * asistente sin responder.
+ */
+function esReintentable(status: unknown): boolean {
+  return status === 429 || status === 400;
+}
+
+function mensajeDeError(status: unknown): string {
   if (status === 429) {
     return "Estás enviando mensajes muy seguido. Espera un momento e inténtalo de nuevo.";
   }
-  return "El asistente no está disponible en este momento. Inténtalo más tarde o escríbenos por WhatsApp.";
+  return "No se pudo enviar tu mensaje. Revísalo e inténtalo de nuevo.";
 }
 
 /**
@@ -194,11 +215,29 @@ export default function AsistenteWidget() {
         terminada: derivado,
       });
     } catch (e) {
-      // El chatbot no guarda un turno que no pudo responder: se saca la
-      // pregunta de la lista y vuelve al input, para reenviarla sin duplicarla.
-      setMensajes(mensajes);
-      setBorrador(texto);
-      setError(mensajeDeError(e));
+      const status = statusDeError(e);
+      if (esReintentable(status)) {
+        // El chatbot no recibió el turno: se saca la pregunta de la lista y
+        // vuelve al input, para reenviarla sin duplicarla.
+        setMensajes(mensajes);
+        setBorrador(texto);
+        setError(mensajeDeError(status));
+        return;
+      }
+
+      // CU-65, excepción 1: se termina como una derivación, igual que hace
+      // el chatbot cuando su motor no responde.
+      const conAviso: Mensaje[] = [
+        ...conPregunta,
+        { rol: "asistente", texto: SIN_RESPUESTA },
+      ];
+      setMensajes(conAviso);
+      setTerminada(true);
+      guardarConversacion({
+        idSesion: sesion,
+        mensajes: conAviso,
+        terminada: true,
+      });
     } finally {
       setEnviando(false);
     }

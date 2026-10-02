@@ -78,9 +78,18 @@ POST /api/asistente/mensajes
 | 429 | `"ThrottlerException: Too Many Requests"` | Mas de 10 mensajes por minuto desde la misma IP |
 | 503 | `"El asistente no esta disponible en este momento"` | Falta `CHATBOT_URL` / `CHATBOT_API_KEY`, el chatbot no responde (timeout 60 s), responde con error, o responde vacio |
 
-> Si el chatbot falla, no guarda el turno: reenviar el mismo mensaje no lo
-> duplica en el historial. El widget aprovecha esto y devuelve el texto al
-> input para reintentar.
+> **CU-65, excepcion 1.** Si el motor del chatbot falla o no termina dentro de
+> su plazo (`REPLY_TIMEOUT_MS` en finet-chatbot, 45 s), el chatbot no responde
+> 503: deriva la conversacion con un texto fijo ("No pude responder en este
+> momento. Una persona de nuestro equipo puede atenderte por WhatsApp al…") y
+> `derivado: true`. Si el que no responde es el chatbot mismo (caido, o pasados
+> los 60 s de aca), este endpoint responde 503 y el widget muestra ese mismo
+> texto y termina la conversacion. El CU pide decir que "un agente humano
+> tomara su caso en breve", pero todavia no hay agentes detras del asistente
+> (CU-70): el texto dice lo que si existe.
+>
+> Ante un 429 o un 400 el widget devuelve el mensaje al input para reenviarlo:
+> el chatbot no lo recibio, asi que no queda duplicado.
 
 ### Derivacion a una persona
 

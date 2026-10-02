@@ -83,16 +83,43 @@ describe('AsistenteWidget (CU-65)', () => {
     expect(sesiones[0]).toBe(sesiones[1]);
   });
 
-  it('si falla, devuelve el mensaje al input y avisa', async () => {
+  it.each([
+    ['responde con error', () => respuestaError(503)],
+    ['no se alcanza', () => Promise.reject(new TypeError('Failed to fetch'))],
+  ])(
+    'si el asistente %s, recomienda WhatsApp y termina la conversación (CU-65)',
+    async (_, falla) => {
+      const user = userEvent.setup();
+      (global.fetch as jest.Mock).mockImplementationOnce(falla);
+      render(<AsistenteWidget />);
+
+      await user.click(screen.getByRole('button', { name: /abrir asistente/i }));
+      await user.type(screen.getByLabelText(/escribe tu mensaje/i), 'hola{Enter}');
+
+      expect(
+        await screen.findByText(/no pude responder en este momento/i),
+      ).toHaveTextContent('+56 9 4500 2319');
+      expect(screen.getByText('hola')).toBeInTheDocument();
+      expect(screen.queryByLabelText(/escribe tu mensaje/i)).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /iniciar nueva conversación/i }),
+      ).toBeInTheDocument();
+      expect(
+        JSON.parse(localStorage.getItem('finet-asistente') ?? '{}').terminada,
+      ).toBe(true);
+    },
+  );
+
+  it('si el backend rechaza el mensaje, lo devuelve al input para reenviarlo', async () => {
     const user = userEvent.setup();
-    (global.fetch as jest.Mock).mockResolvedValueOnce(respuestaError(503));
+    (global.fetch as jest.Mock).mockResolvedValueOnce(respuestaError(400));
     render(<AsistenteWidget />);
 
     await user.click(screen.getByRole('button', { name: /abrir asistente/i }));
     const input = screen.getByLabelText(/escribe tu mensaje/i);
     await user.type(input, 'hola{Enter}');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no está disponible/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo enviar/i);
     expect(input).toHaveValue('hola');
   });
 
@@ -105,6 +132,7 @@ describe('AsistenteWidget (CU-65)', () => {
     await user.type(screen.getByLabelText(/escribe tu mensaje/i), 'hola{Enter}');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/muy seguido/i);
+    expect(screen.getByLabelText(/escribe tu mensaje/i)).toHaveValue('hola');
   });
 
   const guardarConversacion = (horasAtras: number) =>
