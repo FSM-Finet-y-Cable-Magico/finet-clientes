@@ -31,10 +31,12 @@ export const REGISTRO_PAGO_DEFINIDO = false;
  * El saldo que debe cada cliente. La deuda la calcula G8, no nosotros: el acuerdo
  * v2.0 pone Factura y Pago de su lado (§3) y dice que G2 no reconstruye reglas
  * derivadas (§5). En su respuesta del 01-10, G8 confirmó que el saldo no es una
- * columna: lo calcula su Billing y lo entrega `GET /api/integrations/g2/invoices`,
- * con el vencimiento efectivo de cada factura. Falta que lo desplieguen. Sin él,
- * el pago no tiene un total que cobrar (la precondición del CU-42 y del CU-43 es
- * "una deuda pendiente identificada"), y el aviso de corte (CU-68) no tiene monto.
+ * columna: lo calcula su Billing y lo entrega `GET /api/integrations/g2/invoices`.
+ * El 02-10 mandó el formato (`saldoExigible` por factura), y la lectura ya está
+ * construida (`common/saldo/saldo-cliente.service.ts`). Falta que G8 confirme su
+ * deploy y el smoke (su §15). Sin él, el pago no tiene un total que cobrar (la
+ * precondición del CU-42 y del CU-43 es "una deuda pendiente identificada"), y
+ * el aviso de corte (CU-68) no tiene monto.
  */
 export const SALDO_CLIENTE_DEFINIDO = false;
 
