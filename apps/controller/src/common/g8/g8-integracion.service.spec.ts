@@ -67,7 +67,14 @@ describe('G8IntegracionService', () => {
 
       const facturas = await service.facturas({ idEmpresa: 1, idCliente: 123 });
 
-      expect(facturas).toEqual([{ idFactura: 101, saldoExigible: 14990 }]);
+      expect(facturas).toEqual([
+        {
+          idFactura: 101,
+          saldoExigible: 14990,
+          fechaVencimientoEfectiva: '2026-10-15',
+          aceptaPagos: true,
+        },
+      ]);
       const [url, init] = fetchMock.mock.calls[0];
       expect((url as URL).href).toBe(
         'https://g8.test/api/integrations/g2/invoices?id_empresa=1&id_cliente=123',
@@ -87,6 +94,23 @@ describe('G8IntegracionService', () => {
       expect((fetchMock.mock.calls[0][0] as URL).href).toBe(
         'https://g8.test/api/integrations/g2/invoices?id_empresa=2&id_contrato=456',
       );
+    });
+
+    it('sin vencimiento efectivo ni aceptaPagos, la factura igual se lee (con null)', async () => {
+      fetchMock.mockResolvedValue(
+        respuesta(200, { items: [{ idFactura: 7, saldoExigible: 1000 }] }),
+      );
+
+      await expect(
+        service.facturas({ idEmpresa: 1, idCliente: 123 }),
+      ).resolves.toEqual([
+        {
+          idFactura: 7,
+          saldoExigible: 1000,
+          fechaVencimientoEfectiva: null,
+          aceptaPagos: null,
+        },
+      ]);
     });
 
     it('una respuesta sin `items` o sin `saldoExigible` es un error, no "sin deuda"', async () => {

@@ -42,7 +42,11 @@ export const ESTADO_ENVIO = {
   FALLIDO: 'fallido',
 } as const;
 
-/** Estados de factura que cuentan como deuda viva (igual que deuda-publica). */
+/**
+ * Estados de factura que cuentan como deuda viva (igual que deuda-publica). En
+ * el CU-67 y el CU-68 solo sirven para saber a quién preguntarle a G8: si se
+ * avisa lo deciden sus datos (`deuda-g8.ts`).
+ */
 export const ESTADOS_IMPAGOS = ['pendiente', 'vencida'];
 
 /**

@@ -49,6 +49,15 @@ describe('SaldoClienteService', () => {
       expect(g8.facturas).toHaveBeenCalledWith({ idEmpresa: 1, idCliente: 10 });
     });
 
+    it('facturasDe entrega las facturas de G8 tal cual, para el CU-67 y el CU-68', async () => {
+      await expect(
+        service.facturasDe({ idCliente: 10, idContrato: null }, true),
+      ).resolves.toEqual([
+        { idFactura: 101, saldoExigible: 14990 },
+        { idFactura: 102, saldoExigible: 19990 },
+      ]);
+    });
+
     it('por código de abonado, solo el de ese contrato', async () => {
       await service.saldoDe({ idCliente: 10, idContrato: 456 }, true);
 

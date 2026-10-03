@@ -21,14 +21,31 @@ export type SelectorFacturasG8 = { idEmpresa: number } & (
 );
 
 /**
- * Lo que usamos de cada factura. `saldoExigible` es "el monto actualmente
- * cobrable" (§2): el saldo lo calcula G8, y el portal no lo reconstruye.
+ * Lo que usamos de cada factura (§2). El saldo y el vencimiento los calcula G8,
+ * y el portal no los reconstruye (su ratificación del 02-10, §2 y §4):
+ * - `saldoExigible`: "el monto actualmente cobrable";
+ * - `fechaVencimientoEfectiva`: el vencimiento con la prórroga aprobada
+ *   (`YYYY-MM-DD`);
+ * - `aceptaPagos`: si G8 permite registrar un pago de esa factura.
+ *
+ * Los dos últimos pueden faltar: una factura sin ellos no dispara ningún aviso,
+ * pero su saldo se suma igual.
  */
-export type FacturaG8 = { idFactura: number; saldoExigible: number };
+export type FacturaG8 = {
+  idFactura: number;
+  saldoExigible: number;
+  fechaVencimientoEfectiva: string | null;
+  aceptaPagos: boolean | null;
+};
 
 const respuestaFacturas = z.object({
   items: z.array(
-    z.object({ idFactura: z.number(), saldoExigible: z.number() }),
+    z.object({
+      idFactura: z.number(),
+      saldoExigible: z.number(),
+      fechaVencimientoEfectiva: z.string().nullish(),
+      aceptaPagos: z.boolean().nullish(),
+    }),
   ),
 });
 
@@ -93,7 +110,12 @@ export class G8IntegracionService {
         `G8 respondió ${res.status} sin las facturas de su contrato`,
       );
     }
-    return leido.data.items;
+    return leido.data.items.map((f) => ({
+      idFactura: f.idFactura,
+      saldoExigible: f.saldoExigible,
+      fechaVencimientoEfectiva: f.fechaVencimientoEfectiva ?? null,
+      aceptaPagos: f.aceptaPagos ?? null,
+    }));
   }
 
   /** §12: `POST /api/integrations/g2/tickets/{idTicket}/wifi-result`. */

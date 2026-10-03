@@ -181,7 +181,8 @@ export class MailService {
       currency: 'CLP',
       maximumFractionDigits: 0,
     }).format(monto);
-    const fecha = fechaLimite.toISOString().slice(0, 10);
+    // §11.4 del Documento 0: DD/MM/AAAA.
+    const fecha = fechaCliente(fechaLimite);
 
     return `
 <!DOCTYPE html>

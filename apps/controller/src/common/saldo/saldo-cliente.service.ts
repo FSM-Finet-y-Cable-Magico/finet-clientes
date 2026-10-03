@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { G8IntegracionService } from '../g8/g8-integracion.service.js';
+import {
+  G8IntegracionService,
+  type FacturaG8,
+} from '../g8/g8-integracion.service.js';
 import { SALDO_CLIENTE_DEFINIDO } from '../pendientes.js';
 
 /** A quién se le cobra: por código de abonado, solo ese contrato. */
@@ -37,6 +40,22 @@ export class SaldoClienteService {
     cuenta: Cuenta,
     saldoDefinido = SALDO_CLIENTE_DEFINIDO,
   ): Promise<number | null> {
+    const facturas = await this.facturasDe(cuenta, saldoDefinido);
+    return facturas === null
+      ? null
+      : facturas.reduce((total, f) => total + f.saldoExigible, 0);
+  }
+
+  /**
+   * Las facturas del cliente tal como las entrega G8, con su saldo y su
+   * vencimiento efectivo. El recordatorio (CU-67) y el aviso de corte (CU-68)
+   * deciden con esto y no con la base (ratificación de G8 del 02-10, §4).
+   * `null` si G8 todavía no está o no pudo responder.
+   */
+  async facturasDe(
+    cuenta: Cuenta,
+    saldoDefinido = SALDO_CLIENTE_DEFINIDO,
+  ): Promise<FacturaG8[] | null> {
     if (!saldoDefinido) return null;
 
     try {
@@ -48,20 +67,19 @@ export class SaldoClienteService {
       const idEmpresa = cliente?.id_empresa;
       if (!idEmpresa) {
         this.logger.warn(
-          `El cliente ${cuenta.idCliente} no tiene empresa: no se le puede pedir el saldo a G8`,
+          `El cliente ${cuenta.idCliente} no tiene empresa: no se le pueden pedir sus facturas a G8`,
         );
         return null;
       }
 
-      const facturas = await this.g8.facturas(
+      return await this.g8.facturas(
         cuenta.idContrato === null
           ? { idEmpresa, idCliente: cuenta.idCliente }
           : { idEmpresa, idContrato: cuenta.idContrato },
       );
-      return facturas.reduce((total, f) => total + f.saldoExigible, 0);
     } catch (error) {
       this.logger.warn(
-        `No se pudo obtener el saldo del cliente ${cuenta.idCliente}: ${error instanceof Error ? error.message : 'error desconocido'}`,
+        `No se pudieron obtener las facturas del cliente ${cuenta.idCliente} desde G8: ${error instanceof Error ? error.message : 'error desconocido'}`,
       );
       return null;
     }

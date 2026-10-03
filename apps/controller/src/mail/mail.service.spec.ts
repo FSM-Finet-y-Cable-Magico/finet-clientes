@@ -72,6 +72,21 @@ describe('MailService — correos del Incremento 3', () => {
     });
   });
 
+  describe('CU-67: recordatorio de pago', () => {
+    it('dice el monto y el vencimiento en DD/MM/AAAA (§11.4)', async () => {
+      await mail.sendRecordatorioPago(
+        'ana@b.cl',
+        'Ana',
+        24990,
+        new Date('2026-10-04T00:00:00.000Z'),
+      );
+
+      expect(html()).toContain('04/10/2026');
+      expect(html()).not.toContain('2026-10-04');
+      expect(html()).toContain('$24.990');
+    });
+  });
+
   describe('CU-69: confirmación de pago', () => {
     beforeEach(async () => {
       await mail.sendConfirmacionPago(
