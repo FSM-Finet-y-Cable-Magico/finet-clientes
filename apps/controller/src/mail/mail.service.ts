@@ -95,15 +95,16 @@ export class MailService {
   }
 
   /**
-   * CU-68 / RF-50: aviso de corte inminente por morosidad: la deuda, la fecha
-   * de corte y el enlace directo para pagar. Lanza si el despacho falla: quien
-   * llama decide si reintenta.
+   * CU-68 / RF-50: aviso de corte inminente por morosidad: la deuda, cuándo
+   * venció y el enlace directo para pagar. No promete una fecha de corte: los
+   * días de gracia son de cada contrato y los maneja G8. Lanza si el despacho
+   * falla: quien llama decide si reintenta.
    */
   async sendAvisoCorte(
     email: string,
     nombre: string,
     deuda: number,
-    fechaCorte: Date,
+    vencimiento: Date,
     enlacePago: string,
   ) {
     const from =
@@ -114,7 +115,7 @@ export class MailService {
       from,
       to: email,
       subject: 'Aviso de corte de servicio - Portal Clientes',
-      html: this.avisoCorteTemplate(nombre, deuda, fechaCorte, enlacePago),
+      html: this.avisoCorteTemplate(nombre, deuda, vencimiento, enlacePago),
     });
 
     this.logger.log('Service cut notice email sent');
@@ -204,19 +205,19 @@ export class MailService {
   private avisoCorteTemplate(
     nombre: string,
     deuda: number,
-    fechaCorte: Date,
+    vencimiento: Date,
     enlacePago: string,
   ): string {
     return plantillaCorreo({
-      resumen: `Tienes una deuda de ${pesos(deuda)}. Tu servicio se cortará el ${fechaCliente(fechaCorte)}.`,
+      resumen: `Tienes una deuda vencida de ${pesos(deuda)}. Tu servicio puede ser cortado.`,
       etiqueta: { texto: 'Aviso de corte', tono: 'alerta' },
       titulo: 'Tu servicio está por ser cortado',
       cuerpo:
         `Hola ${escaparHtml(nombre)}: tu servicio está próximo a ser cortado por una deuda vencida. ` +
-        'Para evitarlo, paga antes de la fecha de corte.' +
+        'Para evitarlo, paga lo antes posible.' +
         comprobante([
           ['Deuda pendiente', pesos(deuda)],
-          ['Fecha de corte', fechaCliente(fechaCorte)],
+          ['Venció el', fechaCliente(vencimiento)],
         ]) +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</p>',
       boton: { texto: 'Pagar mi deuda', enlace: enlacePago },
