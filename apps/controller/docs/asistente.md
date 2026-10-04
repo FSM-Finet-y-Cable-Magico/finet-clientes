@@ -288,3 +288,7 @@ WHATSAPP_NUMBER="+56 9 4500 2319"
 
 Son dos claves distintas, una por sentido. Para levantarlo en local:
 finet-chatbot en el puerto 3001 (el 3000 lo usa Next).
+
+La guia paso a paso para levantar los tres procesos, comprobar que funcionan
+y resolver los problemas frecuentes esta en finet-chatbot,
+`docs/puesta-en-marcha.md`.
