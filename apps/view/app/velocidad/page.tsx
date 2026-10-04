@@ -6,7 +6,7 @@ export const metadata: Metadata = metadataSeccion({
   path: "/velocidad",
   title: "Test de velocidad",
   description:
-    "Mide la velocidad de bajada, subida y latencia de tu conexion a internet.",
+    "Mide la velocidad de bajada, subida y latencia de tu conexión a internet.",
 });
 
 export default function VelocidadPage() {
@@ -14,7 +14,7 @@ export default function VelocidadPage() {
     <section className="mx-auto w-full max-w-3xl px-4 py-12">
       <h1 className="text-2xl font-bold text-foreground">Test de velocidad</h1>
       <p className="mt-3 max-w-2xl text-muted">
-        Mide la velocidad real de tu conexion. La prueba corre desde tu propio
+        Mide la velocidad real de tu conexión. La prueba corre desde tu propio
         dispositivo contra los servidores de fast.com y demora menos de medio
         minuto.
       </p>
@@ -24,8 +24,8 @@ export default function VelocidadPage() {
       </div>
 
       <p className="mt-6 text-xs text-muted">
-        Los resultados dependen de tu equipo, de la red WiFi y de cuantos
-        dispositivos esten conectados. Para una medicion mas fiel, conectate por
+        Los resultados dependen de tu equipo, de la red WiFi y de cuántos
+        dispositivos estén conectados. Para una medición más fiel, conéctate por
         cable y cierra las descargas en curso.
       </p>
     </section>
