@@ -1,7 +1,7 @@
 import { escaparHtml } from './formato.js';
 
 /**
- * Molde común de los correos del Incremento 3 (CU-68 y CU-69), con los colores
+ * Molde común de los correos del Incremento 3 (CU-67, CU-68 y CU-69), con los colores
  * del portal (`apps/view/app/globals.css`).
  *
  * Es HTML de correo, no de página: tablas para el layout y estilos en línea,
@@ -23,6 +23,7 @@ const COLOR = {
 const TONOS = {
   alerta: { texto: '#93000A', fondo: '#FFDAD6' }, // --color-*-error-container
   exito: { texto: '#00210A', fondo: '#B6F2C2' }, // --color-*-success-container
+  aviso: { texto: '#001F26', fondo: '#ACEDFF' }, // --color-*-info-container
 };
 
 const FUENTE =
