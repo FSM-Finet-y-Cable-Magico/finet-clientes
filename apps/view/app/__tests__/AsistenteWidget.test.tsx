@@ -63,6 +63,20 @@ describe('AsistenteWidget (CU-65)', () => {
     expect(body.id_sesion).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it('reserva un contenedor Markdown para las respuestas del asistente', async () => {
+    const user = userEvent.setup();
+    (global.fetch as jest.Mock).mockResolvedValueOnce(
+      respuestaOk('**Importante:** visita finet.cl'),
+    );
+    render(<AsistenteWidget />);
+
+    await user.click(screen.getByRole('button', { name: /abrir asistente/i }));
+    await user.type(screen.getByLabelText(/escribe tu mensaje/i), 'planes{Enter}');
+
+    expect(await screen.findByText('**Importante:** visita finet.cl')).toBeInTheDocument();
+    expect(document.querySelector('.asistente-markdown')).toBeInTheDocument();
+  });
+
   it('mantiene la misma sesión entre mensajes', async () => {
     const user = userEvent.setup();
     (global.fetch as jest.Mock)

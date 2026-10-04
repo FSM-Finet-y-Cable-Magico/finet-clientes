@@ -172,6 +172,111 @@ body {
     color 200ms ease;
 }
 
+.asistente-markdown > :first-child {
+  margin-top: 0;
+}
+
+.asistente-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.asistente-markdown p,
+.asistente-markdown ul,
+.asistente-markdown ol,
+.asistente-markdown blockquote,
+.asistente-markdown pre,
+.asistente-markdown table {
+  margin-block: 0.6rem;
+}
+
+.asistente-markdown h1,
+.asistente-markdown h2,
+.asistente-markdown h3 {
+  margin-block: 0.75rem 0.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.asistente-markdown h1 {
+  font-size: 1.15rem;
+}
+
+.asistente-markdown h2 {
+  font-size: 1.05rem;
+}
+
+.asistente-markdown h3 {
+  font-size: 1rem;
+}
+
+.asistente-markdown ul,
+.asistente-markdown ol {
+  padding-left: 1.25rem;
+}
+
+.asistente-markdown ul {
+  list-style: disc;
+}
+
+.asistente-markdown ol {
+  list-style: decimal;
+}
+
+.asistente-markdown li + li {
+  margin-top: 0.25rem;
+}
+
+.asistente-markdown strong {
+  font-weight: 700;
+}
+
+.asistente-markdown code {
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--color-border) 65%, transparent);
+  padding: 0.1rem 0.3rem;
+  font-size: 0.9em;
+}
+
+.asistente-markdown pre {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--color-background) 72%, var(--color-surface));
+  padding: 0.65rem 0.75rem;
+  white-space: pre;
+}
+
+.asistente-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.asistente-markdown blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 0.75rem;
+  color: var(--color-muted);
+}
+
+.asistente-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.asistente-markdown th,
+.asistente-markdown td {
+  border: 1px solid var(--color-border);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+
+.asistente-markdown th {
+  background: color-mix(in srgb, var(--color-border) 45%, transparent);
+  font-weight: 700;
+}
+
 @layer base {
   button {
     cursor: pointer;

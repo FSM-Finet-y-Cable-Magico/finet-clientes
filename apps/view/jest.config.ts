@@ -7,6 +7,8 @@ const config: Config = {
   testEnvironment: 'jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    '^react-markdown$': '<rootDir>/test/mocks/react-markdown.tsx',
+    '^remark-gfm$': '<rootDir>/test/mocks/remark-gfm.ts',
   },
   testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
 };

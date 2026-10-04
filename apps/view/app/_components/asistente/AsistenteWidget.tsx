@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, RotateCcw, Send, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../../utils/api";
 import { COMPANY_PHONE_DISPLAY, WHATSAPP_URL } from "../../_lib/company";
 
@@ -408,15 +410,37 @@ export default function AsistenteWidget() {
 function Burbuja({ rol, texto }: Mensaje) {
   const esUsuario = rol === "usuario";
   return (
-    <p
-      className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${
+    <div
+      className={`max-w-[85%] break-words rounded-lg px-3 py-2 text-sm ${
         esUsuario
-          ? "ml-auto rounded-br-sm bg-primary text-background"
+          ? "ml-auto whitespace-pre-wrap rounded-br-sm bg-primary text-background"
           : "mr-auto rounded-bl-sm bg-surface text-foreground"
       }`}
     >
       <span className="sr-only">{esUsuario ? "Tú: " : "Asistente: "}</span>
-      {texto}
-    </p>
+      {esUsuario ? (
+        texto
+      ) : (
+        <div className="asistente-markdown">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: ({ children, href }) => (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline decoration-primary underline-offset-2 hover:opacity-75"
+                >
+                  {children}
+                </a>
+              ),
+            }}
+          >
+            {texto}
+          </ReactMarkdown>
+        </div>
+      )}
+    </div>
   );
 }
