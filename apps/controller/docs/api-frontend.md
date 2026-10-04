@@ -627,87 +627,12 @@ GET /api/deuda-publica/abonado?codigo_abonado=100
 ```
 
 **Respuesta 200:** Misma estructura que consulta por RUT.
-
----
-
-## 5. Panel Admin (API Key)
-
-Requieren header `X-API-Key: <ADMIN_API_KEY>`.
-
-### 5.1 Historial de intentos fallidos (RF-06)
-
-```
-GET /api/admin/intentos-fallidos?bloqueados=true&ip=192.168.1.50&page=1&limit=20
-X-API-Key: finet-admin-key-2026-dev
-```
-
-**Query params (todos opcionales):**
-
-| Param | Tipo | Descripción |
-|-------|------|-------------|
-| `rut` | string | Filtra por RUT (sin puntos ni guión) |
-| `ip` | string | Filtra por dirección IP |
-| `bloqueados` | `"true"` o `"false"` | Solo con bloqueo activo o inactivos |
-| `desde` | string | Fecha inicio (`YYYY-MM-DD`) |
-| `hasta` | string | Fecha fin (`YYYY-MM-DD`) |
-| `page` | number | Página (default 1) |
-| `limit` | number | Por página (default 20, max 100) |
-
-**Respuesta 200:**
-```json
-{
-  "data": [
-    {
-      "id_intento": "15",
-      "rut_intentado": "123456785",
-      "ip_address": "192.168.1.50",
-      "timestamp": "2026-06-01T14:00:00.000Z",
-      "bloqueado_hasta": "2026-06-01T14:15:00.000Z"
-    }
-  ],
-  "total": 45,
-  "page": 1,
-  "limit": 20
-}
-```
-
----
-
-### 5.2 Desbloquear IP (RF-06)
-
-```
-POST /api/admin/intentos-fallidos/desbloquear-ip
-X-API-Key: finet-admin-key-2026-dev
-Content-Type: application/json
-
-{ "ip": "192.168.1.50" }
-```
-
-**Respuesta 200:**
-```json
-{
-  "desbloqueado": true,
-  "registros_afectados": 3
-}
-```
-
-Si la IP no tiene bloqueos activos:
-```json
-{
-  "desbloqueado": false,
-  "registros_afectados": 0
-}
-```
-
----
-
 ## 6. Mecanismos de autenticación
 
 | Tipo | Cómo se envía | Dónde se usa |
 |------|---------------|--------------|
 | **Público** | Sin auth | Login, register, recuperación, deuda pública, landing |
 | **JWT** | Header `Authorization: Bearer <token>` o cookie `access_token` | Portal, perfil, logout |
-| **API Key** | Header `X-API-Key: <valor>` | Admin |
 
 ---
 

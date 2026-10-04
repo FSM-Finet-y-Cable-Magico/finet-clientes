@@ -62,6 +62,31 @@ export class MailService {
     this.logger.log('Password changed email sent');
   }
 
+  /**
+   * CU-67 / RF-49: recordatorio de pago tres dias antes del vencimiento.
+   * Lanza si el despacho falla — quien llama decide si reintenta y como lo
+   * registra en el historial.
+   */
+  async sendRecordatorioPago(
+    email: string,
+    nombre: string,
+    monto: number,
+    fechaLimite: Date,
+  ) {
+    const from =
+      this.configService.get<string>('MAIL_FROM') ||
+      '"Portal Clientes" <no-reply@finet.cl>';
+
+    await this.transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Tu factura vence en 3 dias - Portal Clientes',
+      html: this.recordatorioPagoTemplate(nombre, monto, fechaLimite),
+    });
+
+    this.logger.log('Payment reminder email sent');
+  }
+
   async sendTicketCreated(
     email: string,
     nombre: string,
@@ -80,6 +105,35 @@ export class MailService {
     });
 
     this.logger.log('Ticket created email sent');
+  }
+
+  private recordatorioPagoTemplate(
+    nombre: string,
+    monto: number,
+    fechaLimite: Date,
+  ): string {
+    const montoFormateado = new Intl.NumberFormat('es-CL', {
+      style: 'currency',
+      currency: 'CLP',
+      maximumFractionDigits: 0,
+    }).format(monto);
+    const fecha = fechaLimite.toISOString().slice(0, 10);
+
+    return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; color: #333;">
+  <div style="max-width: 480px; margin: 0 auto; padding: 24px;">
+    <h2 style="color: #1a56db;">Portal Clientes</h2>
+    <p>Hola ${nombre},</p>
+    <p>Te recordamos que tu factura vence el <strong>${fecha}</strong>.</p>
+    <p>Monto a pagar: <strong>${montoFormateado}</strong></p>
+    <p>Si ya pagaste, puedes ignorar este mensaje.</p>
+    <p style="font-size: 12px; color: #666;">Este es un aviso automatico, no respondas a este correo.</p>
+  </div>
+</body>
+</html>`;
   }
 
   private resetTemplate(nombre: string, link: string): string {

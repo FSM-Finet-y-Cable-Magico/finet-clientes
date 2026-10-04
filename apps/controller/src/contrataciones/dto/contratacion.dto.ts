@@ -10,7 +10,7 @@ export const ContratacionDto = z.object({
     .transform((v) => cleanRut(v))
     .refine(validateRut, { message: 'RUT inválido' }),
   email: z.string().email().max(120),
-  telefono: z.string().max(21).optional().nullable(),
+  telefono: z.string().max(20).optional().nullable(),
   id_plan: z.number().int().positive(),
   direccion_completa: z.string().min(1).max(200),
   comuna: z.string().min(1).max(80),

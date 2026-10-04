@@ -3,6 +3,7 @@ import { Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import Navbar from "./_components/layout/navbar/Navbar";
 import Footer from "./_components/layout/footer/Footer";
+import BannerCookies from "./_components/legal/BannerCookies";
 import { themeScript } from "./_components/layout/theme/theme-script";
 import { BASE_URL } from "./_lib/consts";
 import {
@@ -111,6 +112,8 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          {/* CU-76: sale solo si el navegador no tiene preferencia guardada. */}
+          <BannerCookies />
         </AuthProvider>
       </body>
     </html>

@@ -2,14 +2,21 @@
 
 Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el equipo, no versionado en el repo — pedirlo a quien lo mantenga si hace falta la versión original). Este archivo transcribe su contenido para que quede consultable desde el código y no se pierda entre conversaciones.
 
-80 casos de uso repartidos en 4 incrementos:
+80 casos de uso repartidos en 3 incrementos (el 3 y el 4 se fusionaron), según la
+reorganización coordinada con el Grupo 8 y recogida en el documento `CU_por_Incremento`
+del 2026-09-28:
 
 | Incremento | Alcance | CU | % | Estado |
 |---|---|---|---|---|
 | **Incremento 1** | Experiencia del cliente, sitio web, portal y autoservicio | 34 | 42,5% | ✅ Implementado |
-| **Incremento 2** | Gestión operacional, deuda, soporte y administración interna | 29 | 36,25% | ⏳ **En curso** |
-| **Incremento 3** | Pasarelas de pago y asistente virtual | 12 | 15% | No iniciado |
-| **Incremento 4** | SEO, políticas, privacidad y cierre técnico | 5 | 6,25% | No iniciado |
+| **Incremento 2** | Autogestión, diagnóstico, mapa, SEO/políticas adelantadas y ciclo de deuda y pago (conjunto con G8) | 23 | 28,75% | ⏳ **En curso** |
+| **Incremento 3 + 4** | Pasarelas de pago, asistente virtual, notificaciones, cierre técnico y casos aplazados del Inc. 2 | 23 | 28,75% | ⏳ **En curso** |
+
+> **Reorganización del 2026-09-28.** Los antiguos incrementos 3 y 4 se fusionaron en uno.
+> Del Incremento 2 se adelantaron CU-72 a CU-75 (SEO y políticas) y se aplazaron al 3+4 los
+> casos cuya coordinación con G8 quedó para después: CU-46, CU-52, CU-53, CU-48, CU-49,
+> CU-50, CU-33, CU-36, CU-06 y CU-58.
+
 
 > ⚠️ **Discrepancia en el documento fuente:** la tabla de Incremento 1 declara "34 casos de uso" pero solo lista 32 filas — las prioridades 1 y 2 no aparecen en la tabla original. No se inventó contenido para esas dos filas; si alguien tiene la versión completa del documento, hay que completarlas aquí.
 
@@ -57,53 +64,62 @@ Fuente de verdad: documento de requisitos `CU_por_Incremento` (aportado por el e
 
 ---
 
-## Incremento 2 — Gestión operacional, deuda, soporte y administración interna
+## Incremento 2 — Autogestión, diagnóstico, mapa, SEO adelantado y ciclo de deuda
 
-29 CU · 36,25% · **Estado: en curso** (arrancado el 2026-08-20)
+23 CU · 28,75% · **Estado: en curso** (arrancado el 2026-08-20)
 
 ### Criterio de agrupación (del documento fuente)
 
-> El incremento deja operativo el ciclo completo de deuda y cobranza sin depender de ninguna pasarela de pago externa. Los casos CU-44, CU-45, CU-46, CU-52 y CU-53 constituyen la capa de dominio del pago: registro de abonos, validación de unicidad de transacción, actualización de saldo y emisión de comprobante. Esta capa se alimenta en el incremento mediante CU-46, es decir, pagos ingresados por recaudación externa.
+> El Incremento 2 reúne, por un lado, el desarrollo propio de Grupo 2 —autogestión de red
+> inalámbrica (CU-31, CU-32), diagnóstico (CU-34, CU-35), visor cartográfico de factibilidad
+> (CU-59 a CU-62) y registro de solicitudes de soporte (CU-71)— y, por otro, los casos de uso
+> desarrollados en conjunto con Grupo 8 para dejar operativo el ciclo de deuda y cobranza:
+> vencimiento del contrato (CU-54), detección de morosidad (CU-47, CU-80), seguimiento de
+> contratos vencidos (CU-55, CU-56), registro de pago (CU-44, CU-45), bitácora de suspensión y
+> reactivación (CU-51) y generación del reporte financiero (CU-57), junto con el cierre de
+> tickets de soporte (CU-78).
 >
-> Con ello el flujo queda cerrado de extremo a extremo: vencimiento del contrato (CU-54), detección de morosidad (CU-47, CU-80), suspensión del servicio vía SmartOLT (CU-48), registro del pago (CU-44), aplicación del recargo de reconexión (CU-49), reactivación (CU-50) y emisión del comprobante (CU-52, CU-53).
+> Se adelantan a este incremento los casos CU-72 a CU-75 (etiquetas de indexación, términos y
+> políticas de privacidad, archivos de indexación y aceptación de políticas), originalmente
+> ubicados en el Incremento 4, por tratarse de funcionalidad de frontend sin dependencia de las
+> pasarelas de pago ni del asistente virtual.
 >
-> El orden interno parte por CU-54 porque sin fecha de vencimiento asignada no existe el concepto de contrato vencido, del cual dependen todos los casos posteriores de morosidad y suspensión.
->
-> El visor cartográfico (CU-59 a CU-62) se adelanta a este incremento porque corresponde a funcionalidad de frontend sobre capas de mapa, sin dependencia del asistente virtual ni de su base de datos.
+> En contrapartida, se postergan al Incremento 3 + 4 los casos CU-46, CU-52, CU-53, CU-48,
+> CU-49, CU-50, CU-33, CU-36, CU-06 y CU-58, ya que su coordinación con Grupo 8 (recaudación
+> externa, comprobantes de pago, integración con SmartOLT) quedó definida para esa etapa
+> posterior.
 
 ### Casos de uso y estado real en el código (auditado 2026-08-20)
 
+Los estados vienen de esa auditoría y solo se actualizan cuando un CU se comprueba de verdad
+contra sus RF. Si una fila dice pendiente y el código ya lo hace, es que nadie lo ha verificado
+todavía, no que no exista.
+
 | Prioridad | CU | Caso de uso | Bloque | Estado |
 |---|---|---|---|---|
-| 1 | CU-54 | Asignando fecha de vencimiento fija a un contrato | Deuda | ⏳ Pendiente — `contrato` no tiene campo de fecha de vencimiento fija en el schema (solo `dia_vencimiento`, un día del mes) |
-| 2 | CU-47 | Identificando contratos morosos en revisión diaria automática | Deuda | ⏳ Pendiente |
-| 3 | CU-80 | Configurando parámetros de detección de morosidad | Deuda | ⏳ Pendiente — no hay modelo de configuración para esto todavía |
-| 4 | CU-55 | Consultando lista de contratos con saldos vencidos | Deuda | ⏳ Pendiente |
-| 5 | CU-56 | Gestionando seguimiento de contrato vencido seleccionado | Deuda | ⏳ Pendiente |
-| 6 | CU-44 | Registrando pago confirmado con trazabilidad financiera | Núcleo de pago | ⏳ Pendiente — schema listo: `model pago` ya existe (`prisma/schema.prisma`) |
-| 7 | CU-45 | Validando unicidad de código de transacción para evitar duplicados | Núcleo de pago | ⏳ Pendiente — schema listo: `pago.codigo_transaccion` ya es `@unique` |
-| 8 | CU-46 | Incorporando abonos de recaudación externa al saldo del cliente | Núcleo de pago | ⏳ Pendiente |
-| 9 | CU-52 | Generando comprobante de pago en formato PDF | Núcleo de pago | ⏳ Pendiente — schema listo: `pago.comprobante_pdf_url` ya existe |
-| 10 | CU-53 | Enviando comprobante de pago al correo del cliente | Núcleo de pago | ⏳ Pendiente — reutilizable: `MailService`/Nodemailer ya existe (`apps/controller/src/mail/`) |
-| 11 | CU-48 | Suspendiendo servicio por morosidad mediante SmartOLT | SmartOLT | ⏳ Pendiente — sin integración SmartOLT en el código. **Derivado**: la detección de morosidad es de G8 y la ejecución en SmartOLT es de **G3** (acuerdo del 12-09-2026) |
-| 12 | CU-49 | Aplicando recargo de reconexión al saldo del cliente suspendido | SmartOLT | ⏳ Pendiente |
-| 13 | CU-50 | Reactivando servicio de cliente suspendido tras pago total | SmartOLT | ⏳ Pendiente |
-| 14 | CU-51 | Registrando bitácora de eventos de suspensión y reactivación | SmartOLT | ⏳ Pendiente — podría reutilizar `log_auditoria` en vez de un modelo nuevo. Como CU-49 y CU-50, queda del lado de quien opera SmartOLT (**G3**) |
-| 15 | CU-31 | Validando formato de nueva clave de red inalámbrica | Autogestión | ✅ — valida formato en `WifiPasswordSection.tsx` y en el backend con Zod (`dto/solicitud-contrasena-wifi.dto.ts`). **Diverge del RF-24 escrito**: se permiten símbolos, solo se rechazan espacios en blanco (decisión de equipo, pendiente de reflejar en el Documento 0) |
-| 16 | CU-32 | Solicitando cambio de contraseña de red inalámbrica | Autogestión | ✅ — `POST /portal/wifi/password` registra la solicitud en la tabla `solicitud_contrasena_wifi` (estado `PENDIENTE`, en mayúsculas por el §11.15) y la muestra en `/portal/servicios`. La clave nunca se guarda en texto plano: va **cifrada con la llave pública RSA del CRM** (`password_nueva_cifrada`, la vía por la que CU-33 la obtiene; el CRM la borra al aplicarla). El portal **no** cambia la clave: la ejecución es CU-33 y corre por cuenta del CRM |
-| 17 | CU-33 | Ejecutando cambio de clave WiFi solicitado por el cliente | Autogestión | ⏳ Pendiente — la ejecución real contra el equipo del cliente (ONT/router) no está implementada y no es nuestra. **Quién la hace**: según el acuerdo de integración de G8 del 12-09-2026, **G8 valida comercialmente y G3 ejecuta técnicamente** (SmartOLT es de G3, ver la nota de reparto más abajo). Antes teníamos anotado que la aplicaba G8 vía Smart OLT; ese documento lo corrige. **Cómo obtienen la clave**: descifran `solicitud_contrasena_wifi.password_nueva_cifrada` con la llave privada RSA (nosotros ciframos con la pública, `CRM_PUBLIC_KEY`), y al marcar `APLICADA` dejan esa columna en `NULL` — con eso la fila deja de guardar cualquier secreto. Si la columna cifrada llega en `NULL` es que faltaba la llave: hay que pedirle la clave al cliente. **Abierto**: de quién es la llave privada, de G8 o de G3 — lo tienen que definir entre ellos |
-| 18 | CU-34 | Iniciando prueba de velocidad de red con herramienta Ookla | Diagnóstico | 🚧 Parcial — widget de Speedtest.net embebido (`OoklaSpeedTest.tsx`), sin backend propio ni persistencia de resultados |
-| 19 | CU-36 | Ejecutando evaluación de red para diagnóstico técnico | Diagnóstico | ⏳ Pendiente — alcance a confirmar con el equipo (no hay evidencia de un flujo propio más allá del widget de Ookla) |
-| 20 | CU-35 | Visualizando resultados de la evaluación de red | Diagnóstico | 🚧 Parcial — el widget de Ookla muestra resultados inline, pero no hay componente propio ni persistencia |
-| 21 | CU-71 | Registrando solicitud de soporte técnico desde el portal | Soporte | ⏳ Pendiente — `portal/tickets` hoy es solo lectura (CU-29/30), no existe creación de tickets desde el cliente |
-| 22 | CU-78 | Actualizando estado y cerrando ticket de soporte asignado | Soporte | ⏳ Pendiente — es un flujo de agente/admin, no del portal de cliente |
-| 23 | CU-57 | Generando reporte financiero del período seleccionado | Administración | ⏳ Pendiente |
-| 24 | CU-58 | Descargando reporte financiero generado | Administración | ⏳ Pendiente |
-| 25 | CU-06 | Revisando historial de IPs bloqueadas por intentos fallidos | Administración | 🚧 Parcial/✅ — `GET /admin/intentos-fallidos` (`apps/controller/src/admin/`) ya devuelve exactamente esto, con filtros `bloqueados`/`ip`/`rut` y paginado. Revisar si falta UI de administración o si el endpoint ya cubre el CU |
-| 26 | CU-59 | Accediendo al visor cartográfico de factibilidad técnica | Mapa | ✅ — `/cobertura` monta Leaflet vía `GET /api/cobertura/config` |
-| 27 | CU-60 | Visualizando capa de mapa de calor de cobertura | Mapa | ✅ — `leaflet.heat` sobre `GET /api/cobertura/puntos` (capa estática generada desde el KML de planta externa) |
-| 28 | CU-61 | Aplicando zoom sobre el mapa de factibilidad | Mapa | ✅ — rueda/doble click/pellizco, acotado por `zoom_min`/`zoom_max` del backend |
-| 29 | CU-62 | Desplazándose por el mapa de factibilidad mediante paneo | Mapa | ✅ — arrastre con puntero o táctil, acotado por `maxBounds` |
+| 1 | CU-31 | Validando formato de nueva clave de red inalámbrica | Autogestión | ✅ — valida formato en `WifiPasswordSection.tsx` y en el backend con Zod (`dto/solicitud-contrasena-wifi.dto.ts`). **Diverge del RF-24 escrito**: se permiten símbolos, solo se rechazan espacios en blanco (decisión de equipo, pendiente de reflejar en el Documento 0) |
+| 2 | CU-32 | Solicitando cambio de contraseña de red inalámbrica | Autogestión | ✅ — `POST /portal/wifi/password` registra la solicitud en la tabla `solicitud_contrasena_wifi` (estado `PENDIENTE`, en mayúsculas por el §11.15) y la muestra en `/portal/servicios`. La clave nunca se guarda en texto plano: va **cifrada con la llave pública RSA del CRM** (`password_nueva_cifrada`, la vía por la que CU-33 la obtiene; el CRM la borra al aplicarla). El portal **no** cambia la clave: la ejecución es CU-33 y corre por cuenta del CRM |
+| 3 | CU-34 | Iniciando prueba de velocidad de red con herramienta Ookla | Diagnóstico | 🚧 Parcial — widget de Speedtest.net embebido (`OoklaSpeedTest.tsx`), sin backend propio ni persistencia de resultados |
+| 4 | CU-35 | Visualizando resultados de la evaluación de red | Diagnóstico | 🚧 Parcial — el widget de Ookla muestra resultados inline, pero no hay componente propio ni persistencia |
+| 5 | CU-59 | Accediendo al visor cartográfico de factibilidad técnica | Mapa | ✅ — `/cobertura` monta Leaflet vía `GET /api/cobertura/config` |
+| 6 | CU-60 | Visualizando capa de mapa de calor de cobertura | Mapa | ✅ — `leaflet.heat` sobre `GET /api/cobertura/puntos` (capa estática generada desde el KML de planta externa) |
+| 7 | CU-61 | Aplicando zoom sobre el mapa de factibilidad | Mapa | ✅ — rueda/doble click/pellizco, acotado por `zoom_min`/`zoom_max` del backend |
+| 8 | CU-62 | Desplazándose por el mapa de factibilidad mediante paneo | Mapa | ✅ — arrastre con puntero o táctil, acotado por `maxBounds` |
+| 9 | CU-71 | Registrando solicitud de soporte técnico desde el portal | Soporte | ⏳ Pendiente — `portal/tickets` hoy es solo lectura (CU-29/30), no existe creación de tickets desde el cliente |
+| 10 | CU-72 | Generando etiquetas de indexación por sección y plan | SEO/Políticas | ✅ — `metadataSeccion`/`metadataPlan` en `apps/view/app/_lib/seo.ts` |
+| 11 | CU-73 | Accediendo a términos, condiciones y políticas de privacidad | SEO/Políticas | ✅ — `/terminos` y `/privacidad` publicadas y enlazadas desde el footer. Faltan datos que entrega Finet, ver abajo |
+| 12 | CU-74 | Generando y actualizando archivos de indexación del sitio | SEO/Políticas | ✅ — `sitemap.xml` y `robots.txt` desde `apps/view/app/_lib/rutas-publicas.ts` |
+| 13 | CU-75 | Registrando aceptación de políticas de privacidad en formularios | SEO/Políticas | ✅ — casilla obligatoria en contratación y registro de cuenta (no existe formulario de Contacto). La aceptación se registra en `log_auditoria` (`ACEPTAR_POLITICA_PRIVACIDAD`) dentro de la misma transacción que los datos, sin cambios de schema. Ver `apps/controller/docs/contrataciones.md` |
+| 14 | CU-44 | Registrando pago confirmado con trazabilidad financiera | Núcleo de pago · conjunto G8 | ⏳ Pendiente — schema listo: `model pago` ya existe (`prisma/schema.prisma`) |
+| 15 | CU-45 | Validando unicidad de código de transacción para evitar duplicados | Núcleo de pago · conjunto G8 | ⏳ Pendiente — schema listo: `pago.codigo_transaccion` ya es `@unique` |
+| 16 | CU-47 | Identificando contratos morosos en revisión diaria automática | Deuda · conjunto G8 | ⏳ Pendiente |
+| 17 | CU-51 | Registrando bitácora de eventos de suspensión y reactivación | SmartOLT · conjunto G8 | ⏳ Pendiente — podría reutilizar `log_auditoria` en vez de un modelo nuevo. Como CU-49 y CU-50, queda del lado de quien opera SmartOLT (**G3**) |
+| 18 | CU-54 | Asignando fecha de vencimiento fija a un contrato | Deuda · conjunto G8 | ⏳ Pendiente — `contrato` no tiene campo de fecha de vencimiento fija en el schema (solo `dia_vencimiento`, un día del mes) |
+| 19 | CU-55 | Consultando lista de contratos con saldos vencidos | Deuda · conjunto G8 | ⏳ Pendiente |
+| 20 | CU-56 | Gestionando seguimiento de contrato vencido seleccionado | Deuda · conjunto G8 | ⏳ Pendiente |
+| 21 | CU-57 | Generando reporte financiero del período seleccionado | Administración · conjunto G8 | ⏳ Pendiente |
+| 22 | CU-78 | Actualizando estado y cerrando ticket de soporte asignado | Soporte · conjunto G8 | ⏳ Pendiente — es un flujo de agente/admin, no del portal de cliente |
+| 23 | CU-80 | Configurando parámetros de detección de morosidad | Deuda · conjunto G8 | ⏳ Pendiente — no hay modelo de configuración para esto todavía |
 
 > **Reparto con el Grupo 8.** El documento `CU_Grupo2_Equivalencias_Grupo8_Incremento2.pdf`
 > cerró el alcance de este incremento: 7 CU son 100% nuestros, 5 se trabajan en conjunto con G8
@@ -145,51 +161,75 @@ Una rama por bloque, todas creadas desde `dev` el 2026-08-20 (ver [CONTRIBUTING.
 | `incremento-2/autogestion` | Autogestión | CU-31, CU-32, CU-33 |
 | `incremento-2/diagnostico` | Diagnóstico | CU-34, CU-36, CU-35 |
 | `incremento-2/soporte` | Soporte | CU-71, CU-78 |
-| `incremento-2/administracion` | Administración | CU-57, CU-58, CU-06 |
+| `incremento-2/administracion` | Administración | CU-57, CU-58 |
 | `incremento-2/mapa` | Mapa | CU-59, CU-60, CU-61, CU-62 |
+
+> **Ojo:** estas ramas se crearon el 2026-08-20, antes de la reorganización del 2026-09-28.
+> Varios de los CU que listan se aplazaron al Incremento 3 + 4 (CU-46, CU-52, CU-53, CU-48,
+> CU-49, CU-50, CU-33, CU-36 y CU-58), y `incremento-2/administracion` se quedó sin el CU-06.
+> La tabla se deja tal como estaba porque describe para qué se abrió cada rama.
 
 El orden de dependencia real es el que describe el criterio de agrupación: `deuda` (en especial CU-54) antes que `smartolt`, y `nucleo-pago` puede avanzar en paralelo. `mapa` y `autogestion`/`diagnostico` no dependen de nada del resto del incremento.
 
 ---
 
-## Incremento 3 — Pasarelas de pago y asistente virtual
+## Incremento 3 + 4 — Pasarelas, asistente virtual, notificaciones y cierre técnico
 
-12 CU · 15% · No iniciado
+23 CU · 28,75% · **Estado: en curso** (arrancado el 2026-09-28)
 
-> **Nota:** el schema de Prisma ya tiene modelado `conversacion_bot`, `mensaje_bot`, `plantilla_notificacion` y `log_notificacion` — el diseño de datos para este incremento ya existe, no arranca de cero cuando llegue el momento. `apps/view/app/portal/_lib/portal-actions.ts` también tiene ya un `initiatePayment()` que llama a `POST /portal/payment/initiate` (endpoint que todavía no existe en el backend) — scaffolding temprano para CU-42/43.
+> **Nota:** el schema ya tiene modelados `conversacion_bot`, `mensaje_bot`,
+> `plantilla_notificacion`, `log_notificacion` y `consentimiento_cookies` — el diseño de
+> datos de este incremento ya existe y no arranca de cero.
 
 ### Criterio de agrupación (del documento fuente)
 
-> CU-42 y CU-43 incorporan el canal de pago en línea sobre una capa de dominio ya construida y verificada en el Incremento 2. Ambas pasarelas se integran contra la misma interfaz de pago, lo que permite desarrollarlas en paralelo durante el Incremento 2 sin alterar la planificación, dado que el contrato de interfaz ya se encuentra definido. Este bajo acoplamiento es el fundamento de agrupar ambas integraciones en un mismo incremento.
+> Los antiguos Incremento 3 e Incremento 4 se fusionan en un único incremento. Mantiene como
+> casos propios las pasarelas de pago Webpay y Mercado Pago (CU-42, CU-43), el bloque completo
+> del asistente virtual —que requiere un esquema de datos propio para el historial
+> conversacional— (CU-63 a CU-66, CU-70, CU-77, CU-79), las notificaciones asociadas al mismo
+> canal de mensajería (CU-67 a CU-69) y el consentimiento de cookies (CU-76).
 >
-> El bloque de asistente virtual se mantiene íntegro en este incremento por requerir un esquema de datos propio para el historial conversacional. Los casos de despacho de notificaciones (CU-67, CU-68, CU-69) se ubican aquí porque comparten el canal de mensajería del asistente; adelantarlos obligaría a construir dicho canal antes de tiempo.
+> Se incorporan además los casos CU-52, CU-53, CU-46, CU-58, CU-06, CU-33, CU-36, CU-48,
+> CU-49 y CU-50, reubicados desde el Incremento 2 al quedar aplazada su coordinación con
+> Grupo 8 (recaudación externa, comprobantes de pago y suspensión/reactivación vía SmartOLT).
 
-| Prioridad | CU | Caso de uso | Bloque |
-|---|---|---|---|
-| 1 | CU-42 | Pagando deuda mediante la pasarela Webpay de Transbank | Pasarelas |
-| 2 | CU-43 | Pagando deuda mediante la pasarela Mercado Pago | Pasarelas |
-| 3 | CU-63 | Solicitando RUT al inicio de la conversación | Chatbot |
-| 4 | CU-64 | Consultando saldo y estado del servicio vía asistente | Chatbot |
-| 5 | CU-65 | Respondiendo consultas mediante el asistente virtual | Chatbot |
-| 6 | CU-66 | Reportando falla y generando solicitud de soporte | Chatbot |
-| 7 | CU-77 | Creando ticket de soporte al escalar conversación del asistente | Chatbot |
-| 8 | CU-70 | Derivando conversación a operador humano | Chatbot |
-| 9 | CU-79 | Auditando historial de sesiones del asistente virtual | Chatbot |
-| 10 | CU-67 | Despachando recordatorio de pago previo al vencimiento | Notificaciones |
-| 11 | CU-68 | Despachando aviso de corte inminente por morosidad | Notificaciones |
-| 12 | CU-69 | Despachando confirmación de pago registrado al cliente | Notificaciones |
+### Reparto: qué es nuestro y qué no
 
-## Incremento 4 — SEO, políticas, privacidad y cierre técnico
+De los 23, ocho no los desarrolla el Grupo 2. El criterio es el mismo en todos: **nuestro
+alcance es la interfaz web y el asistente virtual del cliente**, no la administración interna
+ni la operación técnica de la red.
 
-5 CU · 6,25% · En curso (rama `seo`)
+- **CU-63 a CU-66, CU-70, CU-77 y CU-79** — los lleva Dani.
+- **CU-06** — lo desarrolla el CRM (G8).
 
-| Prioridad | CU | Caso de uso | Estado |
-|---|---|---|---|
-| 1 | CU-72 | Generando etiquetas de indexación por sección y plan | ✅ — `metadataSeccion`/`metadataPlan` en `apps/view/app/_lib/seo.ts` |
-| 2 | CU-73 | Accediendo a términos, condiciones y políticas de privacidad | ✅ — `/terminos` y `/privacidad` publicadas y enlazadas desde el footer. Faltan datos que entrega Finet, ver abajo |
-| 3 | CU-74 | Generando y actualizando archivos de indexación del sitio | ✅ — `sitemap.xml` y `robots.txt` desde `apps/view/app/_lib/rutas-publicas.ts` |
-| 4 | CU-75 | Registrando aceptación de políticas de privacidad en formularios | ✅ — casilla obligatoria en contratación y registro de cuenta (no existe formulario de Contacto). La aceptación se registra en `log_auditoria` (`ACEPTAR_POLITICA_PRIVACIDAD`) dentro de la misma transacción que los datos, sin cambios de schema. Ver `apps/controller/docs/contrataciones.md` |
-| 5 | CU-76 | Gestionando consentimiento de cookies al primer ingreso | ⏳ Pendiente |
+Los demás tienen actor Administrador o Técnico, o dependen de un contrato de otro grupo que
+todavía no está publicado; cada fila lo dice.
+
+| Prioridad | CU | Caso de uso | Bloque | Estado |
+|---|---|---|---|---|
+| 1 | CU-42 | Pagando deuda mediante la pasarela Webpay de Transbank | Pasarelas | ⏳ Pendiente — el flujo se puede construir contra el ambiente de integración de la pasarela, pero el **RF-32 (registrar el pago) es dependencia directa** de este CU y el §3 del acuerdo v2.0 con G8 pone `pago` de su lado ("G2 no crea ni modifica reglas comerciales o financieras"). Falta que G8 defina cómo se registra el pago confirmado |
+| 2 | CU-43 | Pagando deuda mediante la pasarela Mercado Pago | Pasarelas | ⏳ Pendiente — el flujo se puede construir contra el ambiente de integración de la pasarela, pero el **RF-32 (registrar el pago) es dependencia directa** de este CU y el §3 del acuerdo v2.0 con G8 pone `pago` de su lado ("G2 no crea ni modifica reglas comerciales o financieras"). Falta que G8 defina cómo se registra el pago confirmado |
+| 3 | CU-63 | Solicitando RUT al inicio de la conversación | Chatbot | 🧑 **Dani** — el bloque del asistente virtual no lo llevamos nosotros (acordado el 2026-09-28) |
+| 4 | CU-64 | Consultando saldo y estado del servicio vía asistente | Chatbot | 🧑 **Dani** — el bloque del asistente virtual no lo llevamos nosotros (acordado el 2026-09-28) |
+| 5 | CU-65 | Respondiendo consultas mediante el asistente virtual | Chatbot | 🧑 **Dani** — el bloque del asistente virtual no lo llevamos nosotros (acordado el 2026-09-28) |
+| 6 | CU-66 | Reportando falla y generando solicitud de soporte | Chatbot | 🧑 **Dani** — el bloque del asistente virtual no lo llevamos nosotros (acordado el 2026-09-28) |
+| 7 | CU-77 | Creando ticket de soporte al escalar conversación del asistente | Chatbot | 🧑 **Dani** — el bloque del asistente virtual no lo llevamos nosotros (acordado el 2026-09-28) |
+| 8 | CU-70 | Derivando conversación a operador humano | Chatbot | 🧑 **Dani** — el bloque del asistente virtual no lo llevamos nosotros (acordado el 2026-09-28) |
+| 9 | CU-79 | Auditando historial de sesiones del asistente virtual | Chatbot | 🧑 **Dani** — el bloque del asistente virtual no lo llevamos nosotros (acordado el 2026-09-28) |
+| 10 | CU-67 | Despachando recordatorio de pago previo al vencimiento | Notificaciones | ✅ 2026-09-28 — tarea programada diaria en `src/notificaciones/`: detecta las facturas impagas que vencen en 3 días (RF-49) y despacha el correo con el `MailService` que ya existía. Tandas de 50 con pausa (RNF-49.1) y registro en `log_notificacion` con canal, marca de tiempo y estado (RNF-49.2). Excepción 1 (sin canal de contacto) → `omitido`; Excepción 2 (falla el despacho) → reintenta una vez y si falla queda `fallido`. Dos candados contra el correo duplicado: `pg_try_advisory_lock` entre instancias y el registro del día por cliente. Sin cambios de esquema. Ver `apps/controller/docs/notificaciones.md` |
+| 11 | CU-68 | Despachando aviso de corte inminente por morosidad | Notificaciones | ⏳ Pendiente — depende de que exista la marca de morosidad (RF-35, revisión diaria), que es CU-47/CU-80 y todavía no está implementada |
+| 12 | CU-69 | Despachando confirmación de pago registrado al cliente | Notificaciones | ⏳ Pendiente — depende de que exista un pago registrado (CU-42/CU-43) |
+| 13 | CU-76 | Gestionando consentimiento de cookies al primer ingreso | SEO/Políticas | ✅ 2026-09-28 — banner en el pie, montado en `app/layout.tsx`, con aceptar y rechazar (RF-57). La decisión persiste en una **cookie cifrada** JWE A256GCM vía `jose` (RNF-57.1, `app/_lib/cookies-consentimiento.servidor.ts`) y se registra en `consentimiento_cookies` con la IP anonimizada. Si ya hay preferencia el banner no sale y no interrumpe la navegación (Excepción 1). El gate `seguimientoPermitido()` apaga el único envío a un tercero que hace el sitio, el de Sentry en `logger.ts`. Comprobado en navegador real: ver `apps/controller/docs/consentimiento.md` |
+| 14 | CU-52 | Generando comprobante de pago en formato PDF | Núcleo de pago · aplazado de Inc. 2 | ⏳ Pendiente — schema listo: `pago.comprobante_pdf_url` ya existe |
+| 15 | CU-53 | Enviando comprobante de pago al correo del cliente | Núcleo de pago · aplazado de Inc. 2 | ⏳ Pendiente — reutilizable: `MailService`/Nodemailer ya existe (`apps/controller/src/mail/`) |
+| 16 | CU-46 | Incorporando abonos de recaudación externa al saldo del cliente | Núcleo de pago · aplazado de Inc. 2 | ⏳ Pendiente |
+| 17 | CU-58 | Descargando reporte financiero generado | Administración · aplazado de Inc. 2 | ⏳ Pendiente |
+| 18 | CU-06 | Revisando historial de IPs bloqueadas por intentos fallidos | Administración · aplazado de Inc. 2 | ✅ **Lo desarrolla el CRM (G8)**, no es nuestro: el alcance del Grupo 2 es interfaz web y asistente virtual. El módulo `src/admin/` que lo implementaba se eliminó el 2026-09-28 — ninguna interfaz del portal lo consumía. Ojo: el RF-05 (CU-05, bloqueo automático por IP) sigue siendo nuestro y no cambia; lo que salió es la **vista** del historial y el desbloqueo manual |
+| 19 | CU-33 | Ejecutando cambio de clave WiFi solicitado por el cliente | Autogestión · aplazado de Inc. 2 | ⏳ Pendiente — la ejecución real contra el equipo del cliente (ONT/router) no está implementada y no es nuestra. **Quién la hace**: según el acuerdo de integración de G8 del 12-09-2026, **G8 valida comercialmente y G3 ejecuta técnicamente** (SmartOLT es de G3, ver la nota de reparto más abajo). Antes teníamos anotado que la aplicaba G8 vía Smart OLT; ese documento lo corrige. **Cómo obtienen la clave**: descifran `solicitud_contrasena_wifi.password_nueva_cifrada` con la llave privada RSA (nosotros ciframos con la pública, `CRM_PUBLIC_KEY`), y al marcar `APLICADA` dejan esa columna en `NULL` — con eso la fila deja de guardar cualquier secreto. Si la columna cifrada llega en `NULL` es que faltaba la llave: hay que pedirle la clave al cliente. **Abierto**: de quién es la llave privada, de G8 o de G3 — lo tienen que definir entre ellos |
+| 20 | CU-36 | Ejecutando evaluación de red para diagnóstico técnico | Diagnóstico · aplazado de Inc. 2 | ⏳ Pendiente — alcance a confirmar con el equipo (no hay evidencia de un flujo propio más allá del widget de Ookla) |
+| 21 | CU-48 | Suspendiendo servicio por morosidad mediante SmartOLT | SmartOLT · aplazado de Inc. 2 | ⏳ Pendiente — sin integración SmartOLT en el código. **Derivado**: la detección de morosidad es de G8 y la ejecución en SmartOLT es de **G3** (acuerdo del 12-09-2026) |
+| 22 | CU-49 | Aplicando recargo de reconexión al saldo del cliente suspendido | SmartOLT · aplazado de Inc. 2 | ⏳ Pendiente |
+| 23 | CU-50 | Reactivando servicio de cliente suspendido tras pago total | SmartOLT · aplazado de Inc. 2 | ⏳ Pendiente |
 
 ### Pendientes del CU-73
 
@@ -266,7 +306,6 @@ El documento de incrementos no cubre RF-XX — estos números vienen de `apps/co
 | RF-02 | Logout | CU-02 |
 | RF-03 | Recuperación de contraseña vía email, sin revelar si el RUT existe | CU-03 |
 | RF-05 | Bloqueo temporal por intentos fallidos por IP (5 en 5 min → 15 min) | CU-05 |
-| RF-06 | Desbloqueo manual de IP por admin | CU-06 |
 | RF-07 | Cierre de sesión automático por inactividad (15 min) | CU-12 |
 | RF-09 | Política de complejidad de contraseña (mín. 8, 1 mayúscula, 1 número) | CU-03, CU-10, CU-11 |
 | RF-10 | Registro: email obligatorio, confirmación de contraseña, unicidad de RUT/email | CU-04 |
