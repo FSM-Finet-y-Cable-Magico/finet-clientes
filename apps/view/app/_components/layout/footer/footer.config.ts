@@ -32,9 +32,10 @@ export const footerColumns: FooterColumn[] = [
 ];
 
 export const legalLinks: FooterLink[] = [
-  { label: 'Términos', href: '/legal/terminos' },
-  { label: 'Privacidad', href: '/legal/privacidad' },
-  { label: 'Ley 21.398', href: '/legal/ley-21398' },
-  { label: 'Reglamento de reclamos', href: '/legal/reclamos' },
-  { label: 'Subtel', href: 'https://www.subtel.gob.cl/' },
+  // CU-73: Ley 21.398 y el reglamento de reclamos son secciones de Términos,
+  // no páginas propias.
+  { label: 'Términos', href: '/terminos' },
+  { label: 'Privacidad', href: '/privacidad' },
+  { label: 'Reclamos', href: '/terminos#reclamos' },
+  { label: 'Subtel', href: 'https://tramites.subtel.gob.cl' },
 ];

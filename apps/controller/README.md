@@ -30,7 +30,6 @@ Variables principales:
 
 - `DATABASE_URL` — conexión a PostgreSQL
 - `JWT_SECRET` — secreto para firmar JWT
-- `ADMIN_API_KEY` — clave para endpoints admin
 - `SESSION_INACTIVITY_MINUTES` — minutos de inactividad para expirar sesión (default: 15)
 - `CORS_ORIGIN` — lista separada por comas de orígenes CORS permitidos
 - `FRONTEND_URL` — URL base del frontend para recuperación de contraseña

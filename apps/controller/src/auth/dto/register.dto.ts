@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { validateRut } from '../../common/utils/rut.js';
+import { aceptacionPoliticaShape } from '../../common/politica-privacidad.js';
 
 export const registerSchema = z
   .object({
+    ...aceptacionPoliticaShape,
     rut: z
       .string()
       .min(1, 'RUT es requerido')
@@ -21,7 +23,7 @@ export const registerSchema = z
       .min(1, 'Email es requerido')
       .email('Email inválido')
       .max(120),
-    telefono: z.string().max(21).optional().or(z.literal('')),
+    telefono: z.string().max(20).optional().or(z.literal('')),
     password: z
       .string()
       .min(8, 'Contraseña debe tener al menos 8 caracteres')

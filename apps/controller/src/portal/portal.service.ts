@@ -8,14 +8,29 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { constants, publicEncrypt } from 'node:crypto';
+import { constants, publicEncrypt, randomUUID } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  ErrorClaveWifiG3,
+  G3WifiService,
+  type RespuestaClaveWifiG3,
+} from '../common/g3/g3-wifi.service.js';
+import {
+  G8IntegracionService,
+  type ResultadoWifiG8,
+} from '../common/g8/g8-integracion.service.js';
+import {
+  COMPROBANTE_G8_DEFINIDO,
+  TICKET_WIFI_DEFINIDO,
+} from '../common/pendientes.js';
 import {
   ESTADOS_CONTRATO_VIGENTES,
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
 import { MailService } from '../mail/mail.service.js';
+import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
 import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
 import {
@@ -24,11 +39,15 @@ import {
   ContratoResumenDto,
   CrearTicketResponseDto,
   FacturaPendienteDto,
+  PagosAnterioresDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
   SolicitudContrasenaWifiResponseDto,
   TicketsResponseDto,
 } from './dto/portal-response.dto.js';
+
+const NO_SE_PUDO_REGISTRAR_WIFI =
+  'No fue posible registrar tu solicitud. Intenta nuevamente mas tarde.';
 
 @Injectable()
 export class PortalService {
@@ -38,6 +57,8 @@ export class PortalService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
+    private readonly g3Wifi: G3WifiService,
+    private readonly g8: G8IntegracionService,
   ) {}
 
   //  CU-23: Consultar estado operativo del contrato
@@ -293,6 +314,83 @@ export class PortalService {
     };
   }
 
+  //  CU-52: los pagos anteriores del cliente, para descargar su comprobante.
+  //
+  //  Se lee `pago` directo, como permite el §5 del acuerdo v2.0. Un pago es del
+  //  cliente si lo dice su `id_cliente` o si su factura es de un contrato suyo:
+  //  `id_cliente` puede venir vacío. No se lee `comprobante_estado`, que todavía
+  //  no existe: está en la migración pendiente de G8.
+  async getPagosAnteriores(idCliente: number): Promise<PagosAnterioresDto> {
+    const pagos = await this.prisma.pago.findMany({
+      where: this.pagosDelCliente(idCliente),
+      select: {
+        id_pago: true,
+        fecha_pago: true,
+        monto: true,
+        pasarela: true,
+        factura: { select: { periodo_mes: true, periodo_anio: true } },
+      },
+      orderBy: { fecha_pago: 'desc' },
+    });
+
+    return {
+      comprobante_disponible: COMPROBANTE_G8_DEFINIDO,
+      pagos: pagos.map((p) => ({
+        id_pago: p.id_pago,
+        fecha_pago: p.fecha_pago.toISOString(),
+        periodo: p.factura
+          ? this.formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
+          : null,
+        monto: Number(p.monto),
+        pasarela: this.nombreMedio(p.pasarela),
+      })),
+    };
+  }
+
+  //  CU-52: el comprobante de un pago del cliente.
+  //
+  //  El comprobante es la boleta (reunión con G8): la emite G8, y la descarga va
+  //  por su `GET …/payments/{id_pago}/tax-document` (respuesta del 02-10, §10).
+  //  Mientras G8 no lo implemente y Finet no confirme la descarga
+  //  (`COMPROBANTE_G8_DEFINIDO`), la llamada no se escribe y el cliente cae en la
+  //  Excepción 2 del CU-52: el comprobante no está disponible.
+  async getComprobante(idCliente: number, idPago: number): Promise<never> {
+    // Si el pago es de otro cliente se responde 404, igual que si no existiera:
+    // no se confirma su existencia.
+    const pago = await this.prisma.pago.findFirst({
+      where: { id_pago: idPago, ...this.pagosDelCliente(idCliente) },
+      select: { id_pago: true },
+    });
+    if (!pago) {
+      throw new NotFoundException('No encontramos ese pago');
+    }
+
+    throw new ServiceUnavailableException(
+      'El comprobante de este pago no está disponible en este momento. Intenta más tarde.',
+    );
+  }
+
+  /**
+   * El nombre del medio, el mismo que muestra `/pagar` (`webpay` → Webpay). El
+   * §11.15 no define un enum de medio de pago, así que un valor que no
+   * conocemos se muestra tal como está guardado.
+   */
+  private nombreMedio(pasarela: string): string {
+    const medio = MEDIOS_PAGO.find(
+      (m) => m.id === pasarela.trim().toLowerCase(),
+    );
+    return medio?.nombre ?? pasarela;
+  }
+
+  private pagosDelCliente(idCliente: number): Prisma.pagoWhereInput {
+    return {
+      OR: [
+        { id_cliente: idCliente },
+        { factura: { contrato: { id_cliente: idCliente } } },
+      ],
+    };
+  }
+
   async getCategoriasTicket(): Promise<CategoriaTicketDto[]> {
     return this.prisma.categoria_falla.findMany({
       select: { id_categoria: true, nombre: true },
@@ -488,25 +586,21 @@ export class PortalService {
 
   //  CU-31 + CU-32: Solicitud de cambio de contrasena de la red WiFi
   //
-  //  El portal NO cambia la clave: solo deja registrada la solicitud para que el
-  //  CRM la ejecute contra el equipo del cliente (CU-33).
+  //  El portal NO cambia la clave: deja registrada la solicitud, y ejecutarla es
+  //  el CU-33, de Grupo 3. El formato ya viene validado por Zod en el
+  //  controller (CU-31 / RF-24).
   //
-  //  La clave NO se guarda en texto plano: va en `password_nueva_cifrada`,
-  //  cifrada con la llave publica del CRM. Solo Grupo 8 tiene la privada, asi
-  //  que en nuestra base no hay nada legible, y ellos la descifran para
-  //  escribirla en el equipo (el router la necesita en claro: la usa para
-  //  derivar la PSK de WPA2). La borran al marcar la solicitud APLICADA, y ahi
-  //  la fila deja de tener cualquier secreto.
-  //
-  //  Se descarto guardar tambien un hash bcrypt: solo habria servido para
-  //  "verificar" algo que ningun CU pide, y un hash de una clave WiFi corta se
-  //  saca por diccionario, asi que era un secreto extra guardado para siempre
-  //  a cambio de nada.
-  //
-  //  El formato ya viene validado por Zod en el controller (CU-31 / RF-24).
+  //  Hay dos flujos y cual corre lo decide `TICKET_WIFI_DEFINIDO`
+  //  (common/pendientes.ts):
+  //  - v1, el de hoy: la solicitud queda en `solicitud_contrasena_wifi`, con la
+  //    clave cifrada con la llave del CRM. El acuerdo v2.0 permite conservarlo
+  //    mientras tanto (§6.7).
+  //  - v2, el del acuerdo v2.0 (§6.4): ticket del CRM y la clave cifrada con la
+  //    llave de G3, enviada directo a G3. Espera a que G8 defina el ticket.
   async solicitarCambioContrasenaWifi(
     idCliente: number,
     dto: SolicitarCambioContrasenaWifiDto,
+    ticketWifiDefinido = TICKET_WIFI_DEFINIDO,
   ): Promise<SolicitudContrasenaWifiResponseDto> {
     // El contrato tiene que ser del cliente autenticado. Si es de otro, se
     // responde 404 igual que si no existiera: no se confirma su existencia.
@@ -536,15 +630,42 @@ export class PortalService {
       );
     }
 
+    return ticketWifiDefinido
+      ? this.enviarCambioWifiAG3(idCliente, contrato.id_contrato, dto.password)
+      : this.registrarCambioWifiV1(
+          idCliente,
+          contrato.id_contrato,
+          dto.password,
+        );
+  }
+
+  //  CU-32, flujo v1: la solicitud queda en `solicitud_contrasena_wifi`.
+  //
+  //  La clave NO se guarda en texto plano: va en `password_nueva_cifrada`,
+  //  cifrada con la llave publica del CRM. Solo Grupo 8 tiene la privada, asi
+  //  que en nuestra base no hay nada legible, y ellos la descifran para
+  //  escribirla en el equipo (el router la necesita en claro: la usa para
+  //  derivar la PSK de WPA2). La borran al marcar la solicitud APLICADA, y ahi
+  //  la fila deja de tener cualquier secreto.
+  //
+  //  Se descarto guardar tambien un hash bcrypt: solo habria servido para
+  //  "verificar" algo que ningun CU pide, y un hash de una clave WiFi corta se
+  //  saca por diccionario, asi que era un secreto extra guardado para siempre
+  //  a cambio de nada.
+  private async registrarCambioWifiV1(
+    idCliente: number,
+    idContrato: number,
+    clave: string,
+  ): Promise<SolicitudContrasenaWifiResponseDto> {
     try {
       // Se cifra recien aca, despues de validar el contrato: no tiene sentido
       // gastar el cifrado en un request que va a terminar en 404 o 409.
-      const passwordNuevaCifrada = this.cifrarClaveParaCrm(dto.password);
+      const passwordNuevaCifrada = this.cifrarClaveParaCrm(clave);
 
       const solicitud = await this.prisma.$transaction(async (tx) => {
         const creada = await tx.solicitud_contrasena_wifi.create({
           data: {
-            id_contrato: contrato.id_contrato,
+            id_contrato: idContrato,
             id_cliente: idCliente,
             password_nueva_cifrada: passwordNuevaCifrada,
             // MAYUSCULAS por la convencion del §11.15 del Documento 0: todo
@@ -589,8 +710,205 @@ export class PortalService {
         `No se pudo registrar la solicitud de cambio de contrasena WiFi del cliente ${idCliente}`,
         error,
       );
-      throw new ServiceUnavailableException(
-        'No fue posible registrar tu solicitud. Intenta nuevamente mas tarde.',
+      throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
+    }
+  }
+
+  //  CU-32, flujo v2: el del acuerdo v2.0 (§6.4). G2 crea el ticket (paso 3),
+  //  cifra la clave con la llave de G3 y se la manda directo (pasos 4 y 5), y G3
+  //  responde en la misma llamada (paso 7). La clave no se guarda en ninguna
+  //  parte, y G8 no recibe ni la clave ni el ciphertext (§6.5).
+  //
+  //  El estado del ticket es de G8 (§3 y §6.3): aca se crea abierto y no se
+  //  vuelve a tocar. Lo que si se hace es informarle a G8 el resultado (paso 8),
+  //  con el contrato de su respuesta del 02-10 (§12), y G8 mueve el ticket.
+  private async enviarCambioWifiAG3(
+    idCliente: number,
+    idContrato: number,
+    clave: string,
+  ): Promise<SolicitudContrasenaWifiResponseDto> {
+    // §6.2: la empresa es la del cliente autenticado. G3 la valida contra el
+    // alcance de nuestra clave de API.
+    const cliente = await this.prisma.cliente.findUnique({
+      where: { id_cliente: idCliente },
+      select: { id_empresa: true },
+    });
+    const idEmpresa = cliente?.id_empresa;
+    if (!idEmpresa) {
+      this.logger.error(
+        `El cliente ${idCliente} no tiene empresa: su cambio de clave WiFi no se puede enviar a G3`,
+      );
+      throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
+    }
+
+    // §6.6 y §10: request_id y trace_id quedan guardados antes del primer
+    // envio, en la misma transaccion que el ticket.
+    const requestId = randomUUID();
+    const traceId = randomUUID();
+    let idTicket: number;
+    try {
+      idTicket = await this.prisma.$transaction(async (tx) => {
+        const id = await this.crearTicketWifi(tx, {
+          idCliente,
+          idEmpresa,
+          idContrato,
+        });
+        await tx.log_auditoria.create({
+          data: {
+            accion: 'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+            entidad_afectada: 'ticket',
+            id_entidad_afectada: id,
+            valor_nuevo: {
+              id_contrato: idContrato,
+              request_id: requestId,
+              trace_id: traceId,
+              destino: 'G3',
+              origen: 'portal',
+            },
+          },
+        });
+        return id;
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo crear el ticket del cambio de clave WiFi del cliente ${idCliente}`,
+        error,
+      );
+      throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
+    }
+
+    let respuesta: RespuestaClaveWifiG3;
+    try {
+      respuesta = await this.g3Wifi.enviarClaveWifi({
+        clave,
+        idTicket: String(idTicket),
+        idContrato,
+        idEmpresa,
+        requestId,
+        traceId,
+      });
+    } catch (error) {
+      // El ticket queda abierto y no se crea otro (§14.12). Tampoco se le dice
+      // al cliente que quedo registrada: no se simula nada.
+      this.logger.error(
+        `G3 no registro el cambio de clave WiFi del ticket ${idTicket} (request_id ${requestId}): ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+      const statusG3 = error instanceof ErrorClaveWifiG3 ? error.status : null;
+      await this.auditarRespuestaG3(idTicket, {
+        request_id: requestId,
+        resultado: 'ERROR',
+        status_g3: statusG3,
+      });
+      await this.informarResultadoWifiG8(
+        idTicket,
+        idEmpresa,
+        traceId,
+        'ERROR_TECNICO',
+        statusG3 === null
+          ? 'G3 no respondió a la solicitud.'
+          : `G3 rechazó la solicitud (HTTP ${statusG3}).`,
+      );
+      throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
+    }
+
+    await this.auditarRespuestaG3(idTicket, {
+      request_id: requestId,
+      resultado: 'REGISTRADA',
+      id_solicitud_g3: respuesta.idSolicitud,
+      estado_g3: respuesta.estado,
+      duplicado: respuesta.duplicado,
+    });
+    // G3 la deja registrada para que un tecnico la aplique: todavia no esta
+    // aplicada, asi que no se informa APLICADO (respuesta de G8 del 02-10, §12).
+    await this.informarResultadoWifiG8(
+      idTicket,
+      idEmpresa,
+      traceId,
+      'REQUIERE_ATENCION_MANUAL',
+      'Solicitud registrada para atención por técnico.',
+    );
+
+    return {
+      id_solicitud: respuesta.idSolicitud,
+      id_contrato: idContrato,
+      estado: respuesta.estado,
+      fecha_solicitud: respuesta.fecha,
+    };
+  }
+
+  /**
+   * §6.4 paso 3: el ticket del cambio de clave WiFi, abierto, con origen PORTAL
+   * y asociado al cliente y al servicio (§6.2 y §7).
+   *
+   * Es el hueco `TICKET_WIFI_DEFINIDO`. G8 lo definio el 01-10: categoria
+   * `CAMBIO_CREDENCIALES_WIFI` y el servicio en `ticket.id_servicio` (FK a
+   * `servicio_contratado`), que nuestro esquema todavia no tiene. Mientras G8 no
+   * lo despliegue no se llega aca: el CU-32 sigue con el v1. Despues se escribe
+   * como `crearTicket`, que crea los tickets genericos del portal, y devuelve el
+   * `id_ticket`.
+   */
+  crearTicketWifi(
+    tx: Prisma.TransactionClient,
+    datos: { idCliente: number; idEmpresa: number; idContrato: number },
+  ): Promise<number> {
+    return Promise.reject(
+      new Error(
+        `Ticket WiFi del cliente ${datos.idCliente} pendiente de G8: categoria y servicio (acuerdo v2.0, §6.1 y §6.2)`,
+      ),
+    );
+  }
+
+  /**
+   * §6.4 paso 8: el resultado a G8, para que mueva el ticket (Escalado en los dos
+   * casos de hoy). Lleva su propio `request_id`, la identidad idempotente del
+   * informe, y el `trace_id` de la operacion. No lanza: si G8 no lo recibe, la
+   * solicitud del cliente no se cae, y queda en el log para reintentarlo a mano.
+   */
+  private async informarResultadoWifiG8(
+    idTicket: number,
+    idEmpresa: number,
+    traceId: string,
+    resultado: ResultadoWifiG8,
+    detalleSaneado: string,
+  ): Promise<void> {
+    const requestId = randomUUID();
+    try {
+      await this.g8.informarResultadoWifi({
+        idTicket,
+        idEmpresa,
+        requestId,
+        traceId,
+        resultado,
+        detalleSaneado,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo informar a G8 el resultado ${resultado} del ticket ${idTicket} (request_id ${requestId}): ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+    }
+  }
+
+  /**
+   * La respuesta de G3, saneada: nunca la clave ni el ciphertext (§12). Si no se
+   * puede escribir no se le cae la solicitud al cliente, que G3 ya registro.
+   */
+  private async auditarRespuestaG3(
+    idTicket: number,
+    valor: Prisma.InputJsonObject,
+  ): Promise<void> {
+    try {
+      await this.prisma.log_auditoria.create({
+        data: {
+          accion: 'RESPUESTA_G3_CAMBIO_CONTRASENA_WIFI',
+          entidad_afectada: 'ticket',
+          id_entidad_afectada: idTicket,
+          valor_nuevo: valor,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo auditar la respuesta de G3 del ticket ${idTicket}`,
+        error,
       );
     }
   }

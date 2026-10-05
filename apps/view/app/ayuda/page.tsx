@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { metadataSeccion } from "../_lib/seo";
 import { faqJsonLd } from "../_lib/jsonld";
 import { WHATSAPP_URL } from "../_lib/company";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = metadataSeccion({
+  path: "/ayuda",
   title: "Ayuda y Preguntas Frecuentes",
   description:
     "Resuelve tus dudas sobre contratacion, instalacion, cobertura, pagos y soporte de Finet. Preguntas frecuentes de Internet fibra optica en La Pintana y Puente Alto.",
-};
+});
 
 const faqs = [
   {

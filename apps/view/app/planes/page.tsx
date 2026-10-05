@@ -1,18 +1,27 @@
 import type { Metadata } from "next";
+import { metadataSeccion, resumenPlanes } from "../_lib/seo";
 import { getLandingPlanes } from "../_lib/api";
 import { itemListJsonLd } from "../_lib/jsonld";
 import PlanesClient from "../_components/catalog/PlanesClient";
 
-export const metadata: Metadata = {
-  title: "Planes de Internet Fibra Optica",
-  description:
-    "Descubre nuestros planes de Internet fibra optica. Fibra Hogar, Fibra Plus y Fibra Empresa en La Pintana, Puente Alto y La Florida. Contrata hoy.",
-  openGraph: {
-    title: "Planes de Internet Fibra Optica | Finet",
-    description:
+export async function generateMetadata(): Promise<Metadata> {
+  const resumen = resumenPlanes(await getLandingPlanes());
+  // Cantidad y precio en vez de los nombres: la lista puede crecer y la
+  // descripcion no pasa de ~160 caracteres.
+  const planes = resumen
+    ? resumen.cantidad === 1
+      ? `plan de Internet fibra optica desde ${resumen.precioDesde}`
+      : `${resumen.cantidad} planes de Internet fibra optica desde ${resumen.precioDesde}`
+    : "planes de Internet fibra optica";
+
+  return metadataSeccion({
+    path: "/planes",
+    title: "Planes de Internet Fibra Optica",
+    description: `Descubre ${resumen?.cantidad === 1 ? "nuestro" : "nuestros"} ${planes} en La Pintana, Puente Alto y La Florida. Contrata hoy.`,
+    shareDescription:
       "Planes con fibra optica simetrica en La Pintana y Puente Alto.",
-  },
-};
+  });
+}
 
 export default async function PlanesPage() {
   const planes = await getLandingPlanes();

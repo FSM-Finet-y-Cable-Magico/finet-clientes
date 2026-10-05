@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Search,
   AlertCircle,
@@ -316,14 +317,17 @@ export default function DeudaLookupForm() {
                 <p className="text-sm text-muted mt-1">
                   Saldo pendiente
                 </p>
-                {/* TODO: enlazar a la pasarela de pago (CU-42+). Por ahora sin acción. */}
-                <button
-                  type="button"
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-background shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
+                <Link
+                  href={
+                    modo === "rut"
+                      ? `/pagar?rut=${encodeURIComponent(cleanRut(rut))}`
+                      : `/pagar?abonado=${encodeURIComponent(codigo.trim())}`
+                  }
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-on-accent shadow-sm transition-all hover:shadow-md hover:brightness-105 active:scale-[0.98]"
                 >
                   <CreditCard size={16} aria-hidden />
                   Pagar ahora
-                </button>
+                </Link>
               </>
             ) : (
               <p className="mt-4 text-lg font-semibold text-success">

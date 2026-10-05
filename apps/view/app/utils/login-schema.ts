@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MENSAJE_POLITICA_REQUERIDA } from "../_lib/legal";
 
 export function cleanRut(rut: string) {
   return rut.replace(/[^0-9kK]/g, "").toUpperCase();
@@ -82,6 +83,8 @@ export const registerSchema = z
     confirmPassword: z
       .string({ message: "Debes confirmar la contraseña" })
       .min(1, "Debes confirmar la contraseña"),
+    // CU-75: casilla obligatoria de la Política de Privacidad.
+    aceptaPolitica: z.literal(true, { error: MENSAJE_POLITICA_REQUERIDA }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Las contraseñas no coinciden",

@@ -1,5 +1,16 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  ServiceUnavailableException,
+  UseGuards,
+} from '@nestjs/common';
 import { PortalService } from './portal.service.js';
+import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentClient } from '../auth/decorators/current-client.decorator.js';
 import type { cliente } from '../../generated/prisma/client.js';
@@ -24,7 +35,10 @@ import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasen
 @Controller('portal')
 @UseGuards(JwtAuthGuard)
 export class PortalController {
-  constructor(private readonly portalService: PortalService) {}
+  constructor(
+    private readonly portalService: PortalService,
+    private readonly enlaces: EnlacePagoService,
+  ) {}
 
   /**
    * CU-24: Panel principal del Portal Cliente
@@ -127,6 +141,48 @@ export class PortalController {
     return this.portalService.getResumenDeuda(cliente.id_cliente);
   }
 
+  /**
+   * CU-52: Pagos anteriores del cliente, para descargar su comprobante
+   *
+   * GET /portal/pagos
+   * Auth: Bearer <token>
+   *
+   * Respuesta: PagosAnterioresDto
+   *   - comprobante_disponible: boolean (false mientras G8 no implemente la
+   *     boleta en su tax-document: ver COMPROBANTE_G8_DEFINIDO)
+   *   - pagos: id_pago, fecha_pago (ISO), periodo ("Abril 2026" o null),
+   *     monto, pasarela. Del más nuevo al más viejo
+   *
+   * Errores:
+   *   401 - Sesión expirada por inactividad / Token JWT inválido
+   */
+  @Get('pagos')
+  getPagosAnteriores(@CurrentClient() cliente: cliente) {
+    return this.portalService.getPagosAnteriores(cliente.id_cliente);
+  }
+
+  /**
+   * CU-52: Comprobante en PDF de un pago del cliente
+   *
+   * GET /portal/pagos/:id/comprobante
+   * Auth: Bearer <token>
+   *
+   * El PDF lo genera G8. Mientras su endpoint no esté desplegado, responde 503
+   * (Excepción 2 del CU-52).
+   *
+   * Errores:
+   *   401 - Sesión expirada por inactividad / Token JWT inválido
+   *   404 - El pago no existe o no es del cliente
+   *   503 - El comprobante no está disponible en este momento
+   */
+  @Get('pagos/:id/comprobante')
+  getComprobante(
+    @CurrentClient() cliente: cliente,
+    @Param('id', ParseIntPipe) idPago: number,
+  ) {
+    return this.portalService.getComprobante(cliente.id_cliente, idPago);
+  }
+
   @Get('tickets/categorias')
   getCategoriasTicket() {
     return this.portalService.getCategoriasTicket();
@@ -181,26 +237,30 @@ export class PortalController {
    * Auth: Bearer <token>
    *
    * Este endpoint NO cambia la clave del WiFi. Solo deja registrada la
-   * solicitud para que el CRM la ejecute despues contra el equipo del cliente
-   * (CU-33). La respuesta confirma que la solicitud quedo creada, nada mas.
+   * solicitud: aplicarla es el CU-33, de Grupo 3. La respuesta confirma que la
+   * solicitud quedo creada, nada mas.
    *
    * Body: { id_contrato: number, password: string }
    *   - password: 8 a 63 caracteres, sin espacios en blanco. Se permiten
    *     simbolos (decision del equipo, diverge de CU-31/RF-24 escritos —
    *     ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md)
-   *   - se guarda cifrada con la llave publica del CRM en
-   *     `solicitud_contrasena_wifi.password_nueva_cifrada`: no queda en texto
-   *     plano y solo el CRM puede leerla (la necesita para aplicarla)
+   *   - nunca queda en texto plano. Hoy (v1) se guarda en
+   *     `solicitud_contrasena_wifi.password_nueva_cifrada`, cifrada con la llave
+   *     publica del CRM. Cuando G8 defina el ticket WiFi (v2, acuerdo v2.0
+   *     §6.4) se crea el ticket y la clave va cifrada con la llave de G3,
+   *     directo a G3, sin guardarse en ninguna parte
    *
    * Respuesta: SolicitudContrasenaWifiResponseDto
-   *   - id_solicitud, id_contrato, estado ("PENDIENTE"), fecha_solicitud
+   *   - id_solicitud, id_contrato, estado ("PENDIENTE"), fecha_solicitud. En el
+   *     v2, id_solicitud, estado y fecha son los que devuelve G3
    *
    * Errores:
    *   400 - La clave no cumple el formato (CU-32 Excepcion 3)
    *   401 - Sesion expirada por inactividad (CU-32 Excepcion 1)
    *   404 - El servicio seleccionado no es del cliente o no existe
    *   409 - El servicio no esta activo (CU-32 Excepcion 2)
-   *   503 - No fue posible registrar la solicitud
+   *   503 - No fue posible registrar la solicitud (en el v2, tambien si G3
+   *         no la registro)
    */
   @Post('wifi/password')
   solicitarCambioContrasenaWifi(
@@ -212,5 +272,29 @@ export class PortalController {
       cliente.id_cliente,
       body,
     );
+  }
+
+  /**
+   * CU-42 / CU-43 desde el portal: el enlace para pagar la deuda de este
+   * cliente. Es el mismo enlace firmado del aviso de corte (RNF-50.1), así el
+   * RUT no queda en la URL.
+   *
+   * GET /portal/enlace-pago → { enlace: "/pagar?t=…" }
+   *
+   * Errores:
+   *   401 - Sesión expirada por inactividad
+   *   503 - Falta ENLACE_PAGO_SECRET: el pago en línea no está disponible
+   */
+  @Get('enlace-pago')
+  enlacePago(@CurrentClient() cliente: cliente): { enlace: string } {
+    try {
+      return {
+        enlace: `/pagar?t=${this.enlaces.crearEnlacePago(cliente.id_cliente)}`,
+      };
+    } catch {
+      throw new ServiceUnavailableException(
+        'El pago en línea no está disponible por ahora.',
+      );
+    }
   }
 }

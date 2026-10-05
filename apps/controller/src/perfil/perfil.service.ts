@@ -94,7 +94,9 @@ export class PerfilService {
           cliente.telefono !== null
             ? { telefono: cliente.telefono }
             : undefined,
-        valor_nuevo: { telefono: dto.telefono },
+        // El acuerdo v2.0 con G8 pide auditar el origen PORTAL de este cambio
+        // (§3 y §12): el teléfono lo puede escribir más de un grupo.
+        valor_nuevo: { telefono: dto.telefono, origen: 'PORTAL' },
         ip_origen: ip,
       },
     });
@@ -164,7 +166,8 @@ export class PerfilService {
         id_entidad_afectada: idCliente,
         valor_anterior:
           cliente.email !== null ? { email: cliente.email } : undefined,
-        valor_nuevo: { email: dto.email },
+        // Origen PORTAL por el acuerdo v2.0 con G8 (§3 y §12), igual que el teléfono.
+        valor_nuevo: { email: dto.email, origen: 'PORTAL' },
         ip_origen: ip,
       },
     });

@@ -17,8 +17,6 @@ Base URL: `http://localhost:4000/api`
 | `PATCH` | `/auth/perfil/telefono` | JWT | 10 req/min | Actualizar teléfono |
 | `PATCH` | `/auth/perfil/email` | JWT | 10 req/min | Actualizar correo electrónico |
 | `PATCH` | `/auth/perfil/password` | JWT | 10 req/min | Cambiar contraseña |
-| `GET` | `/admin/intentos-fallidos` | API Key | 10 req/min | Historial de intentos fallidos |
-| `POST` | `/admin/intentos-fallidos/desbloquear-ip` | API Key | 10 req/min | Desbloquear una IP manualmente |
 
 ---
 
@@ -74,8 +72,8 @@ Content-Type: application/json
   "nombre_completo": "Juan Perez",
   "email": "juan@ejemplo.cl",
   "telefono": "912345678",
-  "password": "MiClave1",
-  "password_confirmation": "MiClave1"
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>"
 }
 ```
 
@@ -158,7 +156,7 @@ Content-Type: application/json
 
 {
   "token": "eyJhbGciOi...",
-  "password": "NuevaClave1"
+  "password": "<contraseña nueva>"
 }
 ```
 
@@ -244,7 +242,7 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "telefono": "+56987654321"
 }
 ```
@@ -284,7 +282,7 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "email": "nuevo@correo.cl"
 }
 ```
@@ -323,9 +321,9 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
-  "password_nuevo": "NuevaClave2!",
-  "password_confirmacion": "NuevaClave2!"
+  "password_actual": "<contraseña actual>",
+  "password_nuevo": "<contraseña nueva>",
+  "password_confirmacion": "<contraseña nueva>"
 }
 ```
 
@@ -353,93 +351,6 @@ Content-Type: application/json
 | 400 | La nueva contraseña no puede ser igual a la actual | Misma contraseña |
 | 401 | La contraseña actual es incorrecta | Password actual incorrecta |
 | 401 | Sesión expirada por inactividad | Sesión inactiva |
-
----
-
-## GET /admin/intentos-fallidos
-
-Consulta el historial de intentos fallidos de login. Requiere API Key.
-
-```
-GET /api/admin/intentos-fallidos?bloqueados=true&page=1&limit=20
-X-API-Key: <ADMIN_API_KEY>
-```
-
-**Query params (todos opcionales):**
-
-| Param | Tipo | Default | Descripción |
-|---|---|---|---|
-| `rut` | string | — | Filtra por RUT exacto (sin puntos ni guión) |
-| `ip` | string | — | Filtra por dirección IP exacta |
-| `bloqueados` | `true` \| `false` | — | Solo con bloqueo activo (`bloqueado_hasta > now`) o inactivos |
-| `desde` | string (fecha) | — | Intentos desde esta fecha (`YYYY-MM-DD`) |
-| `hasta` | string (fecha) | — | Intentos hasta esta fecha (`YYYY-MM-DD`) |
-| `page` | number | 1 | Número de página |
-| `limit` | number | 20 | Resultados por página (max 100) |
-
-**Respuesta 200:**
-```json
-{
-  "data": [
-    {
-      "id_intento": "15",
-      "rut_intentado": "123456785",
-      "ip_address": "192.168.1.50",
-      "timestamp": "2026-05-30T14:00:00.000Z",
-      "bloqueado_hasta": "2026-05-30T14:15:00.000Z"
-    }
-  ],
-  "total": 45,
-  "page": 1,
-  "limit": 20
-}
-```
-
-**Errores:**
-| Código | Causa |
-|---|---|
-| 401 | Falta header `X-API-Key`, key inválida, o `ADMIN_API_KEY` no configurado |
-
----
-
-## POST /admin/intentos-fallidos/desbloquear-ip
-
-Desbloquea manualmente una IP, eliminando el `bloqueado_hasta` de todos los registros activos. La acción queda registrada en `log_auditoria`.
-
-```
-POST /api/admin/intentos-fallidos/desbloquear-ip
-X-API-Key: <ADMIN_API_KEY>
-Content-Type: application/json
-
-{
-  "ip": "192.168.1.50"
-}
-```
-
-**Respuesta 200:**
-```json
-{
-  "desbloqueado": true,
-  "registros_afectados": 5
-}
-```
-
-**IP no bloqueada — Respuesta 200:**
-```json
-{
-  "desbloqueado": false,
-  "registros_afectados": 0
-}
-```
-
-**Errores:**
-| Código | Causa |
-|---|---|
-| 400 | IP con formato inválido |
-| 401 | API Key inválida o faltante |
-
----
-
 ## Sesiones e inactividad
 
 - Cada login/register crea una sesión en `sesion_portal` con `fecha_expiracion = now + 15 min`.
@@ -472,7 +383,6 @@ Configurado via `ThrottlerGuard` global en `app.module.ts`:
 |---|---|---|
 | `DATABASE_URL` | Sí | Conexión PostgreSQL |
 | `JWT_SECRET` | Sí | Secreto para firmar JWT |
-| `ADMIN_API_KEY` | Sí | API Key para endpoints admin |
 | `SESSION_INACTIVITY_MINUTES` | No (default: 15) | Minutos de inactividad para expirar sesión |
 | `FRONTEND_URL` | Sí | URL base del frontend para enlaces de recuperación |
 | `SMTP_HOST` | No (default: localhost) | Servidor SMTP para envío de emails |
@@ -494,12 +404,12 @@ BASE_URL=http://localhost:4000/api
 # Login
 curl -X POST "$BASE_URL/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"rut":"12.345.678-5","password":"MiClave1"}'
+  -d '{"rut":"12.345.678-5","password":"<contraseña>"}'
 
 # Register
 curl -X POST "$BASE_URL/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"rut":"12.345.678-5","nombre_completo":"Juan Perez","email":"juan@test.cl","password":"MiClave1","password_confirmation":"MiClave1"}'
+  -d '{"rut":"12.345.678-5","nombre_completo":"Juan Perez","email":"juan@test.cl","password":"<contraseña>","password_confirmation":"<contraseña>"}'
 
 # Recuperar password
 curl -X POST "$BASE_URL/auth/recuperar-password" \
@@ -509,7 +419,7 @@ curl -X POST "$BASE_URL/auth/recuperar-password" \
 # Restablecer password
 curl -X POST "$BASE_URL/auth/restablecer-password" \
   -H "Content-Type: application/json" \
-  -d '{"token":"<token>","password":"NuevaClave1"}'
+  -d '{"token":"<token>","password":"<contraseña nueva>"}'
 
 # Perfil
 curl -X GET "$BASE_URL/auth/perfil" \
@@ -519,33 +429,23 @@ curl -X GET "$BASE_URL/auth/perfil" \
 curl -X PATCH "$BASE_URL/auth/perfil/telefono" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","telefono":"+56987654321"}'
+  -d '{"password_actual":"<contraseña actual>","telefono":"+56987654321"}'
 
 # Actualizar email
 curl -X PATCH "$BASE_URL/auth/perfil/email" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","email":"nuevo@correo.cl"}'
+  -d '{"password_actual":"<contraseña actual>","email":"nuevo@correo.cl"}'
 
 # Cambiar contraseña
 curl -X PATCH "$BASE_URL/auth/perfil/password" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","password_nuevo":"NuevaClave2!","password_confirmacion":"NuevaClave2!"}'
+  -d '{"password_actual":"<contraseña actual>","password_nuevo":"<contraseña nueva>","password_confirmacion":"<contraseña nueva>"}'
 
 # Logout
 curl -X POST "$BASE_URL/auth/logout" \
   -H "Authorization: Bearer <jwt>"
-
-# Admin - Intentos fallidos
-curl -X GET "$BASE_URL/admin/intentos-fallidos?bloqueados=true" \
-  -H "X-API-Key: finet-admin-key-2026-dev"
-
-# Admin - Desbloquear IP
-curl -X POST "$BASE_URL/admin/intentos-fallidos/desbloquear-ip" \
-  -H "X-API-Key: finet-admin-key-2026-dev" \
-  -H "Content-Type: application/json" \
-  -d '{"ip":"192.168.1.50"}'
 ```
 
 ## Seguridad aplicada
@@ -584,9 +484,6 @@ curl -X POST "$BASE_URL/admin/intentos-fallidos/desbloquear-ip" \
 | `src/mail/mail.service.ts` | Servicio de envío de emails (nodemailer) |
 | `src/mail/mail.module.ts` | Módulo global de mail |
 | `src/common/utils/rut.ts` | Limpieza y validación de RUT chileno |
-| `src/admin/admin.controller.ts` | Endpoints admin |
-| `src/admin/admin.service.ts` | Lógica de admin |
-| `src/admin/guards/api-key.guard.ts` | Guard para API Key |
 | `src/app.module.ts` | Módulo raíz con ThrottlerGuard global |
 
 ## Email en desarrollo

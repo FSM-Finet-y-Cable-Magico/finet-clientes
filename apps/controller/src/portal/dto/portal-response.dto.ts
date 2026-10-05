@@ -52,6 +52,22 @@ export interface FacturaPendienteDto {
   dias_vencida: number | null; // null si aún no vence
 }
 
+// ─── CU-52: Pagos anteriores y su comprobante ────────────────────────────────
+// El cliente ve sus pagos y descarga el comprobante del que quiera. El PDF lo
+// genera G8; `comprobante_disponible` dice si su endpoint ya se puede usar.
+export interface PagosAnterioresDto {
+  comprobante_disponible: boolean;
+  pagos: PagoAnteriorDto[];
+}
+
+export interface PagoAnteriorDto {
+  id_pago: number;
+  fecha_pago: string; // ISO 8601: es un instante, la vista lo muestra en hora de Chile
+  periodo: string | null; // "Abril 2026"; null si el pago no tiene factura asociada
+  monto: number;
+  pasarela: string; // "Webpay" o "Mercado Pago"; otro valor va tal cual (el §11.15 no define el enum)
+}
+
 // ─── CU-29 / CU-30: Tickets de soporte ───────────────────────────────────────
 export interface TicketsResponseDto {
   total: number;
@@ -83,12 +99,12 @@ export interface CrearTicketResponseDto {
 }
 
 // ─── CU-32: Solicitud de cambio de contrasena de la red WiFi ────────────────
-// El portal solo registra la solicitud: la ejecucion en el equipo del cliente
-// es CU-33 y corre por cuenta del CRM. Por eso la respuesta confirma la
-// creacion de la solicitud y no un cambio ya aplicado.
+// El portal solo registra la solicitud: aplicarla en el equipo del cliente es
+// el CU-33, de Grupo 3. Por eso la respuesta confirma la creacion de la
+// solicitud y no un cambio ya aplicado. En el flujo v2 (acuerdo v2.0 §6.4),
+// id_solicitud, estado y fecha son los que devuelve G3.
 //
-// La clave nunca vuelve en la respuesta: se guarda hasheada y el cliente ya
-// la conoce, no hay motivo para devolverla.
+// La clave nunca vuelve en la respuesta: el cliente ya la conoce.
 export interface SolicitudContrasenaWifiResponseDto {
   id_solicitud: number;
   id_contrato: number;

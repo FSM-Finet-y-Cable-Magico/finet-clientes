@@ -24,7 +24,7 @@ POST /api/auth/login
 ```json
 {
   "rut": "12.345.678-5",
-  "password": "MiClave1"
+  "password": "<contraseña>"
 }
 ```
 
@@ -80,12 +80,16 @@ POST /api/auth/register
   "nombre_completo": "Juan Perez",
   "email": "juan@ejemplo.cl",
   "telefono": "912345678",
-  "password": "Clave123",
-  "password_confirmation": "Clave123"
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>",
+  "acepta_politica_privacidad": true,
+  "version_politica_privacidad": "1.1"
 }
 ```
 
 `telefono` es opcional (puede omitirse o enviarse como `""`).
+
+**CU-75:** `acepta_politica_privacidad` tiene que venir en `true` (si no, 400 con `"Debes aceptar la Política de Privacidad para continuar"`) y `version_politica_privacidad` es la versión publicada en `/privacidad`. El cliente y la aceptación se registran en la misma transacción: una fila en `log_auditoria` con `accion = 'ACEPTAR_POLITICA_PRIVACIDAD'`, la IP de origen **anonimizada** (`common/utils/ip.ts`: se guarda la red, `203.0.113.0/24`), `fecha_hora` y los datos enviados (sin la contraseña) en `valor_nuevo`. La `ip_origen` de `sesion_portal` y la `ip_address` de `intento_fallido` **no** se anonimizan: el bloqueo por IP compara el valor exacto. Ver [la bitácora del 2026-09-28](../../../docs/2026-09-28-ip-consentimiento-y-legales.md).
 
 **Reglas de contrasena:**
 - Minimo 8 caracteres
@@ -179,7 +183,7 @@ POST /api/auth/restablecer-password
 ```json
 {
   "token": "eyJhbGciOi...",
-  "password": "NuevaClave1"
+  "password": "<contraseña nueva>"
 }
 ```
 
@@ -259,7 +263,7 @@ const API_URL = 'http://localhost:4000/api';
 const res = await fetch(`${API_URL}/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ rut: '12.345.678-5', password: 'MiClave1' }),
+  body: JSON.stringify({ rut: '12.345.678-5', password: '<contraseña>' }),
 });
 
 if (res.status === 401) {
@@ -292,7 +296,7 @@ const token = window.location.hash.replace('#token=', '');
 const res = await fetch(`${API_URL}/auth/restablecer-password`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ token, password: 'NuevaClave1' }),
+  body: JSON.stringify({ token, password: '<contraseña nueva>' }),
 });
 
 if (res.ok) {

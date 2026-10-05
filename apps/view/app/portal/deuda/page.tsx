@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { api } from "../../utils/api";
 import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
+import IrAPagarButton from "@/app/_components/portal/IrAPagarButton";
+import PagosAnteriores from "@/app/_components/portal/PagosAnteriores";
 
 type Factura = {
   id_factura: number;
@@ -154,14 +156,7 @@ export default function DeudaPage() {
                   {data.facturas_pendientes.length !== 1 ? "s" : ""} pendiente
                   {data.facturas_pendientes.length !== 1 ? "s" : ""}
                 </p>
-                {/* TODO: enlazar a la pasarela de pago (CU-42+). Por ahora sin acción. */}
-                <button
-                  type="button"
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-background shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
-                >
-                  <CreditCard size={16} aria-hidden />
-                  Pagar ahora
-                </button>
+                <IrAPagarButton />
               </div>
 
               <div className="p-6">
@@ -224,6 +219,9 @@ export default function DeudaPage() {
               </p>
             </div>
           )}
+
+          {/* CU-52: pagos anteriores y su comprobante */}
+          <PagosAnteriores />
         </>
       )}
     </div>

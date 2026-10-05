@@ -58,7 +58,7 @@ model caja_nap {
 model canal_whatsapp {
   id_canal           Int                  @id @default(autoincrement())
   id_empresa         Int?
-  numero_telefono    String?              @unique @db.VarChar(21)
+  numero_telefono    String?              @unique @db.VarChar(20)
   nombre_canal       String?              @db.VarChar(80)
   activo             Boolean?             @default(true)
   empresa            empresa?             @relation(fields: [id_empresa], references: [id_empresa], onDelete: NoAction, onUpdate: NoAction, map: "fk_canal_whatsapp_id_empresa")
@@ -80,7 +80,7 @@ model cliente {
   rut                       String?                     @unique @db.VarChar(12)
   nombre_completo           String                      @db.VarChar(120)
   email                     String?                     @db.VarChar(120)
-  telefono                  String?                     @db.VarChar(21)
+  telefono                  String?                     @db.VarChar(20)
   password_portal_hash      String?                     @db.VarChar(72)
   estado                    String                      @db.VarChar(20)
   es_conflictivo            Boolean?                    @default(false)
@@ -535,7 +535,7 @@ model prospecto {
   rut                    String?      @db.VarChar(12)
   nombre_completo        String?      @db.VarChar(120)
   email                  String?      @db.VarChar(120)
-  telefono               String?      @db.VarChar(21)
+  telefono               String?      @db.VarChar(20)
   direccion              String?      @db.VarChar(200)
   estado_pipeline        String?      @db.VarChar(30)
   motivo_perdida         String?      @db.VarChar(30)
@@ -553,7 +553,7 @@ model proveedor {
   nombre_comercial String          @db.VarChar(100)
   rut_proveedor    String?         @db.VarChar(12)
   contacto         String?         @db.VarChar(80)
-  telefono         String?         @db.VarChar(21)
+  telefono         String?         @db.VarChar(20)
   email            String?         @db.VarChar(120)
   orden_ingreso    orden_ingreso[]
 }
@@ -630,7 +630,7 @@ model tecnico_externo {
   id_tecnico_ext  Int             @id @default(autoincrement())
   nombre_completo String          @db.VarChar(120)
   empresa         String?         @db.VarChar(100)
-  telefono        String?         @db.VarChar(21)
+  telefono        String?         @db.VarChar(20)
   activo          Boolean?        @default(true)
   orden_trabajo   orden_trabajo[]
 }

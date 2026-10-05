@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "./_components/layout/navbar/Navbar";
 import Footer from "./_components/layout/footer/Footer";
 import AsistenteWidget from "./_components/asistente/AsistenteWidget";
+import BannerCookies from "./_components/legal/BannerCookies";
 import { themeScript } from "./_components/layout/theme/theme-script";
 import { BASE_URL } from "./_lib/consts";
 import {
@@ -13,6 +14,7 @@ import {
   COMPANY_PHONE_DISPLAY,
 } from "./_lib/company";
 import { AuthProvider } from "./_lib/auth";
+import { BASE_SHARE_METADATA, SEO_DEFAULTS } from "./_lib/seo";
 
 const hanken = Hanken_Grotesk({
   variable: "--font-hanken",
@@ -23,11 +25,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
     template: "%s | Finet — Fibra Optica en La Pintana",
-    default:
-      "Finet — Internet Fibra Optica y TV Digital | La Pintana, Puente Alto",
+    default: SEO_DEFAULTS.title,
   },
-  description:
-    "Internet de fibra optica de alta velocidad desde 200 Mbps simetricos. Planes hogar y empresa en La Pintana, Puente Alto, La Florida y La Granja. Contrata en linea.",
+  description: SEO_DEFAULTS.description,
   keywords: [
     "internet fibra optica",
     "La Pintana",
@@ -46,24 +46,9 @@ export const metadata: Metadata = {
     "max-snippet": 160,
     "max-image-preview": "large",
   },
-  openGraph: {
-    type: "website",
-    siteName: "Finet",
-    title: "Finet — Internet Fibra Optica y TV Digital",
-    description:
-      "Internet de fibra optica de alta velocidad desde 200 Mbps simetricos. Planes para hogar y empresa en La Pintana y Puente Alto.",
-    url: BASE_URL,
-    locale: "es_CL",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Finet — Internet Fibra Optica y TV Digital",
-    description:
-      "Internet de fibra optica de alta velocidad desde 200 Mbps simetricos en La Pintana y Puente Alto.",
-  },
-  alternates: {
-    canonical: BASE_URL,
-  },
+  // Sin `alternates.canonical` aca: lo heredaria cada pagina y todas se
+  // declararian copia de la home. El canonical lo pone `metadataSeccion`.
+  ...BASE_SHARE_METADATA,
   icons: {
     icon: "/favicon.ico",
   },
@@ -129,6 +114,8 @@ export default function RootLayout({
           </main>
           <Footer />
           <AsistenteWidget />
+          {/* CU-76: sale solo si el navegador no tiene preferencia guardada. */}
+          <BannerCookies />
         </AuthProvider>
       </body>
     </html>

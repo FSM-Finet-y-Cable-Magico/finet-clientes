@@ -55,7 +55,7 @@ NEXT_PUBLIC_SENTRY_DSN=
 | Comando | Descripción |
 |---|---|
 | `pnpm dev` | Servidor de desarrollo (puerto 3000) |
-| `pnpm build` | Build de producción |
+| `pnpm build` | Build de producción. Requiere el controller respondiendo: sin catálogo de planes el sitemap falla a propósito (CU-74, ver [docs/routing.md](docs/routing.md#indexación-cu-72--cu-74)) |
 | `pnpm lint` | ESLint (`eslint-config-next`) |
 | `pnpm test` | Tests (Jest + RTL) |
 | `pnpm test:watch` | Tests en modo watch |

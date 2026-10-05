@@ -13,6 +13,8 @@ import LoginBranding from "./LoginBranding";
 import RutInput from "./RutInput";
 import PasswordInput from "./PasswordInput";
 import TelefonoInput from "./TelefonoInput";
+import CasillaPoliticaPrivacidad from "../_components/legal/CasillaPoliticaPrivacidad";
+import { POLITICA_PRIVACIDAD_VERSION } from "../_lib/legal";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -23,6 +25,7 @@ export default function RegisterForm() {
   const [rut, setRut] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [aceptaPolitica, setAceptaPolitica] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -43,6 +46,7 @@ export default function RegisterForm() {
       rut,
       password,
       confirmPassword,
+      aceptaPolitica,
       [field]: value,
     };
     const result = registerSchema.safeParse(current);
@@ -72,6 +76,7 @@ export default function RegisterForm() {
       rut,
       password,
       confirmPassword,
+      aceptaPolitica,
     });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -98,6 +103,8 @@ export default function RegisterForm() {
             : "",
           password: result.data.password,
           password_confirmation: result.data.password,
+          acepta_politica_privacidad: true,
+          version_politica_privacidad: POLITICA_PRIVACIDAD_VERSION,
         },
       );
       login(data.cliente);
@@ -227,6 +234,15 @@ export default function RegisterForm() {
           />
         </div>
 
+        <CasillaPoliticaPrivacidad
+          checked={aceptaPolitica}
+          error={errors.aceptaPolitica}
+          onChange={(marcada) => {
+            setAceptaPolitica(marcada);
+            if (marcada) setErrors((prev) => ({ ...prev, aceptaPolitica: "" }));
+          }}
+        />
+
         <button
           type="submit"
           disabled={loading}
@@ -239,7 +255,7 @@ export default function RegisterForm() {
       <p className="mt-6 text-center text-xs text-muted">
         Al registrarte aceptas nuestros{" "}
         <a
-          href="#"
+          href="/terminos"
           className="text-primary underline hover:opacity-80"
         >
           Términos y Condiciones
