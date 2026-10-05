@@ -47,6 +47,23 @@ export const IdentificarClienteDto = z.object({
 });
 export type IdentificarClienteDto = z.infer<typeof IdentificarClienteDto>;
 
+export const CrearSolicitudSoporteDto = z
+  .object({
+    id_sesion: z.string().trim().min(1).max(100, 'Sesion invalida'),
+    rut: z.string().min(1, 'El RUT es requerido').max(12),
+    access_token: z.string().trim().min(1, 'Sesion de portal requerida'),
+    id_categoria: z.number().int().positive('Categoria invalida'),
+    descripcion: z
+      .string()
+      .trim()
+      .min(1, 'Describe el problema')
+      .max(5000, 'La descripcion no puede superar los 5000 caracteres'),
+  })
+  .strict();
+export type CrearSolicitudSoporteDto = z.infer<
+  typeof CrearSolicitudSoporteDto
+>;
+
 /**
  * Lo que el asistente sabe del cliente una vez verificado. Solo nombre y
  * planes: esto viaja al proveedor del motor LLM, asi que no se manda RUT,

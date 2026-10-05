@@ -45,7 +45,10 @@ export class AsistenteService {
   // constantes de modulo se evaluan antes de que Nest cargue el ConfigModule.
   constructor(private readonly configService: ConfigService) {}
 
-  async responder(dto: MensajeAsistenteDto): Promise<RespuestaAsistenteDto> {
+  async responder(
+    dto: MensajeAsistenteDto,
+    accessToken?: string,
+  ): Promise<RespuestaAsistenteDto> {
     const baseUrl = this.configService.get<string>('CHATBOT_URL')?.trim();
     const apiKey = this.configService.get<string>('CHATBOT_API_KEY')?.trim();
 
@@ -65,6 +68,7 @@ export class AsistenteService {
         body: JSON.stringify({
           sessionId: dto.id_sesion,
           content: dto.mensaje,
+          ...(accessToken ? { accessToken } : {}),
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });

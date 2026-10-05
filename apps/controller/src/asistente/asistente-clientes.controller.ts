@@ -1,8 +1,11 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { AsistenteClientesService } from './asistente-clientes.service.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
-import { IdentificarClienteDto } from './dto/asistente.dto.js';
+import {
+  CrearSolicitudSoporteDto,
+  IdentificarClienteDto,
+} from './dto/asistente.dto.js';
 import { ChatbotApiKeyGuard } from './guards/chatbot-api-key.guard.js';
 
 /**
@@ -37,5 +40,22 @@ export class AsistenteClientesController {
     dto: IdentificarClienteDto,
   ) {
     return this.asistenteClientesService.identificar(dto.rut);
+  }
+
+  @Get('soporte/categorias')
+  @HttpCode(200)
+  @SkipThrottle()
+  categorias() {
+    return this.asistenteClientesService.obtenerCategorias();
+  }
+
+  @Post('soporte')
+  @HttpCode(201)
+  @SkipThrottle()
+  crearSolicitud(
+    @Body(new ZodValidationPipe(CrearSolicitudSoporteDto))
+    dto: CrearSolicitudSoporteDto,
+  ) {
+    return this.asistenteClientesService.crearSolicitud(dto);
   }
 }

@@ -2,6 +2,7 @@ import { jest, beforeEach, describe, it, expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AsistenteClientesService } from './asistente-clientes.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { JwtService } from '@nestjs/jwt';
 
 describe('AsistenteClientesService', () => {
   let service: AsistenteClientesService;
@@ -12,7 +13,11 @@ describe('AsistenteClientesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AsistenteClientesService,
-        { provide: PrismaService, useValue: { cliente: { findFirst } } },
+        {
+          provide: PrismaService,
+          useValue: { cliente: { findFirst } },
+        },
+        { provide: JwtService, useValue: { verifyAsync: jest.fn() } },
       ],
     }).compile();
     service = module.get(AsistenteClientesService);

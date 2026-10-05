@@ -2,13 +2,17 @@
 
 Base URL: `http://localhost:4000/api`
 
-Dos endpoints:
+Endpoints:
 
 - `POST /asistente/mensajes` — **publico**. Lo consume el widget de chat
   (`apps/view/app/_components/asistente/AsistenteWidget.tsx`), presente en
   todo el sitio.
 - `POST /asistente/clientes/identificar` — **interno**. Solo lo llama
   finet-chatbot, con API key, para verificar RUTs (CU-63).
+- `GET /asistente/clientes/soporte/categorias` — **interno**. Devuelve las
+  categorías de falla disponibles para CU-66.
+- `POST /asistente/clientes/soporte` — **interno**. Registra un ticket de
+  soporte para el cliente identificado por RUT (CU-66).
 
 ---
 
@@ -22,6 +26,8 @@ navegador (widget) ──▶ apps/controller  POST /api/asistente/mensajes
                               │  X-Api-Key: ASISTENTE_API_KEY
                               ▼
        apps/controller  POST /api/asistente/clientes/identificar ──▶ tabla cliente
+                                              │
+                                              └── POST /api/asistente/clientes/soporte ──▶ ticket
 ```
 
 - El navegador nunca habla con finet-chatbot: la API key no puede viajar al
@@ -31,8 +37,8 @@ navegador (widget) ──▶ apps/controller  POST /api/asistente/mensajes
   mensajes no pasan por este backend. Por eso es solo texto, sin botones.
 - El historial y la identificacion los guarda finet-chatbot **en memoria**
   bajo `id_sesion` (ultimos 20 turnos). Se pierden si el chatbot se reinicia.
-  Aca no se persiste nada todavia; `conversacion_bot` / `mensaje_bot` quedan
-  para CU-79.
+  Aca no se persiste el historial; al crear soporte se registra una
+  `conversacion_bot` minima y el `ticket` queda vinculado a ella.
 
 ---
 

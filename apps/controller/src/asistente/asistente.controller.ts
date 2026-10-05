@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AsistenteService } from './asistente.service.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
@@ -29,7 +30,13 @@ export class AsistenteController {
   enviar(
     @Body(new ZodValidationPipe(MensajeAsistenteDto))
     dto: MensajeAsistenteDto,
+    @Req() request?: Request,
   ) {
-    return this.asistenteService.responder(dto);
+    const accessToken =
+      request?.cookies?.access_token ??
+      request?.headers.authorization?.replace(/^Bearer\s+/i, '');
+    return accessToken
+      ? this.asistenteService.responder(dto, accessToken)
+      : this.asistenteService.responder(dto);
   }
 }

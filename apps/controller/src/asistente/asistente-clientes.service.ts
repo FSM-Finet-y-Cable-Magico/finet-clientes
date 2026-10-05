@@ -1,7 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { cleanRut } from '../common/utils/rut.js';
 import type { ClienteIdentificadoDto } from './dto/asistente.dto.js';
+import type { CrearSolicitudSoporteDto } from './dto/asistente.dto.js';
+import { JwtService } from '@nestjs/jwt';
+
+export interface CategoriaSoporteDto {
+  id_categoria: number;
+  nombre: string;
+}
+
+export interface SolicitudSoporteCreadaDto {
+  id_ticket: number;
+  codigo_seguimiento: string;
+}
 
 /**
  * CU-63: verifica el RUT que el cliente le da al asistente y devuelve los
@@ -12,7 +29,10 @@ import type { ClienteIdentificadoDto } from './dto/asistente.dto.js';
  */
 @Injectable()
 export class AsistenteClientesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async identificar(rut: string): Promise<ClienteIdentificadoDto> {
     const limpio = cleanRut(rut);
@@ -65,5 +85,138 @@ export class AsistenteClientesService {
         ),
       },
     };
+  }
+
+  async obtenerCategorias(): Promise<CategoriaSoporteDto[]> {
+    return this.prisma.categoria_falla.findMany({
+      select: { id_categoria: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
+  async crearSolicitud(
+    dto: CrearSolicitudSoporteDto,
+  ): Promise<SolicitudSoporteCreadaDto> {
+    let clienteAutenticado: number;
+    try {
+      const payload = await this.jwtService.verifyAsync<{
+        sub?: number;
+        type?: string;
+      }>(dto.access_token);
+      if (payload.type && payload.type !== 'access') {
+        throw new UnauthorizedException('Sesion de portal invalida');
+      }
+      if (typeof payload.sub !== 'number') {
+        throw new UnauthorizedException('Sesion de portal invalida');
+      }
+      const sesion = await this.prisma.sesion_portal.findFirst({
+        where: {
+          token: dto.access_token,
+          fecha_expiracion: { gt: new Date() },
+        },
+        select: { id_cliente: true },
+      });
+      if (!sesion || sesion.id_cliente !== payload.sub) {
+        throw new UnauthorizedException('Sesion de portal expirada');
+      }
+      clienteAutenticado = payload.sub;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      throw new UnauthorizedException('Sesion de portal invalida');
+    }
+
+    const limpio = cleanRut(dto.rut);
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const cliente = await tx.cliente.findFirst({
+          where: {
+            rut: {
+              in: [limpio, limpio.toUpperCase(), limpio.toLowerCase()],
+            },
+          },
+          select: { id_cliente: true, id_empresa: true },
+        });
+        if (!cliente) {
+          throw new BadRequestException('Cliente no encontrado');
+        }
+        if (cliente.id_cliente !== clienteAutenticado) {
+          throw new UnauthorizedException(
+            'La sesion no corresponde al cliente',
+          );
+        }
+
+        const categoria = await tx.categoria_falla.findUnique({
+          where: { id_categoria: dto.id_categoria },
+          select: { id_categoria: true },
+        });
+        if (!categoria) {
+          throw new BadRequestException('Categoria no encontrada');
+        }
+
+        const conversacion = await tx.conversacion_bot.create({
+          data: {
+            id_cliente: cliente.id_cliente,
+            plataforma: 'web',
+            fecha_inicio: new Date(),
+            fecha_fin: new Date(),
+          },
+          select: { id_conversacion: true },
+        });
+
+        const ticket = await tx.ticket.create({
+          data: {
+            id_cliente: cliente.id_cliente,
+            id_empresa: cliente.id_empresa,
+            id_categoria: categoria.id_categoria,
+            id_conversacion_bot: conversacion.id_conversacion,
+            prioridad: 'media',
+            estado: 'abierto',
+            descripcion: dto.descripcion,
+            origen: 'asistente',
+          },
+          select: { id_ticket: true, fecha_creacion: true },
+        });
+
+        const anio =
+          ticket.fecha_creacion?.getFullYear() ?? new Date().getFullYear();
+        const codigoSeguimiento = `FIN-${anio}-${String(ticket.id_ticket).padStart(6, '0')}`;
+
+        await tx.ticket.update({
+          where: { id_ticket: ticket.id_ticket },
+          data: { codigo_seguimiento: codigoSeguimiento },
+        });
+
+        await tx.log_auditoria.create({
+          data: {
+            accion: 'CREAR_TICKET_ASISTENTE',
+            entidad_afectada: 'ticket',
+            id_entidad_afectada: ticket.id_ticket,
+            valor_nuevo: {
+              codigo_seguimiento: codigoSeguimiento,
+              id_categoria: categoria.id_categoria,
+              id_sesion: dto.id_sesion,
+              origen: 'asistente',
+            },
+          },
+        });
+
+        return {
+          id_ticket: ticket.id_ticket,
+          codigo_seguimiento: codigoSeguimiento,
+        };
+      });
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+      throw new ServiceUnavailableException(
+        'No fue posible registrar el reporte de soporte',
+        { cause: error },
+      );
+    }
   }
 }
