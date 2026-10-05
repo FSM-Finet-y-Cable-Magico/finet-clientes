@@ -17,12 +17,20 @@ import {
   G3WifiService,
   type RespuestaClaveWifiG3,
 } from '../common/g3/g3-wifi.service.js';
-import { TICKET_WIFI_DEFINIDO } from '../common/pendientes.js';
+import {
+  G8IntegracionService,
+  type ResultadoWifiG8,
+} from '../common/g8/g8-integracion.service.js';
+import {
+  COMPROBANTE_G8_DEFINIDO,
+  TICKET_WIFI_DEFINIDO,
+} from '../common/pendientes.js';
 import {
   ESTADOS_CONTRATO_VIGENTES,
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
 import { MailService } from '../mail/mail.service.js';
+import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
 import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
 import {
@@ -31,6 +39,7 @@ import {
   ContratoResumenDto,
   CrearTicketResponseDto,
   FacturaPendienteDto,
+  PagosAnterioresDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
   SolicitudContrasenaWifiResponseDto,
@@ -49,6 +58,7 @@ export class PortalService {
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly g3Wifi: G3WifiService,
+    private readonly g8: G8IntegracionService,
   ) {}
 
   //  CU-23: Consultar estado operativo del contrato
@@ -301,6 +311,83 @@ export class PortalService {
       saldo_total,
       saldo_confirmado: true,
       facturas_pendientes: facturasMapeadas,
+    };
+  }
+
+  //  CU-52: los pagos anteriores del cliente, para descargar su comprobante.
+  //
+  //  Se lee `pago` directo, como permite el §5 del acuerdo v2.0. Un pago es del
+  //  cliente si lo dice su `id_cliente` o si su factura es de un contrato suyo:
+  //  `id_cliente` puede venir vacío. No se lee `comprobante_estado`, que todavía
+  //  no existe: está en la migración pendiente de G8.
+  async getPagosAnteriores(idCliente: number): Promise<PagosAnterioresDto> {
+    const pagos = await this.prisma.pago.findMany({
+      where: this.pagosDelCliente(idCliente),
+      select: {
+        id_pago: true,
+        fecha_pago: true,
+        monto: true,
+        pasarela: true,
+        factura: { select: { periodo_mes: true, periodo_anio: true } },
+      },
+      orderBy: { fecha_pago: 'desc' },
+    });
+
+    return {
+      comprobante_disponible: COMPROBANTE_G8_DEFINIDO,
+      pagos: pagos.map((p) => ({
+        id_pago: p.id_pago,
+        fecha_pago: p.fecha_pago.toISOString(),
+        periodo: p.factura
+          ? this.formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
+          : null,
+        monto: Number(p.monto),
+        pasarela: this.nombreMedio(p.pasarela),
+      })),
+    };
+  }
+
+  //  CU-52: el comprobante de un pago del cliente.
+  //
+  //  El comprobante es la boleta (reunión con G8): la emite G8, y la descarga va
+  //  por su `GET …/payments/{id_pago}/tax-document` (respuesta del 02-10, §10).
+  //  Mientras G8 no lo implemente y Finet no confirme la descarga
+  //  (`COMPROBANTE_G8_DEFINIDO`), la llamada no se escribe y el cliente cae en la
+  //  Excepción 2 del CU-52: el comprobante no está disponible.
+  async getComprobante(idCliente: number, idPago: number): Promise<never> {
+    // Si el pago es de otro cliente se responde 404, igual que si no existiera:
+    // no se confirma su existencia.
+    const pago = await this.prisma.pago.findFirst({
+      where: { id_pago: idPago, ...this.pagosDelCliente(idCliente) },
+      select: { id_pago: true },
+    });
+    if (!pago) {
+      throw new NotFoundException('No encontramos ese pago');
+    }
+
+    throw new ServiceUnavailableException(
+      'El comprobante de este pago no está disponible en este momento. Intenta más tarde.',
+    );
+  }
+
+  /**
+   * El nombre del medio, el mismo que muestra `/pagar` (`webpay` → Webpay). El
+   * §11.15 no define un enum de medio de pago, así que un valor que no
+   * conocemos se muestra tal como está guardado.
+   */
+  private nombreMedio(pasarela: string): string {
+    const medio = MEDIOS_PAGO.find(
+      (m) => m.id === pasarela.trim().toLowerCase(),
+    );
+    return medio?.nombre ?? pasarela;
+  }
+
+  private pagosDelCliente(idCliente: number): Prisma.pagoWhereInput {
+    return {
+      OR: [
+        { id_cliente: idCliente },
+        { factura: { contrato: { id_cliente: idCliente } } },
+      ],
     };
   }
 
@@ -633,8 +720,8 @@ export class PortalService {
   //  parte, y G8 no recibe ni la clave ni el ciphertext (§6.5).
   //
   //  El estado del ticket es de G8 (§3 y §6.3): aca se crea abierto y no se
-  //  vuelve a tocar. Informarle a G8 el resultado (paso 8) espera el contrato
-  //  del §11.
+  //  vuelve a tocar. Lo que si se hace es informarle a G8 el resultado (paso 8),
+  //  con el contrato de su respuesta del 02-10 (§12), y G8 mueve el ticket.
   private async enviarCambioWifiAG3(
     idCliente: number,
     idContrato: number,
@@ -706,11 +793,21 @@ export class PortalService {
       this.logger.error(
         `G3 no registro el cambio de clave WiFi del ticket ${idTicket} (request_id ${requestId}): ${error instanceof Error ? error.message : 'error desconocido'}`,
       );
+      const statusG3 = error instanceof ErrorClaveWifiG3 ? error.status : null;
       await this.auditarRespuestaG3(idTicket, {
         request_id: requestId,
         resultado: 'ERROR',
-        status_g3: error instanceof ErrorClaveWifiG3 ? error.status : null,
+        status_g3: statusG3,
       });
+      await this.informarResultadoWifiG8(
+        idTicket,
+        idEmpresa,
+        traceId,
+        'ERROR_TECNICO',
+        statusG3 === null
+          ? 'G3 no respondió a la solicitud.'
+          : `G3 rechazó la solicitud (HTTP ${statusG3}).`,
+      );
       throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
     }
 
@@ -721,6 +818,15 @@ export class PortalService {
       estado_g3: respuesta.estado,
       duplicado: respuesta.duplicado,
     });
+    // G3 la deja registrada para que un tecnico la aplique: todavia no esta
+    // aplicada, asi que no se informa APLICADO (respuesta de G8 del 02-10, §12).
+    await this.informarResultadoWifiG8(
+      idTicket,
+      idEmpresa,
+      traceId,
+      'REQUIERE_ATENCION_MANUAL',
+      'Solicitud registrada para atención por técnico.',
+    );
 
     return {
       id_solicitud: respuesta.idSolicitud,
@@ -734,11 +840,12 @@ export class PortalService {
    * §6.4 paso 3: el ticket del cambio de clave WiFi, abierto, con origen PORTAL
    * y asociado al cliente y al servicio (§6.2 y §7).
    *
-   * Es el hueco `TICKET_WIFI_DEFINIDO`: falta que G8 defina el literal de la
-   * categoria (§6.1) y donde va el servicio, porque `ticket` no tiene esa
-   * columna (§6.2). Mientras tanto no se llega aca: el CU-32 sigue con el v1.
-   * Cuando respondan se escribe como `crearTicket`, que crea los tickets
-   * genericos del portal, y devuelve el `id_ticket`.
+   * Es el hueco `TICKET_WIFI_DEFINIDO`. G8 lo definio el 01-10: categoria
+   * `CAMBIO_CREDENCIALES_WIFI` y el servicio en `ticket.id_servicio` (FK a
+   * `servicio_contratado`), que nuestro esquema todavia no tiene. Mientras G8 no
+   * lo despliegue no se llega aca: el CU-32 sigue con el v1. Despues se escribe
+   * como `crearTicket`, que crea los tickets genericos del portal, y devuelve el
+   * `id_ticket`.
    */
   crearTicketWifi(
     tx: Prisma.TransactionClient,
@@ -749,6 +856,36 @@ export class PortalService {
         `Ticket WiFi del cliente ${datos.idCliente} pendiente de G8: categoria y servicio (acuerdo v2.0, §6.1 y §6.2)`,
       ),
     );
+  }
+
+  /**
+   * §6.4 paso 8: el resultado a G8, para que mueva el ticket (Escalado en los dos
+   * casos de hoy). Lleva su propio `request_id`, la identidad idempotente del
+   * informe, y el `trace_id` de la operacion. No lanza: si G8 no lo recibe, la
+   * solicitud del cliente no se cae, y queda en el log para reintentarlo a mano.
+   */
+  private async informarResultadoWifiG8(
+    idTicket: number,
+    idEmpresa: number,
+    traceId: string,
+    resultado: ResultadoWifiG8,
+    detalleSaneado: string,
+  ): Promise<void> {
+    const requestId = randomUUID();
+    try {
+      await this.g8.informarResultadoWifi({
+        idTicket,
+        idEmpresa,
+        requestId,
+        traceId,
+        resultado,
+        detalleSaneado,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo informar a G8 el resultado ${resultado} del ticket ${idTicket} (request_id ${requestId}): ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+    }
   }
 
   /**

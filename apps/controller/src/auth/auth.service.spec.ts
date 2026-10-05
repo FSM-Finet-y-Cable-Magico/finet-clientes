@@ -516,6 +516,9 @@ describe('AuthService', () => {
   describe('bloqueo por intentos fallidos', () => {
     it('bloquear RUT despues de 5 intentos en 10 minutos', async () => {
       (prisma.intento_fallido.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.intento_fallido.create as jest.Mock).mockResolvedValue({
+        id_intento: 7n,
+      });
       (prisma.intento_fallido.count as jest.Mock)
         .mockResolvedValueOnce(4)
         .mockResolvedValueOnce(0);
@@ -532,6 +535,9 @@ describe('AuthService', () => {
 
     it('bloquear IP despues de 5 intentos en 5 minutos', async () => {
       (prisma.intento_fallido.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.intento_fallido.create as jest.Mock).mockResolvedValue({
+        id_intento: 8n,
+      });
       (prisma.intento_fallido.count as jest.Mock)
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(4);
@@ -656,6 +662,109 @@ describe('AuthService', () => {
       // El intento fue registrado en el fallback (no debería lanzar error)
       // Verificamos que create fue llamado (aunque falló)
       expect(prisma.intento_fallido.create).toHaveBeenCalled();
+    });
+  });
+
+  // CU-06 como CU del sistema: no hay panel, pero el historial de las IPs
+  // bloqueadas queda guardado, con su fecha, hora y cantidad de intentos.
+  describe('CU-06: historial de bloqueos en el sistema', () => {
+    const auditorias = () =>
+      (prisma.log_auditoria.create as jest.Mock).mock.calls.map(
+        (c) =>
+          (c[0] as { data: { accion: string; valor_nuevo: unknown } }).data,
+      );
+
+    beforeEach(() => {
+      (prisma.intento_fallido.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.intento_fallido.create as jest.Mock).mockResolvedValue({
+        id_intento: 42n,
+      });
+      porRut.mockResolvedValue(null);
+    });
+
+    it('el quinto intento desde la misma IP queda en la bitácora con la cantidad de intentos (CU-05)', async () => {
+      (prisma.intento_fallido.count as jest.Mock)
+        .mockResolvedValueOnce(0) // RUT, 10 minutos
+        .mockResolvedValueOnce(4); // IP, 5 minutos
+
+      await expect(
+        authService.login('999999999', 'mala', '192.168.1.50'),
+      ).rejects.toThrow('RUT o contraseña incorrectos');
+
+      expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
+        data: {
+          accion: 'BLOQUEO_INTENTOS_FALLIDOS',
+          entidad_afectada: 'intento_fallido',
+          valor_nuevo: {
+            id_intento: 42,
+            bloquea_ip: true,
+            bloquea_rut: false,
+            intentos_ip: 5,
+            intentos_rut: 1,
+            bloqueado_hasta: expect.any(String),
+            origen: 'PORTAL',
+          },
+          ip_origen: '192.168.1.50',
+        },
+      });
+    });
+
+    it('el bloqueo dura 15 minutos (RF-05)', async () => {
+      (prisma.intento_fallido.count as jest.Mock)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(4);
+      const antes = Date.now();
+
+      await authService
+        .login('999999999', 'mala', '192.168.1.50')
+        .catch(() => undefined);
+
+      const { bloqueado_hasta } = auditorias()[0].valor_nuevo as {
+        bloqueado_hasta: string;
+      };
+      const minutos = (new Date(bloqueado_hasta).getTime() - antes) / 60_000;
+      expect(minutos).toBeGreaterThanOrEqual(14.9);
+      expect(minutos).toBeLessThanOrEqual(15.1);
+    });
+
+    it('un intento que no bloquea no se audita', async () => {
+      (prisma.intento_fallido.count as jest.Mock).mockResolvedValue(1);
+
+      await expect(
+        authService.login('999999999', 'mala', '192.168.1.50'),
+      ).rejects.toThrow('RUT o contraseña incorrectos');
+
+      expect(prisma.intento_fallido.create).toHaveBeenCalled();
+      expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+    });
+
+    it('si la auditoría falla, el bloqueo se aplica igual', async () => {
+      (prisma.intento_fallido.count as jest.Mock)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(4);
+      (prisma.log_auditoria.create as jest.Mock).mockRejectedValue(
+        new Error('db caida a medias'),
+      );
+
+      await expect(
+        authService.login('999999999', 'mala', '192.168.1.50'),
+      ).rejects.toThrow('RUT o contraseña incorrectos');
+
+      // La fila que bloquea quedó escrita: es la que el login consulta después.
+      const { data } = (prisma.intento_fallido.create as jest.Mock).mock
+        .calls[0][0] as { data: { bloqueado_hasta?: Date } };
+      expect(data.bloqueado_hasta).toBeInstanceOf(Date);
+    });
+
+    it('el login exitoso reinicia el contador del RUT, pero conserva sus bloqueos', async () => {
+      porRut.mockResolvedValue(mockCliente);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await authService.login('123456785', 'buena', '127.0.0.1');
+
+      expect(prisma.intento_fallido.deleteMany).toHaveBeenCalledWith({
+        where: { rut_intentado: '123456785', bloqueado_hasta: null },
+      });
     });
   });
 });

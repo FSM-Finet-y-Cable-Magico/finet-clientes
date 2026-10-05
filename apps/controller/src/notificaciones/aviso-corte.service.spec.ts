@@ -19,6 +19,18 @@ const AYER = new Date('2026-10-04T00:00:00.000Z');
 const SITIO = 'https://portal.finet.cl';
 const CON_DATOS = { pasarelaActiva: true, saldoDefinido: true };
 
+/** Una factura como la entrega G8 (su §2 del 02-10): venció ayer. */
+function deG8(over: Record<string, unknown> = {}) {
+  return {
+    idFactura: 7,
+    saldoExigible: 57980,
+    fechaVencimientoEfectiva: '2026-10-04',
+    aceptaPagos: true,
+    ...over,
+  };
+}
+
+/** Una factura impaga de la base: solo dice a quién preguntarle a G8. */
 function factura(over: Record<string, unknown> = {}) {
   return {
     id_factura: 7,
@@ -38,12 +50,12 @@ describe('AvisoCorteService', () => {
   let mail: jest.Mocked<MailService>;
   let enlaces: EnlacePagoService;
   let candado: jest.Mock;
-  let saldos: { saldoDe: jest.Mock };
+  let saldos: { facturasDe: jest.Mock };
   let entorno: Record<string, string | undefined>;
 
   beforeEach(async () => {
     candado = jest.fn().mockResolvedValue([{ tomado: true }]);
-    saldos = { saldoDe: jest.fn().mockResolvedValue(57980) };
+    saldos = { facturasDe: jest.fn().mockResolvedValue([deG8()]) };
     entorno = { FRONTEND_URL: SITIO, ENLACE_PAGO_SECRET: 'clave' };
     const mockPrisma = {
       $transaction: jest.fn(
@@ -141,36 +153,62 @@ describe('AvisoCorteService', () => {
 
   // ─── Con los datos: el flujo del CU-68 ───────────────────────────────────
 
-  it('busca las facturas impagas que vencieron ayer', async () => {
+  it('a G8 solo se le pregunta por los clientes con facturas impagas', async () => {
     await service.ejecutar(HOY, CON_DATOS);
 
     expect(prisma.factura.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
-          fecha_limite_pago: AYER,
-          estado: { in: ['pendiente', 'vencida'] },
-        },
+        where: { estado: { in: ['pendiente', 'vencida'] } },
       }),
     );
   });
 
-  it('avisa la deuda que da G8, la fecha de corte (vencimiento + 4 días, §6.7.3) y el enlace', async () => {
+  it('avisa la deuda que da G8, cuándo venció según G8 y el enlace; sin fecha de corte propia', async () => {
     (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
 
     const r = await service.ejecutar(HOY, CON_DATOS);
 
-    expect(saldos.saldoDe).toHaveBeenCalledWith({
-      idCliente: 10,
-      idContrato: null,
-    });
+    expect(saldos.facturasDe).toHaveBeenCalledWith(
+      { idCliente: 10, idContrato: null },
+      true,
+    );
     expect(mail.sendAvisoCorte).toHaveBeenCalledWith(
       'ana@b.cl',
       'Ana',
       57980,
-      new Date('2026-10-08T00:00:00.000Z'),
+      AYER,
       expect.stringContaining('/pagar?t='),
     );
     expect(r).toMatchObject({ detectadas: 1, enviados: 1, ejecutada: true });
+  });
+
+  it('decide con el vencimiento efectivo de G8, no con una fecha de la base', async () => {
+    // G8 aprobó una prórroga: todavía no vence.
+    (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
+    saldos.facturasDe.mockResolvedValue([
+      deG8({ fechaVencimientoEfectiva: '2026-10-09' }),
+    ]);
+
+    const r = await service.ejecutar(HOY, CON_DATOS);
+
+    expect(mail.sendAvisoCorte).not.toHaveBeenCalled();
+    expect(r.detectadas).toBe(0);
+  });
+
+  it('la deuda del aviso es todo lo que G8 dice que debe, no solo lo de ayer', async () => {
+    (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
+    saldos.facturasDe.mockResolvedValue([
+      deG8(),
+      deG8({
+        idFactura: 8,
+        saldoExigible: 10000,
+        fechaVencimientoEfectiva: '2026-11-04',
+      }),
+    ]);
+
+    await service.ejecutar(HOY, CON_DATOS);
+
+    expect((mail.sendAvisoCorte as jest.Mock).mock.calls[0]![2]).toBe(67980);
   });
 
   it('con dos contratos vencidos ayer, un solo aviso', async () => {
@@ -178,9 +216,11 @@ describe('AvisoCorteService', () => {
       factura({ id_factura: 7 }),
       factura({ id_factura: 8 }),
     ]);
+    saldos.facturasDe.mockResolvedValue([deG8(), deG8({ idFactura: 8 })]);
 
     const r = await service.ejecutar(HOY, CON_DATOS);
 
+    expect(saldos.facturasDe).toHaveBeenCalledTimes(1);
     expect(mail.sendAvisoCorte).toHaveBeenCalledTimes(1);
     expect(r).toMatchObject({ detectadas: 1, enviados: 1, yaAvisados: 0 });
   });
@@ -255,25 +295,33 @@ describe('AvisoCorteService', () => {
     expect(orden).toEqual(['registro', 'correo']);
   });
 
-  it('si G8 ya no le registra deuda, no hay corte que avisar', async () => {
+  it.each([
+    ['si G8 ya no le registra saldo exigible', { saldoExigible: 0 }],
+    ['si G8 no acepta pagos de esa factura', { aceptaPagos: false }],
+    [
+      'sin vencimiento efectivo (no se adivina)',
+      { fechaVencimientoEfectiva: null },
+    ],
+  ])('no hay aviso %s', async (_caso, over) => {
     (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
-    saldos.saldoDe.mockResolvedValue(0);
+    saldos.facturasDe.mockResolvedValue([deG8(over)]);
 
     const r = await service.ejecutar(HOY, CON_DATOS);
 
     expect(mail.sendAvisoCorte).not.toHaveBeenCalled();
     expect(prisma.log_notificacion.create).not.toHaveBeenCalled();
-    expect(r.sinDeuda).toBe(1);
+    expect(r.detectadas).toBe(0);
   });
 
-  it('si G8 no puede dar el saldo de ese cliente, no se inventa: queda fallido', async () => {
+  it('si G8 no responde por ese cliente, no se inventa nada y se cuenta', async () => {
     (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
-    saldos.saldoDe.mockResolvedValue(null);
+    saldos.facturasDe.mockResolvedValue(null);
 
     const r = await service.ejecutar(HOY, CON_DATOS);
 
     expect(mail.sendAvisoCorte).not.toHaveBeenCalled();
-    expect(r.fallidos).toBe(1);
+    expect(prisma.log_notificacion.create).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ detectadas: 0, sinDatos: 1 });
   });
 
   // ─── Excepciones del CU-68 ───────────────────────────────────────────────
@@ -371,6 +419,8 @@ describe('AvisoCorteService', () => {
     const r = await service.ejecutar(HOY, CON_DATOS);
 
     expect(mail.sendAvisoCorte).not.toHaveBeenCalled();
+    // Ni siquiera se le vuelve a preguntar a G8.
+    expect(saldos.facturasDe).not.toHaveBeenCalled();
     expect(r.yaAvisados).toBe(1);
   });
 

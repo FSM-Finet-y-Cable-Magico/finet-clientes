@@ -4,12 +4,13 @@
  * Solo la usa el registro de consentimiento (CU-75): ahí la IP es evidencia de
  * origen, no un dato operativo, así que basta la red. El resto del sistema
  * guarda la IP completa **a propósito** — `intento_fallido.ip_address` porque
- * el RF-05 bloquea y el CU-06 desbloquea una IP exacta, y `sesion_portal` y la
- * auditoría de perfil porque son rastro de seguridad.
+ * el RF-05 bloquea una IP exacta y el CU-06 guarda el historial de esos
+ * bloqueos, y `sesion_portal` y la auditoría de perfil porque son rastro de
+ * seguridad.
  *
- * Es una medida de minimización, no de protección: quien pueda leer la base
- * sigue viendo IPs completas en esas otras tablas. La protección real es
- * cifrarlas, pendiente para el I3/I4 junto con la tarea de la clave WiFi.
+ * Es una medida de minimización: quien pueda leer la base sigue viendo IPs
+ * completas en esas otras tablas. Cifrarlas se descartó el 01-10-2026: ningún
+ * CU ni RNF lo pide, y el CU-06 ya no las muestra en ningún panel.
  */
 
 /** Se conserva la red y se descarta el equipo. */

@@ -32,6 +32,13 @@ describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
   });
 
   it('muestra saldo pendiente, detalle de facturas y botón "Pagar ahora" (CU-28/CU-41)', async () => {
+    // La sección de pagos anteriores (CU-52) también pide datos al montarse.
+    (global.fetch as jest.Mock).mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ comprobante_disponible: false, pagos: [] }),
+      }),
+    );
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -69,6 +76,7 @@ describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
     expect(screen.getByText('Mayo 2026')).toBeInTheDocument();
     expect(screen.getByText('Abril 2026')).toBeInTheDocument();
     expect(screen.getByText(/hace 52 días/i)).toBeInTheDocument();
+    await screen.findByText(/aún no registras pagos/i);
 
     // CU-42/43: "Pagar ahora" pide el enlace firmado y lleva a /pagar
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -140,5 +148,93 @@ describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
     });
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  // CU-52: pagos anteriores y su comprobante.
+  describe('Pagos anteriores (CU-52)', () => {
+    const SIN_DEUDA = {
+      tiene_deuda: false,
+      saldo_total: 0,
+      saldo_confirmado: true,
+      facturas_pendientes: [],
+    };
+
+    function responder(pagos: unknown) {
+      (global.fetch as jest.Mock).mockImplementation((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(url.includes('/portal/pagos') ? pagos : SIN_DEUDA),
+        }),
+      );
+    }
+
+    it('lista los pagos con los formatos del Documento 0 y el comprobante deshabilitado mientras falta G8', async () => {
+      responder({
+        comprobante_disponible: false,
+        pagos: [
+          {
+            id_pago: 9,
+            // 22:30 del 7 de abril en Chile: en UTC ya es el 8
+            fecha_pago: '2026-04-08T02:30:00.000Z',
+            periodo: 'Abril 2026',
+            monto: 18990,
+            pasarela: 'WEBPAY',
+          },
+        ],
+      });
+
+      render(<DeudaPage />);
+
+      await screen.findAllByText('07/04/2026');
+      const seccion = screen.getByRole('region', { name: /pagos anteriores/i });
+      expect(seccion).toHaveTextContent('07/04/2026');
+      expect(seccion).toHaveTextContent('Abril 2026');
+      expect(seccion).toHaveTextContent(/\$\s*18\.990/);
+      expect(seccion).toHaveTextContent('WEBPAY');
+      expect(
+        screen.getByText(/todavía no se pueden descargar/i),
+      ).toBeInTheDocument();
+      for (const boton of screen.getAllByRole('button', {
+        name: /descargar comprobante del pago del 07\/04\/2026/i,
+      })) {
+        expect(boton).toBeDisabled();
+      }
+    });
+
+    it('sin pagos muestra el estado vacío', async () => {
+      responder({ comprobante_disponible: false, pagos: [] });
+
+      render(<DeudaPage />);
+
+      expect(
+        await screen.findByText(/aún no registras pagos/i),
+      ).toBeInTheDocument();
+    });
+
+    it('con el endpoint de G8 listo, el comprobante se descarga desde nuestro backend', async () => {
+      responder({
+        comprobante_disponible: true,
+        pagos: [
+          {
+            id_pago: 9,
+            fecha_pago: '2026-04-08T02:30:00.000Z',
+            periodo: 'Abril 2026',
+            monto: 18990,
+            pasarela: 'WEBPAY',
+          },
+        ],
+      });
+
+      render(<DeudaPage />);
+
+      const enlaces = await screen.findAllByRole('link', {
+        name: /descargar comprobante/i,
+      });
+      expect(enlaces[0]).toHaveAttribute(
+        'href',
+        expect.stringContaining('/portal/pagos/9/comprobante'),
+      );
+    });
   });
 });

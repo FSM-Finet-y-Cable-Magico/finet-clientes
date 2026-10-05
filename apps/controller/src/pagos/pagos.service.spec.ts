@@ -9,6 +9,7 @@ import { PagosService, enmascararRut } from './pagos.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
+import { G8IntegracionService } from '../common/g8/g8-integracion.service.js';
 import { IdentificadorPagoDto, IniciarPagoDto } from './dto/pagos.dto.js';
 
 const ANA = { id_cliente: 10, nombre_completo: 'Ana Pérez', rut: '123456785' };
@@ -125,12 +126,17 @@ describe('PagosService', () => {
       expect(saldos.saldoDe).not.toHaveBeenCalled();
     });
 
-    it('la deuda la calcula G8: mientras no diga dónde está, el saldo es null', async () => {
-      const real = new SaldoClienteService();
+    it('la deuda la calcula G8: mientras no confirme su deploy, el saldo es null y no se le pregunta', async () => {
+      const g8 = { facturas: jest.fn() };
+      const real = new SaldoClienteService(
+        prisma as unknown as PrismaService,
+        g8 as unknown as G8IntegracionService,
+      );
 
       await expect(
         real.saldoDe({ idCliente: 10, idContrato: null }),
       ).resolves.toBeNull();
+      expect(g8.facturas).not.toHaveBeenCalled();
     });
   });
 

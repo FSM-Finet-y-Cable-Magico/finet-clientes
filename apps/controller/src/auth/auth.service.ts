@@ -12,6 +12,13 @@ import { MailService } from '../mail/mail.service.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
 
+/**
+ * CU-05: "se registra el evento en la bitácora de auditoría". Y es lo que deja el
+ * CU-06, que el sistema guarde el historial de las IPs bloqueadas con su fecha,
+ * hora y cantidad de intentos, sin panel.
+ */
+export const ACCION_BLOQUEO_INTENTOS = 'BLOQUEO_INTENTOS_FALLIDOS';
+
 interface IntentoFallidoMemoria {
   rut_intentado: string;
   ip_address: string;
@@ -207,10 +214,13 @@ export class AuthService {
       throw new UnauthorizedException('RUT o contraseña incorrectos');
     }
 
-    // Login exitoso: limpiar intentos fallidos del RUT
+    // Login exitoso: se reinicia el contador del RUT, pero las filas que
+    // dispararon un bloqueo se conservan: son el historial del CU-06. No cambian
+    // el control, porque un login exitoso solo llega con esos bloqueos ya vencidos
+    // y fuera de las ventanas de conteo (5 y 10 minutos, contra 15 de bloqueo).
     try {
       await this.prisma.intento_fallido.deleteMany({
-        where: { rut_intentado: rutLimpio },
+        where: { rut_intentado: rutLimpio, bloqueado_hasta: null },
       });
     } catch {
       this.fallback.limpiarBloqueoRut(rutLimpio);
@@ -506,7 +516,7 @@ export class AuthService {
         );
       }
 
-      await this.prisma.intento_fallido.create({
+      const creado = await this.prisma.intento_fallido.create({
         data: {
           rut_intentado: rutLimpio,
           id_empresa: idEmpresa ?? undefined,
@@ -514,7 +524,18 @@ export class AuthService {
           timestamp: ahora,
           bloqueado_hasta: bloquearHasta ?? undefined,
         },
+        select: { id_intento: true },
       });
+
+      if (bloquearHasta) {
+        await this.auditarBloqueo(creado, ip, {
+          bloquea_ip: bloquearIp,
+          bloquea_rut: bloquearRut,
+          intentos_ip: intentosIp + 1,
+          intentos_rut: intentosRut + 1,
+          bloqueado_hasta: bloquearHasta.toISOString(),
+        });
+      }
     } catch {
       // CU-05 Excepción 1: DB no disponible → registrar en fallback en memoria
       this.logger.warn(
@@ -533,6 +554,51 @@ export class AuthService {
           `Brute force block (fallback): ${motivo} bloqueado hasta ${resultado.bloquearHasta.toISOString()}`,
         );
       }
+    }
+  }
+
+  /**
+   * El evento del bloqueo en la bitácora de auditoría (CU-05), que además es el
+   * historial que guarda el CU-06: la IP, la fecha y hora, y la cantidad de
+   * intentos.
+   *
+   * No va en una transacción con el intento a propósito: el bloqueo ya quedó
+   * aplicado con esa fila, y si la auditoría fallara junto con ella, el bloqueo
+   * se perdería con la base arriba (el respaldo en memoria solo se consulta con
+   * la base caída). Por eso nunca lanza.
+   */
+  private async auditarBloqueo(
+    intento: { id_intento: bigint },
+    ip: string,
+    detalle: {
+      bloquea_ip: boolean;
+      bloquea_rut: boolean;
+      intentos_ip: number;
+      intentos_rut: number;
+      bloqueado_hasta: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.prisma.log_auditoria.create({
+        data: {
+          accion: ACCION_BLOQUEO_INTENTOS,
+          entidad_afectada: 'intento_fallido',
+          valor_nuevo: {
+            // Número JSON, como pide el §10 del acuerdo v2.0 para los IDs
+            // internos. El BigInt no pasa a JSON tal cual, y los ids están muy
+            // lejos de 2^53. No va en id_entidad_afectada, que es Int.
+            id_intento: Number(intento.id_intento),
+            ...detalle,
+            origen: 'PORTAL',
+          },
+          ip_origen: ip,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo auditar el bloqueo del intento ${String(intento?.id_intento)}`,
+        error,
+      );
     }
   }
 }

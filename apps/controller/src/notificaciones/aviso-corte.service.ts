@@ -19,15 +19,18 @@ import {
 } from './despacho-notificacion.js';
 import {
   CANDADO_AVISO_CORTE,
-  DIAS_GRACIA_CORTE,
   TIPO_EVENTO_AVISO_CORTE,
 } from './aviso-corte.constantes.js';
 import {
-  ESTADOS_IMPAGOS,
   PAUSA_ENTRE_TANDAS_MS,
   TANDA_MAXIMA,
   ZONA_HORARIA,
 } from './recordatorio-pago.constantes.js';
+import {
+  clientesConFacturasImpagas,
+  diaG8,
+  facturasQueVencenEl,
+} from './deuda-g8.js';
 
 /** Lo que el aviso necesita y todavía no está en el sistema. Ver `common/pendientes.ts`. */
 export type DatosAvisoCorte = {
@@ -36,38 +39,32 @@ export type DatosAvisoCorte = {
 };
 
 export type ResumenAvisoCorte = {
-  /** Clientes con al menos una factura impaga que venció ayer: un aviso por cada uno. */
+  /** Clientes con una factura que, según G8, venció ayer y sigue impaga: un aviso por cada uno. */
   detectadas: number;
   enviados: number;
   sinCanal: number;
   fallidos: number;
   yaAvisados: number;
-  /** Clientes a los que G8 ya no les registra deuda: no hay corte que avisar. */
-  sinDeuda: number;
+  /** Clientes por los que G8 no pudo responder: no se adivina. */
+  sinDatos: number;
   /** false si falta un dato, o si otra instancia tenía el candado. */
   ejecutada: boolean;
   /** Qué falta para que corra. Vacío cuando no falta nada. */
   faltan: string[];
 };
 
-/** Un cliente a avisar, con las facturas que le vencieron ayer. */
-type Moroso = {
-  id_cliente: number | null;
-  nombre: string;
-  email: string | null;
-  facturas: number[];
-};
-
 /**
  * CU-68 / RF-50: aviso de corte inminente por morosidad.
  *
- * **Qué dice:** cuánto debe el cliente, la **fecha de corte** y el enlace
- * directo para pagar. La fecha de corte es el vencimiento más los 4 días de
- * prórroga del §6.7.3: se muestra la fecha, no los días.
+ * **Todo lo financiero lo dice G8** (su ratificación del 02-10, §2 y §4): se
+ * avisa al cliente con una factura cuya `fechaVencimientoEfectiva` fue ayer,
+ * con `saldoExigible` y que acepte pagos. La base solo dice a quién preguntarle
+ * (ver `deuda-g8.ts`).
  *
- * **Cuándo avisa:** el día siguiente al vencimiento de una factura impaga. El CU
- * habla de un "umbral de morosidad" que el Documento 0 no define; así el aviso
- * solo depende de la fecha de vencimiento.
+ * **Qué dice:** cuánto debe el cliente (la suma de su `saldoExigible`), cuándo
+ * venció y el enlace directo para pagar. **No promete una fecha de corte:** los
+ * días de gracia se configuran por contrato en G8 (CU-47, RF-35 y CU-80), y el
+ * CU-68 y el RF-50 no piden la fecha.
  *
  * **Uno por cliente**, aunque tenga varios contratos vencidos el mismo día.
  *
@@ -119,7 +116,7 @@ export class AvisoCorteService {
       sinCanal: 0,
       fallidos: 0,
       yaAvisados: 0,
-      sinDeuda: 0,
+      sinDatos: 0,
       ejecutada: false,
       faltan: [],
     };
@@ -138,7 +135,7 @@ export class AvisoCorteService {
 
     try {
       const r = await conCandado(this.prisma, CANDADO_AVISO_CORTE, () =>
-        this.tanda(ahora, vacio),
+        this.tanda(ahora, vacio, datos),
       );
       if (!r.tomado) {
         this.logger.log(
@@ -158,6 +155,7 @@ export class AvisoCorteService {
   private async tanda(
     ahora: Date,
     vacio: ResumenAvisoCorte,
+    datos: DatosAvisoCorte,
   ): Promise<ResumenAvisoCorte> {
     // Antes de despachar nada: sin la URL del sitio o sin la clave de los
     // enlaces, los correos saldrían con el enlace roto o no saldrían, y cada
@@ -167,60 +165,51 @@ export class AvisoCorteService {
 
     const hoy = inicioDelDiaUTC(ahora);
     const ayer = sumarDias(hoy, -1);
-    const fechaCorte = sumarDias(ayer, DIAS_GRACIA_CORTE);
     const idPlantilla = await this.despacho.plantilla();
-    const morosos = await this.vencidosAyer(ayer);
+    const candidatos = await clientesConFacturasImpagas(this.prisma);
 
-    const resumen: ResumenAvisoCorte = {
-      ...vacio,
-      detectadas: morosos.length,
-      ejecutada: true,
-    };
+    const resumen: ResumenAvisoCorte = { ...vacio, ejecutada: true };
 
-    for (let i = 0; i < morosos.length; i += TANDA_MAXIMA) {
+    for (let i = 0; i < candidatos.length; i += TANDA_MAXIMA) {
       if (i > 0) await pausa(PAUSA_ENTRE_TANDAS_MS);
-      for (const m of morosos.slice(i, i + TANDA_MAXIMA)) {
+      for (const c of candidatos.slice(i, i + TANDA_MAXIMA)) {
         // Si la tanda se cae a mitad y se relanza, al que ya se le avisó hoy
-        // no se le vuelve a avisar.
+        // no se le vuelve a avisar ni se le pregunta de nuevo a G8.
         if (
-          await this.despacho.yaSeLeAvisoDesde(m.id_cliente, idPlantilla, hoy)
+          await this.despacho.yaSeLeAvisoDesde(c.idCliente, idPlantilla, hoy)
         ) {
           resumen.yaAvisados++;
           continue;
         }
 
-        // El monto lo da G8. Si ya no le registra deuda, no hay corte que
-        // avisar; si no puede darlo, el despacho queda fallido.
-        const deuda =
-          m.id_cliente === null
-            ? null
-            : await this.saldos.saldoDe({
-                idCliente: m.id_cliente,
-                idContrato: null,
-              });
-        if (deuda !== null && deuda <= 0) {
-          resumen.sinDeuda++;
+        const facturas = await this.saldos.facturasDe(
+          { idCliente: c.idCliente, idContrato: null },
+          datos.saldoDefinido,
+        );
+        if (facturas === null) {
+          resumen.sinDatos++;
           continue;
         }
+        const vencidas = facturasQueVencenEl(facturas, diaG8(ayer));
+        if (vencidas.length === 0) continue;
 
+        resumen.detectadas++;
+        // Lo que debe en total, según G8.
+        const deuda = facturas.reduce((t, f) => t + f.saldoExigible, 0);
         const estado = await this.despacho.despachar({
-          idCliente: m.id_cliente,
-          email: m.email,
+          idCliente: c.idCliente,
+          email: c.email,
           idPlantilla,
           ahora,
-          referencia: `cliente ${m.id_cliente}, facturas ${m.facturas.join(', ')}`,
-          enviar: () => {
-            if (deuda === null) {
-              throw new Error('el saldo del cliente no está disponible');
-            }
-            return this.mail.sendAvisoCorte(
-              m.email!,
-              m.nombre,
+          referencia: `cliente ${c.idCliente}, facturas ${vencidas.map((f) => f.idFactura).join(', ')}`,
+          enviar: () =>
+            this.mail.sendAvisoCorte(
+              c.email!,
+              c.nombre,
               deuda,
-              fechaCorte,
-              this.enlacePago(sitio, m.id_cliente!),
-            );
-          },
+              ayer,
+              this.enlacePago(sitio, c.idCliente),
+            ),
         });
 
         if (estado === 'enviado') resumen.enviados++;
@@ -233,45 +222,9 @@ export class AvisoCorteService {
       `[CU-68] avisos de corte por vencimientos del ${ayer.toISOString().slice(0, 10)}: ` +
         `${resumen.detectadas} clientes, ${resumen.enviados} enviados, ` +
         `${resumen.sinCanal} sin canal, ${resumen.fallidos} fallidos, ` +
-        `${resumen.yaAvisados} ya avisados, ${resumen.sinDeuda} sin deuda`,
+        `${resumen.yaAvisados} ya avisados, ${resumen.sinDatos} sin datos de G8`,
     );
     return resumen;
-  }
-
-  /** Clientes con facturas que vencieron ayer y siguen impagas, uno por cliente. */
-  private async vencidosAyer(ayer: Date): Promise<Moroso[]> {
-    const facturas = await this.prisma.factura.findMany({
-      where: { fecha_limite_pago: ayer, estado: { in: ESTADOS_IMPAGOS } },
-      select: {
-        id_factura: true,
-        contrato: {
-          select: {
-            cliente: {
-              select: { id_cliente: true, nombre_completo: true, email: true },
-            },
-          },
-        },
-      },
-      orderBy: { id_factura: 'asc' },
-    });
-
-    const porCliente = new Map<number | null, Moroso>();
-    for (const f of facturas) {
-      const cliente = f.contrato?.cliente;
-      const id = cliente?.id_cliente ?? null;
-      const previo = porCliente.get(id);
-      if (previo) {
-        previo.facturas.push(f.id_factura);
-        continue;
-      }
-      porCliente.set(id, {
-        id_cliente: id,
-        nombre: cliente?.nombre_completo ?? '',
-        email: cliente?.email ?? null,
-        facturas: [f.id_factura],
-      });
-    }
-    return [...porCliente.values()];
   }
 
   /** RF-50 y RNF-50.1: enlace corto, único y firmado. */

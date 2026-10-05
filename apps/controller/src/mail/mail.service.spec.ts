@@ -46,9 +46,15 @@ describe('MailService — correos del Incremento 3', () => {
       expect(html()).toContain('próximo a ser cortado por una deuda vencida');
     });
 
-    it('dice cuánto debe y la fecha de corte en DD/MM/AAAA', () => {
+    it('dice cuánto debe y cuándo venció, en DD/MM/AAAA', () => {
       expect(html()).toContain('$144.940');
+      expect(html()).toContain('Venció el');
       expect(html()).toContain('03/10/2026');
+    });
+
+    it('no promete una fecha de corte: los días de gracia los maneja G8', () => {
+      expect(html()).not.toContain('Fecha de corte');
+      expect(html()).not.toMatch(/se cortar[aá] el/i);
     });
 
     it('no muestra los días de gracia: son un cálculo interno', () => {
@@ -69,6 +75,21 @@ describe('MailService — correos del Incremento 3', () => {
     it('no interpreta como HTML lo que escribió el cliente', () => {
       expect(html()).toContain('Ana &lt;b&gt;');
       expect(html()).not.toContain('Ana <b>');
+    });
+  });
+
+  describe('CU-67: recordatorio de pago', () => {
+    it('dice el monto y el vencimiento en DD/MM/AAAA (§11.4)', async () => {
+      await mail.sendRecordatorioPago(
+        'ana@b.cl',
+        'Ana',
+        24990,
+        new Date('2026-10-04T00:00:00.000Z'),
+      );
+
+      expect(html()).toContain('04/10/2026');
+      expect(html()).not.toContain('2026-10-04');
+      expect(html()).toContain('$24.990');
     });
   });
 
