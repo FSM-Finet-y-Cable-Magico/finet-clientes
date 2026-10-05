@@ -7,11 +7,11 @@ import {
   AlertCircle,
   RefreshCw,
   Zap,
-  CreditCard,
 } from "lucide-react";
 import { useAuth } from "../_lib/auth";
 import { api } from "../utils/api";
 import StatusBadge from "@/app/_components/ui/StatusBadge";
+import IrAPagarButton from "@/app/_components/portal/IrAPagarButton";
 import { estadoContratoBadge } from "@/app/_lib/estado-contrato";
 
 type Contrato = {
@@ -266,14 +266,7 @@ export default function PortalPage() {
                             : `Vence: ${formatFechaCorta(masProxima.fecha_limite_pago)}`}
                         </p>
                       )}
-                      {/* TODO: enlazar a la pasarela de pago (CU-42+). Por ahora sin acción. */}
-                      <button
-                        type="button"
-                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-background shadow-sm transition-all hover:opacity-90 active:scale-[0.98]"
-                      >
-                        <CreditCard size={16} aria-hidden />
-                        Pagar ahora
-                      </button>
+                      <IrAPagarButton />
                     </>
                   );
                 })()

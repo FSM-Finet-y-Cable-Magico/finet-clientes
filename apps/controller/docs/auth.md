@@ -24,7 +24,7 @@ POST /api/auth/login
 ```json
 {
   "rut": "12.345.678-5",
-  "password": "MiClave1"
+  "password": "<contraseña>"
 }
 ```
 
@@ -80,8 +80,8 @@ POST /api/auth/register
   "nombre_completo": "Juan Perez",
   "email": "juan@ejemplo.cl",
   "telefono": "912345678",
-  "password": "Clave123",
-  "password_confirmation": "Clave123",
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>",
   "acepta_politica_privacidad": true,
   "version_politica_privacidad": "1.1"
 }
@@ -183,7 +183,7 @@ POST /api/auth/restablecer-password
 ```json
 {
   "token": "eyJhbGciOi...",
-  "password": "NuevaClave1"
+  "password": "<contraseña nueva>"
 }
 ```
 
@@ -263,7 +263,7 @@ const API_URL = 'http://localhost:4000/api';
 const res = await fetch(`${API_URL}/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ rut: '12.345.678-5', password: 'MiClave1' }),
+  body: JSON.stringify({ rut: '12.345.678-5', password: '<contraseña>' }),
 });
 
 if (res.status === 401) {
@@ -296,7 +296,7 @@ const token = window.location.hash.replace('#token=', '');
 const res = await fetch(`${API_URL}/auth/restablecer-password`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ token, password: 'NuevaClave1' }),
+  body: JSON.stringify({ token, password: '<contraseña nueva>' }),
 });
 
 if (res.ok) {

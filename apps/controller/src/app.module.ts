@@ -17,6 +17,7 @@ import { CoberturaModule } from './cobertura/cobertura.module.js';
 import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
 import { ConsentimientoModule } from './consentimiento/consentimiento.module.js';
 import { NotificacionesModule } from './notificaciones/notificaciones.module.js';
+import { PagosModule } from './pagos/pagos.module.js';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module.js'
     DiagnosticoModule,
     ConsentimientoModule,
     NotificacionesModule,
+    PagosModule,
   ],
   controllers: [AppController],
   providers: [

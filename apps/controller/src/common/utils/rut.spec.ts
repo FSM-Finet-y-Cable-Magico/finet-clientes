@@ -1,4 +1,4 @@
-import { cleanRut, formatRut, validateRut } from './rut.js';
+import { cleanRut, formatRut, validateRut, variantesRut } from './rut.js';
 
 describe('cleanRut', () => {
   it('remove dots and dash from formatted RUT', () => {
@@ -32,16 +32,42 @@ describe('formatRut', () => {
   });
 });
 
+describe('variantesRut', () => {
+  it('busca el RUT sin guion y con guion', () => {
+    expect(variantesRut('12.345.678-5')).toEqual(['123456785', '12345678-5']);
+  });
+
+  it('acepta la K en mayúscula y en minúscula, con y sin guion', () => {
+    expect(variantesRut('7777777k')).toEqual([
+      '7777777K',
+      '7777777-K',
+      '7777777k',
+      '7777777-k',
+    ]);
+  });
+
+  it('da lo mismo cómo venga escrito', () => {
+    expect(variantesRut('12345678-5')).toEqual(variantesRut('123456785'));
+  });
+});
+
 describe('validateRut', () => {
   const validRuts = [
     '12.345.678-5',
     '11.111.111-1',
-    '7.777.777-K',
     '30.686.957-4',
     '123456785',
     '111111111',
-    '7777777K',
     '306869574',
+    // RUT bajo 10 millones (7 dígitos): el cálculo anterior los rechazaba.
+    '9.345.678-5', // el ejemplo del §11 del Documento 0
+    '93456785',
+    '7.777.777-6',
+    '1.234.567-4',
+    '5.126.663-3',
+    // dígito K
+    '10.000.013-K',
+    '10000013k',
   ];
 
   for (const rut of validRuts) {
@@ -51,6 +77,10 @@ describe('validateRut', () => {
   }
 
   const invalidRuts = [
+    // el cálculo anterior los daba por válidos
+    '7.777.777-K',
+    '7777777K',
+    '1.234.567-K',
     '11.111.111-K',
     '12.345.678-0',
     '7.777.777-0',

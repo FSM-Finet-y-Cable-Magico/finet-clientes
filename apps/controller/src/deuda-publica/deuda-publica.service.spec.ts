@@ -9,7 +9,7 @@ describe('DeudaPublicaService', () => {
 
   beforeEach(async () => {
     const mockPrisma = {
-      cliente: { findUnique: jest.fn() },
+      cliente: { findFirst: jest.fn() },
       contrato: { findUnique: jest.fn(), findMany: jest.fn() },
       factura: { findMany: jest.fn() },
     };
@@ -25,15 +25,27 @@ describe('DeudaPublicaService', () => {
     (prisma.contrato.findMany as jest.Mock).mockResolvedValue([]);
   });
 
+  it('busca el RUT en sus dos formas: hay clientes guardados con guion (G3, 29-09)', async () => {
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await service.consultarPorRut('12.345.678-5');
+
+    expect(prisma.cliente.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { rut: { in: ['123456785', '12345678-5'] } },
+      }),
+    );
+  });
+
   it('retorna encontrado:false si el RUT no existe', async () => {
-    (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue(null);
     const r = await service.consultarPorRut('123456785');
     expect(r.encontrado).toBe(false);
     expect(r.cliente).toBeNull();
   });
 
   it('retorna tiene_deuda:false cuando no hay facturas pendientes', async () => {
-    (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
       id_cliente: 1,
       nombre_completo: 'Juan Pérez',
       rut: '123456785',
@@ -49,7 +61,7 @@ describe('DeudaPublicaService', () => {
 
   it('calcula dias_vencida cuando la factura está vencida', async () => {
     const ayer = new Date(Date.now() - 86_400_000 * 3);
-    (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
       id_cliente: 1,
       nombre_completo: 'Juan',
       rut: '123456785',
@@ -72,7 +84,7 @@ describe('DeudaPublicaService', () => {
 
   it('calcula dias_para_vencer cuando la factura está pendiente', async () => {
     const futuro = new Date(Date.now() + 86_400_000 * 5);
-    (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
       id_cliente: 1,
       nombre_completo: 'Juan',
       rut: '123456785',
@@ -111,7 +123,7 @@ describe('DeudaPublicaService', () => {
   });
 
   it('marca detalle_disponible y informacion_completa en true en el camino feliz', async () => {
-    (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
       id_cliente: 1,
       nombre_completo: 'Juan',
       rut: '123456785',
@@ -133,7 +145,7 @@ describe('DeudaPublicaService', () => {
   });
 
   it('CU-41 Exc 1: detalle_disponible:false si la consulta de facturas falla', async () => {
-    (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
       id_cliente: 1,
       nombre_completo: 'Juan',
       rut: '123456785',
@@ -150,7 +162,7 @@ describe('DeudaPublicaService', () => {
   });
 
   it('incluye el detalle del/los plan(es) contratado(s) sin duplicados', async () => {
-    (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
       id_cliente: 1,
       nombre_completo: 'Juan',
       rut: '123456785',
@@ -187,7 +199,7 @@ describe('DeudaPublicaService', () => {
   });
 
   it('CU-41 Exc 2: informacion_completa:false si una factura tiene monto null', async () => {
-    (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
       id_cliente: 1,
       nombre_completo: 'Juan',
       rut: '123456785',

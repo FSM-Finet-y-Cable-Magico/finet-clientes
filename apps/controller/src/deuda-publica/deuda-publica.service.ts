@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { cleanRut } from '../common/utils/rut.js';
+import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import {
   DetalleFacturaPublicaDto,
   DeudaPublicaResponseDto,
@@ -27,8 +27,8 @@ export class DeudaPublicaService {
   async consultarPorRut(rut: string): Promise<DeudaPublicaResponseDto> {
     const rutNormalizado = cleanRut(rut);
 
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { rut: rutNormalizado },
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { rut: { in: variantesRut(rutNormalizado) } },
       select: {
         id_cliente: true,
         nombre_completo: true,

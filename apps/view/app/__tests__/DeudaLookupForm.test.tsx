@@ -50,9 +50,12 @@ describe('DeudaLookupForm (CU-39/CU-40)', () => {
       expect(screen.getByText(/juan pérez/i)).toBeInTheDocument();
     });
 
-    // Detalle del plan y botón de pago (sin link)
+    // Detalle del plan y "Pagar ahora", que lleva a /pagar con el mismo RUT (CU-42/43)
     expect(screen.getByText(/plan 200 mbps/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /pagar ahora/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /pagar ahora/i })).toHaveAttribute(
+      'href',
+      '/pagar?rut=123456785',
+    );
   });
 
   it('cambia a modo código de abonado y consulta (CU-40)', async () => {

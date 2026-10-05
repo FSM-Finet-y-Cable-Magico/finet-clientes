@@ -47,10 +47,15 @@ describe('RecordatorioPagoService', () => {
   let service: RecordatorioPagoService;
   let prisma: jest.Mocked<PrismaService>;
   let mail: jest.Mocked<MailService>;
+  let candado: jest.Mock;
 
   beforeEach(async () => {
+    candado = jest.fn().mockResolvedValue([{ tomado: true }]);
     const mockPrisma = {
-      $queryRaw: jest.fn().mockResolvedValue([{ pg_try_advisory_lock: true }]),
+      $transaction: jest.fn(
+        (fn: (tx: { $queryRaw: jest.Mock }) => Promise<unknown>) =>
+          fn({ $queryRaw: candado }),
+      ),
       factura: { findMany: jest.fn().mockResolvedValue([]) },
       plantilla_notificacion: {
         findFirst: jest.fn().mockResolvedValue({ id_plantilla: 5 }),
@@ -74,6 +79,18 @@ describe('RecordatorioPagoService', () => {
     service = module.get(RecordatorioPagoService);
     prisma = module.get(PrismaService);
     mail = module.get(MailService);
+  });
+
+  it('corre a las 9 de Chile, no a la hora del servidor (§11: America/Santiago)', () => {
+    const opciones = Reflect.getMetadata(
+      'SCHEDULE_CRON_OPTIONS',
+      RecordatorioPagoService.prototype.tandaDiaria,
+    ) as { cronTime: string; timeZone: string };
+
+    expect(opciones).toMatchObject({
+      cronTime: '0 9 * * *',
+      timeZone: 'America/Santiago',
+    });
   });
 
   // ─── RF-49: tres días corridos antes del vencimiento ─────────────────────
@@ -246,9 +263,7 @@ describe('RecordatorioPagoService', () => {
   // ─── Frecuencia: una vez por ciclo. Los dos candados ─────────────────────
 
   it('no manda nada si otra instancia tiene el candado', async () => {
-    (prisma.$queryRaw as jest.Mock).mockResolvedValue([
-      { pg_try_advisory_lock: false },
-    ]);
+    candado.mockResolvedValue([{ tomado: false }]);
     (prisma.factura.findMany as jest.Mock).mockResolvedValue([factura()]);
 
     const r = await service.ejecutar(HOY);
@@ -393,8 +408,38 @@ describe('RecordatorioPagoService', () => {
     expect(r).toMatchObject({ detectadas: 0, ejecutada: true });
   });
 
+  it('usa un candado de transacción, que se suelta solo, y no uno de sesión', async () => {
+    await service.ejecutar(HOY);
+
+    const sql = (candado.mock.calls[0]![0] as TemplateStringsArray).join('?');
+    expect(sql).toContain('pg_try_advisory_xact_lock');
+    // pg_try_advisory_lock a secas queda tomado por la conexión del pool
+    // después de la tanda, y el cron del día siguiente se la salta.
+    expect(sql).not.toMatch(/pg_try_advisory_lock\(/);
+  });
+
+  it('el trabajo corre dentro de la transacción que sostiene el candado', async () => {
+    const orden: string[] = [];
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      async (fn: (tx: { $queryRaw: jest.Mock }) => Promise<unknown>) => {
+        orden.push('abre');
+        const r = await fn({ $queryRaw: candado });
+        orden.push('cierra');
+        return r;
+      },
+    );
+    (prisma.factura.findMany as jest.Mock).mockImplementation(() => {
+      orden.push('trabaja');
+      return Promise.resolve([]);
+    });
+
+    await service.ejecutar(HOY);
+
+    expect(orden).toEqual(['abre', 'trabaja', 'cierra']);
+  });
+
   it('si no se puede tomar el candado por un error de base, no manda nada', async () => {
-    (prisma.$queryRaw as jest.Mock).mockRejectedValue(
+    (prisma.$transaction as jest.Mock).mockRejectedValue(
       new Error('sin conexión'),
     );
 

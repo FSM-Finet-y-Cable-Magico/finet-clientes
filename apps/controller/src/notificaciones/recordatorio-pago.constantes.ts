@@ -12,6 +12,13 @@
  * acuerdo con G8).
  */
 
+/**
+ * §11 del Documento 0: la zona horaria del sistema es la de Chile continental.
+ * Sin esto el cron corre a la hora del servidor, que en Railway es UTC: las 9
+ * serían las 6 de la mañana en Chile.
+ */
+export const ZONA_HORARIA = 'America/Santiago';
+
 /** RF-49: "tres días corridos antes de la fecha de vencimiento". */
 export const DIAS_ANTES_DEL_VENCIMIENTO = 3;
 

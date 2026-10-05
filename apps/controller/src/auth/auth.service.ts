@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
-import { cleanRut } from '../common/utils/rut.js';
+import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
 
 interface IntentoFallidoMemoria {
@@ -161,8 +161,8 @@ export class AuthService {
       }
     }
 
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { rut: rutLimpio },
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { rut: { in: variantesRut(rutLimpio) } },
     });
 
     if (!cliente) {
@@ -260,8 +260,8 @@ export class AuthService {
   ) {
     const rutLimpio = cleanRut(rut);
 
-    const existenteRut = await this.prisma.cliente.findUnique({
-      where: { rut: rutLimpio },
+    const existenteRut = await this.prisma.cliente.findFirst({
+      where: { rut: { in: variantesRut(rutLimpio) } },
     });
 
     if (existenteRut) {
@@ -354,8 +354,8 @@ export class AuthService {
       message: 'Si el RUT está registrado, recibirás un enlace de recuperación',
     };
 
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { rut: rutLimpio },
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { rut: { in: variantesRut(rutLimpio) } },
     });
 
     if (!cliente) {

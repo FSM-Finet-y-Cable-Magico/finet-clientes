@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+const push = jest.fn();
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
 import DeudaPage from '@/app/portal/deuda/page';
 
 describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
@@ -67,10 +70,21 @@ describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
     expect(screen.getByText('Abril 2026')).toBeInTheDocument();
     expect(screen.getByText(/hace 52 días/i)).toBeInTheDocument();
 
-    // El botón existe pero es intencionalmente inerte (pasarela de pago: CU-42+)
-    const botonPagar = screen.getByRole('button', { name: /pagar ahora/i });
-    expect(botonPagar).toBeInTheDocument();
-    expect(botonPagar).not.toHaveAttribute('href');
+    // CU-42/43: "Pagar ahora" pide el enlace firmado y lleva a /pagar
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ enlace: '/pagar?t=p.1.a.b.c' }),
+    });
+    await userEvent.setup().click(
+      screen.getByRole('button', { name: /pagar ahora/i }),
+    );
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/portal/enlace-pago'),
+        expect.any(Object),
+      );
+      expect(push).toHaveBeenCalledWith('/pagar?t=p.1.a.b.c');
+    });
   });
 
   it('muestra aviso cuando el saldo no está confirmado (CU-27 Excepción 3)', async () => {

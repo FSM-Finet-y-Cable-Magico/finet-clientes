@@ -18,8 +18,7 @@ export const ContratacionDto = z.object({
 });
 export type ContratacionDto = z.infer<typeof ContratacionDto>;
 
+/** CU-18: la solicitud queda como Prospecto (acuerdo v2.0 §4). */
 export interface ContratacionResponseDto {
-  id_cliente: number;
-  id_contrato: number;
-  id_ot: number;
+  id_prospecto: number;
 }

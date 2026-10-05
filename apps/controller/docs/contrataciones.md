@@ -32,10 +32,10 @@ POST /api/contrataciones
 **Respuesta 201:**
 
 ```json
-{ "id_cliente": 10, "id_contrato": 20, "id_ot": 30 }
+{ "id_prospecto": 5 }
 ```
 
-Crea en una sola transacción el cliente (estado `pendiente`), su dirección, el contrato (`PENDIENTE`), la orden de instalación, el prospecto y la aceptación de la Política de Privacidad. La aceptación es una fila en `log_auditoria` con `accion = 'ACEPTAR_POLITICA_PRIVACIDAD'`, la IP de origen **anonimizada** (`203.0.113.7` se guarda como `203.0.113.0/24`, ver `common/utils/ip.ts`), `fecha_hora` y los datos enviados en `valor_nuevo`. Si no se puede registrar, no se crea nada.
+Crea **solo el prospecto**, en la etapa `NUEVO` del pipeline (§11.10), y la aceptación de la Política de Privacidad a su nombre, en una sola transacción. **No crea cliente, dirección, contrato ni orden de trabajo**: el acuerdo v2.0 con G8 (§4 y prueba §14.1) dice que el formulario público termina en el prospecto, y que el cliente lo crea G8 cuando la instalación de G3 queda completada. El plan de interés no tiene columna en `prospecto`: queda en la auditoría (`CREAR_PROSPECTO_PORTAL`, `valor_nuevo.id_plan`) mientras G8 dice dónde lo quiere. Si el RUT ya es cliente, responde 409 como antes. La aceptación es una fila en `log_auditoria` con `accion = 'ACEPTAR_POLITICA_PRIVACIDAD'`, la IP de origen **anonimizada** (`203.0.113.7` se guarda como `203.0.113.0/24`, ver `common/utils/ip.ts`), `fecha_hora` y los datos enviados en `valor_nuevo`. Si no se puede registrar, no se crea nada.
 
 La anonimización no cambia el contrato de este endpoint ni sus mensajes: solo la precisión de ese dato almacenado. Las IPs de seguridad (`intento_fallido`, `sesion_portal`) siguen exactas a propósito, porque el bloqueo del RF-05 y el desbloqueo del CU-06 comparan una IP exacta. Es una medida provisional; el cifrado real está anotado en [la bitácora del 2026-09-28](../../../docs/2026-09-28-ip-consentimiento-y-legales.md).
 

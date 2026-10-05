@@ -57,6 +57,12 @@ GET /api/deuda-publica/rut?rut=123456785
 
 > `codigo_abonado` es `null` en consultas por RUT (solo se incluye en consultas por abonado).
 
+> El RUT se busca en sus dos formas, sin guion y con guion (K mayúscula o minúscula). El
+> Documento 0 (§11) pide guardarlo sin guion y así lo escribimos, pero la base es compartida y en
+> producción hay clientes guardados con guion (G3 contó 14 de 25 el 29-09). Lo mismo hacen el
+> login, el registro, la recuperación de contraseña, la contratación y `/api/pagos` (ver
+> `variantesRut` en `src/common/utils/rut.ts`).
+
 **Respuesta 200 — No encontrado:**
 
 ```json

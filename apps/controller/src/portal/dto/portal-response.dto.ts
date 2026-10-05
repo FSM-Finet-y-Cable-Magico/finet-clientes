@@ -83,12 +83,12 @@ export interface CrearTicketResponseDto {
 }
 
 // ─── CU-32: Solicitud de cambio de contrasena de la red WiFi ────────────────
-// El portal solo registra la solicitud: la ejecucion en el equipo del cliente
-// es CU-33 y corre por cuenta del CRM. Por eso la respuesta confirma la
-// creacion de la solicitud y no un cambio ya aplicado.
+// El portal solo registra la solicitud: aplicarla en el equipo del cliente es
+// el CU-33, de Grupo 3. Por eso la respuesta confirma la creacion de la
+// solicitud y no un cambio ya aplicado. En el flujo v2 (acuerdo v2.0 §6.4),
+// id_solicitud, estado y fecha son los que devuelve G3.
 //
-// La clave nunca vuelve en la respuesta: se guarda hasheada y el cliente ya
-// la conoce, no hay motivo para devolverla.
+// La clave nunca vuelve en la respuesta: el cliente ya la conoce.
 export interface SolicitudContrasenaWifiResponseDto {
   id_solicitud: number;
   id_contrato: number;

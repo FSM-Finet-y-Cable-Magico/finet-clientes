@@ -2,6 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import {
+  escaparHtml,
+  fechaCliente,
+  fechaHoraCliente,
+  pesos,
+} from './formato.js';
+import { comprobante, plantillaCorreo } from './plantilla-correo.js';
 
 @Injectable()
 export class MailService {
@@ -87,6 +94,63 @@ export class MailService {
     this.logger.log('Payment reminder email sent');
   }
 
+  /**
+   * CU-68 / RF-50: aviso de corte inminente por morosidad: la deuda, la fecha
+   * de corte y el enlace directo para pagar. Lanza si el despacho falla: quien
+   * llama decide si reintenta.
+   */
+  async sendAvisoCorte(
+    email: string,
+    nombre: string,
+    deuda: number,
+    fechaCorte: Date,
+    enlacePago: string,
+  ) {
+    const from =
+      this.configService.get<string>('MAIL_FROM') ||
+      '"Portal Clientes" <no-reply@finet.cl>';
+
+    await this.transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Aviso de corte de servicio - Portal Clientes',
+      html: this.avisoCorteTemplate(nombre, deuda, fechaCorte, enlacePago),
+    });
+
+    this.logger.log('Service cut notice email sent');
+  }
+
+  /**
+   * CU-69 / RF-51: confirmación de un pago registrado, con los datos que el
+   * RF-32 exige guardar de cada pago. Lanza si el despacho falla: quien llama
+   * decide si reintenta.
+   */
+  async sendConfirmacionPago(
+    email: string,
+    nombre: string,
+    monto: number,
+    fecha: Date,
+    codigoAutorizacion: string,
+  ) {
+    const from =
+      this.configService.get<string>('MAIL_FROM') ||
+      '"Portal Clientes" <no-reply@finet.cl>';
+
+    await this.transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Confirmación de pago - Portal Clientes',
+      html: this.confirmacionPagoTemplate(
+        nombre,
+        monto,
+        fecha,
+        codigoAutorizacion,
+      ),
+    });
+
+    this.logger.log('Payment confirmation email sent');
+  }
+
   async sendTicketCreated(
     email: string,
     nombre: string,
@@ -134,6 +198,55 @@ export class MailService {
   </div>
 </body>
 </html>`;
+  }
+
+  private avisoCorteTemplate(
+    nombre: string,
+    deuda: number,
+    fechaCorte: Date,
+    enlacePago: string,
+  ): string {
+    return plantillaCorreo({
+      resumen: `Tienes una deuda de ${pesos(deuda)}. Tu servicio se cortará el ${fechaCliente(fechaCorte)}.`,
+      etiqueta: { texto: 'Aviso de corte', tono: 'alerta' },
+      titulo: 'Tu servicio está por ser cortado',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: tu servicio está próximo a ser cortado por una deuda vencida. ` +
+        'Para evitarlo, paga antes de la fecha de corte.' +
+        comprobante([
+          ['Deuda pendiente', pesos(deuda)],
+          ['Fecha de corte', fechaCliente(fechaCorte)],
+        ]) +
+        '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</p>',
+      boton: { texto: 'Pagar mi deuda', enlace: enlacePago },
+      sitio: this.sitio(),
+    });
+  }
+
+  private confirmacionPagoTemplate(
+    nombre: string,
+    monto: number,
+    fecha: Date,
+    codigoAutorizacion: string,
+  ): string {
+    return plantillaCorreo({
+      resumen: `Registramos tu pago de ${pesos(monto)}.`,
+      etiqueta: { texto: 'Pago confirmado', tono: 'exito' },
+      titulo: 'Registramos tu pago',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: tu pago quedó registrado. Guarda este correo como respaldo.` +
+        comprobante([
+          ['Monto pagado', pesos(monto)],
+          ['Fecha', fechaHoraCliente(fecha)],
+          ['Código de autorización', codigoAutorizacion],
+        ]),
+      sitio: this.sitio(),
+    });
+  }
+
+  /** Para el logo de los correos. Sin la URL del sitio va el nombre en texto. */
+  private sitio(): string | undefined {
+    return this.configService.get<string>('FRONTEND_URL') || undefined;
   }
 
   private resetTemplate(nombre: string, link: string): string {
