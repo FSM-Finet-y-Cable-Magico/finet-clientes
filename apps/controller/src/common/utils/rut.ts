@@ -47,6 +47,9 @@ export function validateRut(rut: string): boolean {
   const body = clean.slice(0, -1);
   const dvIngresado = clean.slice(-1).toUpperCase();
 
+  // Modulo 11: los factores 2..7 se aplican desde el ultimo digito hacia la
+  // izquierda. Contarlos desde la izquierda solo acierta con cuerpos de 8
+  // digitos y rechaza los RUT bajo 10 millones.
   let suma = 0;
   let factor = 2;
   for (let i = body.length - 1; i >= 0; i--) {

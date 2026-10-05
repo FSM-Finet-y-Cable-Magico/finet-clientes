@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller.js';
@@ -15,6 +15,8 @@ import { LandingModule } from './landing/landing.module.js';
 import { ContratacionesModule } from './contrataciones/contrataciones.module.js';
 import { CoberturaModule } from './cobertura/cobertura.module.js';
 import { DiagnosticoModule } from './diagnostico/diagnostico.module.js';
+import { AsistenteModule } from './asistente/asistente.module.js';
+import { limitePorMinuto } from './asistente/limite-chatbot.js';
 import { ConsentimientoModule } from './consentimiento/consentimiento.module.js';
 import { NotificacionesModule } from './notificaciones/notificaciones.module.js';
 import { PagosModule } from './pagos/pagos.module.js';
@@ -24,12 +26,17 @@ import { PagosModule } from './pagos/pagos.module.js';
     ConfigModule.forRoot({ isGlobal: true }),
     // CU-67: habilita el @Cron del recordatorio de pago.
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60_000,
-        limit: 10,
-      },
-    ]),
+    // 10 por minuto, salvo finet-chatbot, que consulta por todos sus clientes
+    // desde una sola IP (ver limite-chatbot.ts).
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: 60_000,
+          limit: limitePorMinuto(config),
+        },
+      ],
+    }),
     PrismaModule,
     MailModule,
     AuthModule,
@@ -40,6 +47,7 @@ import { PagosModule } from './pagos/pagos.module.js';
     ContratacionesModule,
     CoberturaModule,
     DiagnosticoModule,
+    AsistenteModule,
     ConsentimientoModule,
     NotificacionesModule,
     PagosModule,

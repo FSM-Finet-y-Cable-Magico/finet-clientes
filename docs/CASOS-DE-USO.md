@@ -17,7 +17,6 @@ del 2026-09-28:
 > casos cuya coordinación con G8 quedó para después: CU-46, CU-52, CU-53, CU-48, CU-49,
 > CU-50, CU-33, CU-36, CU-06 y CU-58.
 
-
 > ⚠️ **Discrepancia en el documento fuente:** la tabla de Incremento 1 declara "34 casos de uso" pero solo lista 32 filas — las prioridades 1 y 2 no aparecen en la tabla original. No se inventó contenido para esas dos filas; si alguien tiene la versión completa del documento, hay que completarlas aquí.
 
 ---
@@ -180,6 +179,13 @@ El orden de dependencia real es el que describe el criterio de agrupación: `deu
 > **Nota:** el schema ya tiene modelados `conversacion_bot`, `mensaje_bot`,
 > `plantilla_notificacion`, `log_notificacion` y `consentimiento_cookies` — el diseño de
 > datos de este incremento ya existe y no arranca de cero.
+>
+> **Asistente virtual (CU-63 a CU-66, CU-70, CU-77, CU-79), rama `incremento-3/chatbot`:**
+> CU-63 (identificación por RUT), CU-64 (consulta de saldo y facturas), CU-65 (respuesta
+> general vía `finet-chatbot`, con fallback a WhatsApp si el motor no responde) y CU-77
+> (ticket al derivar a una persona, con el historial de la conversación) están
+> implementados en esa rama. Detalle de endpoints y trazabilidad por CU en
+> [`apps/controller/docs/asistente.md`](../apps/controller/docs/asistente.md).
 
 ### Criterio de agrupación (del documento fuente)
 
@@ -310,5 +316,6 @@ El documento de incrementos no cubre RF-XX — estos números vienen de `apps/co
 | RF-09 | Política de complejidad de contraseña (mín. 8, 1 mayúscula, 1 número) | CU-03, CU-10, CU-11 |
 | RF-10 | Registro: email obligatorio, confirmación de contraseña, unicidad de RUT/email | CU-04 |
 | RF-24 | Contraseña WiFi: solo caracteres alfanuméricos | CU-31 |
+| RF-45 | *(sin descripción en el repo: el CU-63 lo cita como dependencia, pero su texto no está en el documento fuente)* | CU-63 |
 
 RF-04, RF-08 y los que faltan entre RF-11 y RF-23 no tienen referencia encontrada en código ni docs — no se completaron para no inventar contenido.

@@ -55,9 +55,12 @@ describe('validateRut', () => {
   const validRuts = [
     '12.345.678-5',
     '11.111.111-1',
+    '9.876.543-3',
+    '98765433',
     '30.686.957-4',
     '123456785',
     '111111111',
+    '77777776',
     '306869574',
     // RUT bajo 10 millones (7 dígitos): el cálculo anterior los rechazaba.
     '9.345.678-5', // el ejemplo del §11 del Documento 0
@@ -84,6 +87,7 @@ describe('validateRut', () => {
     '11.111.111-K',
     '12.345.678-0',
     '7.777.777-0',
+    '7.777.777-K',
     '',
     'hola',
     '12.345.678',
