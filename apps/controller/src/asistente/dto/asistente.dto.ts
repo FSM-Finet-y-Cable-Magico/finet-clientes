@@ -60,9 +60,41 @@ export const CrearSolicitudSoporteDto = z
       .max(5000, 'La descripcion no puede superar los 5000 caracteres'),
   })
   .strict();
-export type CrearSolicitudSoporteDto = z.infer<
-  typeof CrearSolicitudSoporteDto
->;
+export type CrearSolicitudSoporteDto = z.infer<typeof CrearSolicitudSoporteDto>;
+
+/**
+ * Turnos que finet-chatbot guarda por conversacion (20) con margen. El RUT ya
+ * llega reemplazado por `[RUT]`: el chatbot no lo deja en el historial.
+ */
+export const MAX_TURNOS_ESCALAMIENTO = 50;
+
+// CU-77: conversacion que el asistente no pudo resolver y derivo a una persona
+export const EscalarConversacionDto = z
+  .object({
+    id_sesion: z.string().trim().min(1).max(100, 'Sesion invalida'),
+    rut: z
+      .string()
+      .min(1, 'El RUT es requerido')
+      .max(12)
+      .refine((val) => validateRut(val), { message: 'RUT invalido' }),
+    /** Canal de finet-chatbot por donde llego la conversacion. */
+    plataforma: z.enum(['web', 'chatwoot', 'api']),
+    /** Resumen de la consulta que escribe el asistente al derivar. Opcional. */
+    motivo: z.string().trim().min(1).max(1000).optional(),
+    historial: z
+      .array(
+        z
+          .object({
+            rol: z.enum(['user', 'assistant']),
+            contenido: z.string().min(1).max(5000),
+          })
+          .strict(),
+      )
+      .min(1, 'El historial es requerido')
+      .max(MAX_TURNOS_ESCALAMIENTO),
+  })
+  .strict();
+export type EscalarConversacionDto = z.infer<typeof EscalarConversacionDto>;
 
 /**
  * Lo que el asistente sabe del cliente una vez verificado. Solo nombre y

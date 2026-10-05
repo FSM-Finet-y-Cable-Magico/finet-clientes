@@ -13,6 +13,9 @@ Endpoints:
   categorías de falla disponibles para CU-66.
 - `POST /asistente/clientes/soporte` — **interno**. Registra un ticket de
   soporte para el cliente identificado por RUT (CU-66).
+- `POST /asistente/clientes/escalamientos` — **interno**. Registra el ticket
+  y el historial cuando el asistente deriva a un cliente identificado a una
+  persona (CU-77). Ver [seccion 3](#3-ticket-al-derivar-cu-77-interno).
 
 ---
 
@@ -27,7 +30,8 @@ navegador (widget) ──▶ apps/controller  POST /api/asistente/mensajes
                               ▼
        apps/controller  POST /api/asistente/clientes/identificar ──▶ tabla cliente
                                               │
-                                              └── POST /api/asistente/clientes/soporte ──▶ ticket
+                                              ├── POST /api/asistente/clientes/soporte ──▶ ticket
+                                              └── POST /api/asistente/clientes/escalamientos ──▶ conversacion_bot + mensaje_bot + ticket
 ```
 
 - El navegador nunca habla con finet-chatbot: la API key no puede viajar al
@@ -37,8 +41,10 @@ navegador (widget) ──▶ apps/controller  POST /api/asistente/mensajes
   mensajes no pasan por este backend. Por eso es solo texto, sin botones.
 - El historial y la identificacion los guarda finet-chatbot **en memoria**
   bajo `id_sesion` (ultimos 20 turnos). Se pierden si el chatbot se reinicia.
-  Aca no se persiste el historial; al crear soporte se registra una
-  `conversacion_bot` minima y el `ticket` queda vinculado a ella.
+  Aca no se persiste el historial de cada turno; al crear soporte (CU-66) se
+  registra una `conversacion_bot` minima y el `ticket` queda vinculado a ella.
+  Al derivar (CU-77) si se guarda el historial de esa conversacion, en
+  `mensaje_bot`, junto al ticket.
 
 ---
 
@@ -100,10 +106,21 @@ POST /api/asistente/mensajes
 ### Derivacion a una persona
 
 Cuando el cliente pide hablar con una persona, o acepta que el asistente lo
-derive, finet-chatbot responde con un texto fijo que recomienda escribir por
-WhatsApp al numero configurado (`WHATSAPP_NUMBER` en finet-chatbot) y marca la
-conversacion como derivada. Desde ahi no contesta ni registra los mensajes de
-esa sesion.
+derive, finet-chatbot marca la conversacion como derivada y responde con un
+texto fijo. Desde ahi no contesta ni registra los mensajes de esa sesion.
+
+- **Cliente identificado con RUT (CU-77):** se registra un ticket de soporte
+  con el historial (ver [seccion 3](#3-ticket-al-derivar-cu-77-interno)) y el
+  texto le da el codigo: "Genere un reporte con el codigo FIN-2026-000123 para
+  que una persona de nuestro equipo te atienda…". Si el ticket no se pudo
+  registrar (excepcion 1), el texto dice que una persona lo atendera en breve
+  y agrega el WhatsApp.
+- **Cliente sin identificar:** no hay RUT al que vincular un ticket, asi que el
+  texto recomienda escribir por WhatsApp al numero configurado
+  (`WHATSAPP_NUMBER` en finet-chatbot), como antes.
+
+Para el widget no cambia nada: en todos los casos llega `derivado: true` con
+el texto.
 
 1. La respuesta que deriva llega con el texto y `derivado: true`.
 2. El widget muestra ese texto, quita la entrada de texto y muestra "Esta
@@ -273,7 +290,103 @@ publica de deuda (CU-39) no muestre ya.
 
 ---
 
-## 3. Configuracion
+## 3. Ticket al derivar (CU-77, interno)
+
+```
+POST /api/asistente/clientes/escalamientos
+X-API-Key: <ASISTENTE_API_KEY>
+```
+
+Solo para finet-chatbot. Lo llama cuando el asistente deriva a una persona a
+un cliente identificado, ya sea porque el cliente lo pidio o acepto, o porque
+el motor no respondio (CU-65, excepcion 1).
+
+**Este backend solo registra.** No asigna operador ni notifica a nadie: el
+ticket queda `abierto` con `id_usuario_asignado` vacio, y lo toma el equipo
+desde el CRM. Asi la logica de asignacion vive en un solo lugar.
+
+**Body:**
+
+```json
+{
+  "id_sesion": "web:3f6c8a52-7d1e-4b9a-9c2f-5e8d1a0b7c64",
+  "rut": "123456785",
+  "plataforma": "web",
+  "motivo": "Quiere dar de baja su plan y no supe indicarle el proceso",
+  "historial": [
+    { "rol": "user", "contenido": "hola" },
+    { "rol": "assistant", "contenido": "Hola, para ayudarte mejor, ¿me das tu RUT?…" },
+    { "rol": "user", "contenido": "[RUT]" },
+    { "rol": "assistant", "contenido": "Hola Juan, ¿en que te ayudo?" },
+    { "rol": "user", "contenido": "quiero dar de baja mi plan" }
+  ]
+}
+```
+
+| Campo | Tipo | Requerido | Descripcion |
+|-------|------|-----------|-------------|
+| `id_sesion` | string | Si | Clave de la conversacion en finet-chatbot (`web:<uuid>`, `chatwoot:<cuenta>:<conversacion>`). Queda en la auditoria. |
+| `rut` | string | Si | RUT del cliente; se valida el digito verificador. Tiene que existir en `cliente`. |
+| `plataforma` | `web` \| `chatwoot` \| `api` | Si | Canal por donde llego la conversacion. Se guarda en `conversacion_bot.plataforma`. |
+| `motivo` | string | No | Resumen que escribe el asistente (hasta 1000 caracteres). Es la `descripcion` del ticket; sin el, la descripcion es un texto fijo. |
+| `historial` | array | Si | Entre 1 y 50 turnos `{ rol: 'user' \| 'assistant', contenido }` (hasta 5000 caracteres cada uno). El RUT llega reemplazado por `[RUT]`. |
+
+**Que se guarda, en una sola transaccion:**
+
+| Tabla | Que |
+|-------|-----|
+| `conversacion_bot` | `id_cliente`, `plataforma`, `derivada_humano: true`. |
+| `mensaje_bot` | Un registro por turno, con `rol` `cliente` o `asistente`. |
+| `ticket` | `estado: 'abierto'`, `prioridad: 'media'`, `origen: 'asistente'`, vinculado al cliente y a la conversacion, sin operador asignado. Categoria `Asistente virtual` (se crea en `categoria_falla` la primera vez; el operador la cambia si corresponde otra). |
+| `log_auditoria` | Accion `ESCALAR_CONVERSACION_ASISTENTE`. |
+
+**Respuesta 201:**
+
+```json
+{ "id_ticket": 123, "codigo_seguimiento": "FIN-2026-000123" }
+```
+
+El asistente le da el codigo al cliente.
+
+**Errores:**
+
+| HTTP | Mensaje | Causa |
+|------|---------|-------|
+| 400 | `"Validation failed"` (+ `errors`) | RUT invalido, historial vacio o con mas de 50 turnos, rol o plataforma desconocidos, campos de mas |
+| 400 | `"Cliente no encontrado"` | El RUT no esta en `cliente` |
+| 401 | `"X-API-Key header is required"` / `"Invalid API key"` | Falta la clave o es incorrecta |
+| 503 | `"No fue posible registrar el ticket de la derivacion"` | Fallo la base de datos. No queda nada guardado |
+
+Ante cualquier error, o si no responde en 5 s, el asistente aplica la
+excepcion 1 del CU-77: le dice al cliente que una persona lo atendera en breve
+y le da el WhatsApp.
+
+### Trazabilidad del CU-77 — Creando ticket de soporte al escalar conversacion del asistente
+
+| Elemento del CU | Como se cumple | Donde |
+|---|---|---|
+| **Frecuencia:** cada vez que el asistente escala | Las dos derivaciones crean el ticket: la que pide el LLM (`derivar_a_persona`) y la del motor que no responde (CU-65, excepcion 1). | finet-chatbot `src/messages/messages.service.ts` (`handOff`, `answer`) |
+| **Precondicion:** el asistente no puede resolver | Lo decide el LLM: deriva si el cliente lo pide o acepta la derivacion que le ofrecio. | finet-chatbot `src/messages/handoff.ts` (`handoffTool`) |
+| **Descripcion:** registra el evento de escalamiento | `conversacion_bot.derivada_humano` y `log_auditoria` (`ESCALAR_CONVERSACION_ASISTENTE`). | `src/asistente/asistente-clientes.service.ts` (`escalar`) |
+| **Descripcion:** ticket vinculado al RUT con el historial | El ticket se vincula al `cliente` del RUT y a la `conversacion_bot`, cuyos turnos quedan en `mensaje_bot`. | idem |
+| **Descripcion:** asigna el ticket al operador disponible / el operador recibe el contexto | **Fuera de este backend:** el ticket queda abierto sin asignar y lo toma el equipo desde el CRM, que ve el historial por `id_conversacion_bot`. | — |
+| **Excepcion 1:** no se puede crear el ticket | Se informa al cliente que sera atendido en breve, con el WhatsApp. No queda aviso para el operador: lo que no llega a la base de datos solo queda en el log de finet-chatbot. | finet-chatbot `src/messages/handoff.ts` (`ticketFailedText`) |
+| **Poscondicion:** ticket con historial vinculado al RUT | Ver arriba. La asignacion queda pendiente para el CRM. | — |
+| **Dependencias:** RF-54, RF-52 | El texto de esos RF no esta en el repo (ver [CASOS-DE-USO](../../../docs/CASOS-DE-USO.md#requisitos-funcionales-rf)). | — |
+
+**Decisiones que el CU no definia:**
+
+- **Solo clientes identificados.** El CU pide un ticket vinculado al RUT; sin
+  RUT, el asistente sigue recomendando el WhatsApp.
+- **Sin sesion del portal**, a diferencia del CU-66: el ticket lo abre el
+  sistema, no el cliente, y tiene que funcionar por WhatsApp (via Chatwoot),
+  donde no hay sesion. El RUT identifica pero no autentica, igual que en el
+  resto del asistente.
+- **Sin asignacion ni notificacion aca**: es trabajo del CRM.
+
+---
+
+## 4. Configuracion
 
 En `apps/controller/.env`:
 
