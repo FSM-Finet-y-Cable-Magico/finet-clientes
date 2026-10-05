@@ -79,17 +79,43 @@ describe('MailService — correos del Incremento 3', () => {
   });
 
   describe('CU-67: recordatorio de pago', () => {
-    it('dice el monto y el vencimiento en DD/MM/AAAA (§11.4)', async () => {
+    beforeEach(async () => {
       await mail.sendRecordatorioPago(
         'ana@b.cl',
-        'Ana',
+        'Ana <b>',
         24990,
         new Date('2026-10-04T00:00:00.000Z'),
       );
+    });
 
+    it('va al cliente con el asunto del recordatorio', () => {
+      expect(sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'ana@b.cl',
+          subject: 'Tu factura vence en 3 días - Portal Clientes',
+        }),
+      );
+    });
+
+    it('usa el mismo molde que el aviso de corte y la confirmación de pago', () => {
+      expect(html()).toContain('Recordatorio de pago');
+      expect(html()).toContain('Tu factura vence en 3 días');
+      expect(html()).toContain('>FI<');
+    });
+
+    it('dice el monto y el vencimiento en DD/MM/AAAA (§11.4)', () => {
       expect(html()).toContain('04/10/2026');
       expect(html()).not.toContain('2026-10-04');
       expect(html()).toContain('$24.990');
+    });
+
+    it('no lleva botón para pagar: el CU-67 y el RF-49 no lo piden', () => {
+      expect(html()).not.toContain('<a href=');
+    });
+
+    it('no interpreta como HTML lo que escribió el cliente', () => {
+      expect(html()).toContain('Ana &lt;b&gt;');
+      expect(html()).not.toContain('Ana <b>');
     });
   });
 

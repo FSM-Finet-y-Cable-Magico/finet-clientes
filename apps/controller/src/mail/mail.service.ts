@@ -87,7 +87,7 @@ export class MailService {
     await this.transporter.sendMail({
       from,
       to: email,
-      subject: 'Tu factura vence en 3 dias - Portal Clientes',
+      subject: 'Tu factura vence en 3 días - Portal Clientes',
       html: this.recordatorioPagoTemplate(nombre, monto, fechaLimite),
     });
 
@@ -177,29 +177,20 @@ export class MailService {
     monto: number,
     fechaLimite: Date,
   ): string {
-    const montoFormateado = new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      maximumFractionDigits: 0,
-    }).format(monto);
-    // §11.4 del Documento 0: DD/MM/AAAA.
-    const fecha = fechaCliente(fechaLimite);
-
-    return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; color: #333;">
-  <div style="max-width: 480px; margin: 0 auto; padding: 24px;">
-    <h2 style="color: #1a56db;">Portal Clientes</h2>
-    <p>Hola ${nombre},</p>
-    <p>Te recordamos que tu factura vence el <strong>${fecha}</strong>.</p>
-    <p>Monto a pagar: <strong>${montoFormateado}</strong></p>
-    <p>Si ya pagaste, puedes ignorar este mensaje.</p>
-    <p style="font-size: 12px; color: #666;">Este es un aviso automatico, no respondas a este correo.</p>
-  </div>
-</body>
-</html>`;
+    return plantillaCorreo({
+      resumen: `Tu factura de ${pesos(monto)} vence el ${fechaCliente(fechaLimite)}.`,
+      etiqueta: { texto: 'Recordatorio de pago', tono: 'aviso' },
+      titulo: 'Tu factura vence en 3 días',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: te recordamos que tu factura está por vencer.` +
+        comprobante([
+          ['Monto a pagar', pesos(monto)],
+          // §11.4 del Documento 0: DD/MM/AAAA.
+          ['Vence el', fechaCliente(fechaLimite)],
+        ]) +
+        '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</p>',
+      sitio: this.sitio(),
+    });
   }
 
   private avisoCorteTemplate(

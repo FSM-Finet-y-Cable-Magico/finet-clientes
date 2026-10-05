@@ -169,11 +169,11 @@ export default function FastSpeedTest() {
           <TriangleAlert size={28} strokeWidth={1.5} aria-hidden />
         </div>
         <p className="font-medium text-foreground">
-          La herramienta de medicion no esta disponible
+          La herramienta de medición no está disponible
         </p>
         <p className="mt-2 max-w-sm text-sm text-muted">
-          No pudimos conectar con el servidor de pruebas. Revisa tu conexion e
-          intentalo nuevamente en unos minutos.
+          No pudimos conectar con el servidor de pruebas. Revisa tu conexión e
+          inténtalo nuevamente en unos minutos.
         </p>
         <div className="mt-6">
           <PrimaryButton variant="outline" type="button" onClick={iniciar}>
@@ -269,7 +269,7 @@ export default function FastSpeedTest() {
         />
         <Secundario
           etiqueta="Latencia"
-          detalle="Con la linea cargada"
+          detalle="Con la línea cargada"
           valor={resultado?.latenciaCargaMs?.toString() ?? "--"}
           unidad="ms"
           activo={midiendo && estado.fase === "bajada"}
@@ -289,7 +289,7 @@ export default function FastSpeedTest() {
         resultado.subidaMbps === null &&
         resultado.latenciaMs === null && (
           <p className="mt-6 rounded-xl bg-error-container px-4 py-3 text-sm text-on-error-container">
-            No fue posible obtener una medicion concluyente. Intentalo
+            No fue posible obtener una medición concluyente. Inténtalo
             nuevamente.
           </p>
         )}
@@ -301,7 +301,7 @@ export default function FastSpeedTest() {
           resultado.subidaMbps !== null ||
           resultado.latenciaMs !== null) && (
           <p className="mt-6 rounded-xl bg-warning-container px-4 py-3 text-sm text-on-warning-container">
-            La medicion quedo incompleta. Te mostramos solo los valores que
+            La medición quedó incompleta. Te mostramos solo los valores que
             pudimos obtener.
           </p>
         )}
