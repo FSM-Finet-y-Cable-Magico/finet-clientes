@@ -147,6 +147,7 @@ describe('PortalService', () => {
 
       expect(result).toEqual([{ id_categoria: 3, nombre: 'Conectividad' }]);
       expect(prisma.categoria_falla.findMany).toHaveBeenCalledWith({
+        where: { nombre: { not: 'Asistente virtual' } },
         select: { id_categoria: true, nombre: true },
         orderBy: { nombre: 'asc' },
       });

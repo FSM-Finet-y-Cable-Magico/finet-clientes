@@ -32,8 +32,11 @@ export class AsistenteController {
     dto: MensajeAsistenteDto,
     @Req() request?: Request,
   ) {
+    // CU-66: la sesion del portal, si el visitante inicio sesion. Solo la usa
+    // el chatbot para registrar reportes de falla a nombre del cliente.
+    const cookies = request?.cookies as Record<string, string> | undefined;
     const accessToken =
-      request?.cookies?.access_token ??
+      cookies?.access_token ??
       request?.headers.authorization?.replace(/^Bearer\s+/i, '');
     return accessToken
       ? this.asistenteService.responder(dto, accessToken)

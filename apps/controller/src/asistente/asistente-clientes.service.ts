@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { cleanRut } from '../common/utils/rut.js';
+import { CATEGORIA_ESCALAMIENTO } from '../common/constants/ticket.js';
 import type { ClienteIdentificadoDto } from './dto/asistente.dto.js';
 import type {
   CrearSolicitudSoporteDto,
@@ -22,12 +23,6 @@ export interface SolicitudSoporteCreadaDto {
   id_ticket: number;
   codigo_seguimiento: string;
 }
-
-/**
- * CU-77: categoria de los tickets que abre el asistente al derivar. El ticket
- * exige una; el operador la cambia desde el CRM si corresponde otra.
- */
-export const CATEGORIA_ESCALAMIENTO = 'Asistente virtual';
 
 /** Descripcion del ticket cuando el asistente no mando un motivo. */
 const DESCRIPCION_ESCALAMIENTO =
@@ -106,44 +101,77 @@ export class AsistenteClientesService {
     };
   }
 
+  /**
+   * CU-66: categorias entre las que elige el cliente al reportar una falla.
+   * La categoria es la que dirige el ticket al equipo que corresponde en el
+   * CRM. Sin la de CU-77: esa la pone el sistema al derivar, no el cliente.
+   * 503 si la base no responde: para el chatbot es la excepcion 1 del CU.
+   */
   async obtenerCategorias(): Promise<CategoriaSoporteDto[]> {
-    return this.prisma.categoria_falla.findMany({
-      select: { id_categoria: true, nombre: true },
-      orderBy: { nombre: 'asc' },
-    });
+    try {
+      return await this.prisma.categoria_falla.findMany({
+        where: { nombre: { not: CATEGORIA_ESCALAMIENTO } },
+        select: { id_categoria: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      });
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'No fue posible obtener las categorias de soporte',
+        { cause: error },
+      );
+    }
   }
 
-  async crearSolicitud(
-    dto: CrearSolicitudSoporteDto,
-  ): Promise<SolicitudSoporteCreadaDto> {
-    let clienteAutenticado: number;
+  /**
+   * CU-66: el cliente dueño de la sesion del portal que reenvia el chatbot.
+   * 401 si el token no es valido o la sesion ya no existe; si la base no
+   * responde es 503, para que el chatbot no le pida volver a iniciar sesion
+   * por una falla que no es suya.
+   */
+  private async clienteDeLaSesion(accessToken: string): Promise<number> {
+    let payload: { sub?: unknown; type?: unknown };
     try {
-      const payload = await this.jwtService.verifyAsync<{
-        sub?: number;
-        type?: string;
-      }>(dto.access_token);
-      if (payload.type && payload.type !== 'access') {
-        throw new UnauthorizedException('Sesion de portal invalida');
-      }
-      if (typeof payload.sub !== 'number') {
-        throw new UnauthorizedException('Sesion de portal invalida');
-      }
-      const sesion = await this.prisma.sesion_portal.findFirst({
-        where: {
-          token: dto.access_token,
-          fecha_expiracion: { gt: new Date() },
-        },
-        select: { id_cliente: true },
-      });
-      if (!sesion || sesion.id_cliente !== payload.sub) {
-        throw new UnauthorizedException('Sesion de portal expirada');
-      }
-      clienteAutenticado = payload.sub;
-    } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
+      payload = await this.jwtService.verifyAsync(accessToken);
+    } catch {
+      throw new UnauthorizedException('Sesion de portal invalida');
+    }
+    if (
+      (payload.type !== undefined && payload.type !== 'access') ||
+      typeof payload.sub !== 'number'
+    ) {
       throw new UnauthorizedException('Sesion de portal invalida');
     }
 
+    let sesion: { id_cliente: number | null } | null;
+    try {
+      sesion = await this.prisma.sesion_portal.findFirst({
+        where: { token: accessToken, fecha_expiracion: { gt: new Date() } },
+        select: { id_cliente: true },
+      });
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'No fue posible registrar el reporte de soporte',
+        { cause: error },
+      );
+    }
+    if (!sesion || sesion.id_cliente !== payload.sub) {
+      throw new UnauthorizedException('Sesion de portal expirada');
+    }
+    return payload.sub;
+  }
+
+  /**
+   * CU-66: registra la solicitud de soporte que el cliente reporto en el
+   * asistente y devuelve el identificador que se le informa.
+   *
+   * Exige la sesion del portal ademas del RUT: el RUT identifica pero no
+   * autentica, y la solicitud es del propio cliente. 401 si la sesion no es
+   * valida o es de otro cliente; 503 si no se pudo registrar (excepcion 1).
+   */
+  async crearSolicitud(
+    dto: CrearSolicitudSoporteDto,
+  ): Promise<SolicitudSoporteCreadaDto> {
+    const clienteAutenticado = await this.clienteDeLaSesion(dto.access_token);
     const limpio = cleanRut(dto.rut);
 
     try {
@@ -165,8 +193,11 @@ export class AsistenteClientesService {
           );
         }
 
-        const categoria = await tx.categoria_falla.findUnique({
-          where: { id_categoria: dto.id_categoria },
+        const categoria = await tx.categoria_falla.findFirst({
+          where: {
+            id_categoria: dto.id_categoria,
+            nombre: { not: CATEGORIA_ESCALAMIENTO },
+          },
           select: { id_categoria: true },
         });
         if (!categoria) {

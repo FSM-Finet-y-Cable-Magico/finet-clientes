@@ -29,6 +29,7 @@ import {
   ESTADOS_CONTRATO_VIGENTES,
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
+import { CATEGORIA_ESCALAMIENTO } from '../common/constants/ticket.js';
 import { MailService } from '../mail/mail.service.js';
 import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
@@ -393,6 +394,8 @@ export class PortalService {
 
   async getCategoriasTicket(): Promise<CategoriaTicketDto[]> {
     return this.prisma.categoria_falla.findMany({
+      // La del asistente (CU-77) la pone el sistema, no el cliente.
+      where: { nombre: { not: CATEGORIA_ESCALAMIENTO } },
       select: { id_categoria: true, nombre: true },
       orderBy: { nombre: 'asc' },
     });

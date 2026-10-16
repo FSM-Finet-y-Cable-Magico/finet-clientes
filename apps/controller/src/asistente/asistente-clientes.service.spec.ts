@@ -2,19 +2,24 @@ import { jest, beforeEach, describe, it, expect } from '@jest/globals';
 import {
   BadRequestException,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  AsistenteClientesService,
-  CATEGORIA_ESCALAMIENTO,
-} from './asistente-clientes.service.js';
-import type { EscalarConversacionDto } from './dto/asistente.dto.js';
+import { AsistenteClientesService } from './asistente-clientes.service.js';
+import { CATEGORIA_ESCALAMIENTO } from '../common/constants/ticket.js';
+import type {
+  CrearSolicitudSoporteDto,
+  EscalarConversacionDto,
+} from './dto/asistente.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { JwtService } from '@nestjs/jwt';
 
 describe('AsistenteClientesService', () => {
   let service: AsistenteClientesService;
   let findFirst: jest.Mock;
+  let categorias: jest.Mock;
+  let sesionPortal: jest.Mock;
+  let verifyAsync: jest.Mock;
   let tx: {
     cliente: { findFirst: jest.Mock };
     categoria_falla: { findFirst: jest.Mock; create: jest.Mock };
@@ -25,6 +30,11 @@ describe('AsistenteClientesService', () => {
 
   beforeEach(async () => {
     findFirst = jest.fn();
+    categorias = jest.fn().mockResolvedValue([] as never);
+    sesionPortal = jest.fn().mockResolvedValue({ id_cliente: 7 } as never);
+    verifyAsync = jest
+      .fn()
+      .mockResolvedValue({ sub: 7, type: 'access' } as never);
     tx = {
       cliente: {
         findFirst: jest
@@ -54,11 +64,13 @@ describe('AsistenteClientesService', () => {
           provide: PrismaService,
           useValue: {
             cliente: { findFirst },
+            categoria_falla: { findMany: categorias },
+            sesion_portal: { findFirst: sesionPortal },
             $transaction: (trabajo: (t: typeof tx) => Promise<unknown>) =>
               trabajo(tx),
           },
         },
-        { provide: JwtService, useValue: { verifyAsync: jest.fn() } },
+        { provide: JwtService, useValue: { verifyAsync } },
       ],
     }).compile();
     service = module.get(AsistenteClientesService);
@@ -132,6 +144,156 @@ describe('AsistenteClientesService', () => {
         'nombre_completo',
       ]);
     });
+  });
+
+  describe('CU-66: obtenerCategorias', () => {
+    it('lista las categorias por nombre, sin la del asistente', async () => {
+      categorias.mockResolvedValue([
+        { id_categoria: 2, nombre: 'Sin conexion' },
+      ] as never);
+
+      await expect(service.obtenerCategorias()).resolves.toEqual([
+        { id_categoria: 2, nombre: 'Sin conexion' },
+      ]);
+      expect(categorias).toHaveBeenCalledWith({
+        where: { nombre: { not: CATEGORIA_ESCALAMIENTO } },
+        select: { id_categoria: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      });
+    });
+
+    it('responde 503 si la base de datos falla (excepcion 1)', async () => {
+      categorias.mockRejectedValue(new Error('db caida') as never);
+
+      await expect(service.obtenerCategorias()).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+    });
+  });
+
+  describe('CU-66: crearSolicitud', () => {
+    const solicitud: CrearSolicitudSoporteDto = {
+      id_sesion: 'web:3f6c8a52-7d1e-4b9a-9c2f-5e8d1a0b7c64',
+      rut: '12.345.678-5',
+      access_token: 'portal.jwt.token',
+      id_categoria: 2,
+      descripcion: 'Sin internet desde ayer. Ya reinicie el router.',
+    };
+
+    beforeEach(() => {
+      tx.categoria_falla.findFirst.mockResolvedValue({
+        id_categoria: 2,
+      } as never);
+    });
+
+    it('registra el ticket y devuelve su identificador', async () => {
+      await expect(service.crearSolicitud(solicitud)).resolves.toEqual({
+        id_ticket: 123,
+        codigo_seguimiento: 'FIN-2026-000123',
+      });
+      const { data } = tx.ticket.create.mock.calls[0][0] as {
+        data: Record<string, unknown>;
+      };
+      expect(data).toEqual({
+        id_cliente: 7,
+        id_empresa: 1,
+        id_categoria: 2,
+        id_conversacion_bot: 55,
+        prioridad: 'media',
+        estado: 'abierto',
+        descripcion: 'Sin internet desde ayer. Ya reinicie el router.',
+        origen: 'asistente',
+      });
+      expect(tx.ticket.update).toHaveBeenCalledWith({
+        where: { id_ticket: 123 },
+        data: { codigo_seguimiento: 'FIN-2026-000123' },
+      });
+      expect(tx.log_auditoria.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          accion: 'CREAR_TICKET_ASISTENTE',
+          id_entidad_afectada: 123,
+        }),
+      });
+    });
+
+    it('comprueba la sesion del portal con el token que reenvia el chatbot', async () => {
+      await service.crearSolicitud(solicitud);
+
+      expect(verifyAsync).toHaveBeenCalledWith('portal.jwt.token');
+      expect(sesionPortal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ token: 'portal.jwt.token' }),
+        }),
+      );
+    });
+
+    it('no acepta la categoria del asistente (CU-77)', async () => {
+      await service.crearSolicitud(solicitud);
+
+      expect(tx.categoria_falla.findFirst).toHaveBeenCalledWith({
+        where: { id_categoria: 2, nombre: { not: CATEGORIA_ESCALAMIENTO } },
+        select: { id_categoria: true },
+      });
+    });
+
+    it('rechaza una categoria que no existe', async () => {
+      tx.categoria_falla.findFirst.mockResolvedValue(null as never);
+
+      await expect(service.crearSolicitud(solicitud)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(tx.ticket.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'el token no es valido',
+        () => verifyAsync.mockRejectedValue(new Error('jwt') as never),
+      ],
+      [
+        'el token no es de acceso',
+        () => verifyAsync.mockResolvedValue({ sub: 7, type: 'reset' } as never),
+      ],
+      [
+        'la sesion ya no existe',
+        () => sesionPortal.mockResolvedValue(null as never),
+      ],
+      [
+        'la sesion es de otro cliente que el del RUT',
+        () => {
+          verifyAsync.mockResolvedValue({ sub: 8, type: 'access' } as never);
+          sesionPortal.mockResolvedValue({ id_cliente: 8 } as never);
+        },
+      ],
+    ])('responde 401 si %s', async (_, preparar) => {
+      preparar();
+
+      await expect(service.crearSolicitud(solicitud)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(tx.ticket.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'al buscar la sesion',
+        () => sesionPortal.mockRejectedValue(new Error('db caida') as never),
+      ],
+      [
+        'al registrar el ticket',
+        () =>
+          tx.ticket.create.mockRejectedValue(new Error('db caida') as never),
+      ],
+    ])(
+      'responde 503 si la base de datos falla %s (excepcion 1)',
+      async (_, preparar) => {
+        preparar();
+
+        await expect(service.crearSolicitud(solicitud)).rejects.toBeInstanceOf(
+          ServiceUnavailableException,
+        );
+      },
+    );
   });
 
   describe('CU-77: escalar', () => {
