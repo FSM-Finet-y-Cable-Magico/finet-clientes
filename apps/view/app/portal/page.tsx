@@ -68,10 +68,15 @@ function formatPrecio(precio: number) {
   return `$${precio.toLocaleString("es-CL")}`;
 }
 
+/**
+ * `fecha_limite_pago` es una fecha de calendario (@db.Date), no un instante: se formatea
+ * en UTC. En hora de Chile, sin `timeZone`, la medianoche UTC cae el día anterior.
+ */
 function formatFechaCorta(iso: string) {
   return new Date(iso).toLocaleDateString("es-CL", {
     day: "numeric",
     month: "short",
+    timeZone: "UTC",
   });
 }
 

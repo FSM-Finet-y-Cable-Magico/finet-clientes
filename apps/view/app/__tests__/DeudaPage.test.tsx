@@ -6,6 +6,11 @@ jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 import DeudaPage from '@/app/portal/deuda/page';
 
+// Las fechas de calendario (@db.Date) llegan como medianoche UTC. Con la hora de
+// Chile, si no se formatean en UTC, se ven un día antes: se fija para que el test
+// lo detecte en cualquier máquina.
+process.env.TZ = 'America/Santiago';
+
 describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -76,6 +81,7 @@ describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
     expect(screen.getByText('Mayo 2026')).toBeInTheDocument();
     expect(screen.getByText('Abril 2026')).toBeInTheDocument();
     expect(screen.getByText(/hace 52 días/i)).toBeInTheDocument();
+    expect(screen.getByText(/10 de mayo de 2026/)).toBeInTheDocument();
     await screen.findByText(/aún no registras pagos/i);
 
     // CU-42/43: "Pagar ahora" pide el enlace firmado y lleva a /pagar

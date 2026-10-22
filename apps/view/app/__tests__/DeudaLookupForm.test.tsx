@@ -3,6 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DeudaLookupForm from '@/app/components/DeudaLookupForm';
 
+// Las fechas de calendario (@db.Date) llegan como medianoche UTC. Con la hora de
+// Chile, si no se formatean en UTC, se ven un día antes: se fija para que el test
+// lo detecte en cualquier máquina.
+process.env.TZ = 'America/Santiago';
+
 describe('DeudaLookupForm (CU-39/CU-41)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,6 +54,7 @@ describe('DeudaLookupForm (CU-39/CU-41)', () => {
       expect(screen.getByText(/juan pérez/i)).toBeInTheDocument();
     });
     expect(screen.getByText('RUT 12345678-5')).toBeInTheDocument();
+    expect(screen.getByText('10 may')).toBeInTheDocument(); // vence el 2026-05-10
 
     // Detalle del plan y "Pagar ahora", que lleva a /pagar con el mismo RUT (CU-42/43)
     expect(screen.getByText(/plan 200 mbps/i)).toBeInTheDocument();

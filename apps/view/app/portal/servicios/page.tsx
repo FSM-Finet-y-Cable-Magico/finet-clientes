@@ -27,11 +27,16 @@ function formatPrecio(precio: number) {
   return `$${precio.toLocaleString("es-CL")}`;
 }
 
+/**
+ * `fecha_inicio` es una fecha de calendario (@db.Date), no un instante: se formatea
+ * en UTC. En hora de Chile, sin `timeZone`, la medianoche UTC cae el día anterior.
+ */
 function formatFecha(iso: string) {
   return new Date(iso).toLocaleDateString("es-CL", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
