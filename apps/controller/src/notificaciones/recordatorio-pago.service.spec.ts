@@ -139,10 +139,7 @@ describe('RecordatorioPagoService', () => {
 
     const r = await service.ejecutar(HOY, PRENDIDO);
 
-    expect(saldos.facturasDe).toHaveBeenCalledWith(
-      { idCliente: 10, idContrato: null },
-      true,
-    );
+    expect(saldos.facturasDe).toHaveBeenCalledWith({ idCliente: 10 }, true);
     expect(mail.sendRecordatorioPago).toHaveBeenCalledWith(
       'juan@example.com',
       'Juan Pérez',

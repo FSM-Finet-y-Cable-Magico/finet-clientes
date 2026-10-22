@@ -14,11 +14,8 @@ import {
  * pasa por ningún mensaje ni log.
  */
 
-/** Las facturas se piden siempre dentro de una empresa (§2). */
-export type SelectorFacturasG8 = { idEmpresa: number } & (
-  | { idCliente: number }
-  | { idContrato: number }
-);
+/** Las facturas se piden por cliente, siempre dentro de una empresa (§2). */
+export type SelectorFacturasG8 = { idEmpresa: number; idCliente: number };
 
 /**
  * Lo que usamos de cada factura (§2). El saldo y el vencimiento los calcula G8,
@@ -90,16 +87,12 @@ export class ErrorIntegracionG8 extends Error {
 export class G8IntegracionService {
   constructor(private readonly config: ConfigService) {}
 
-  /** §2: `GET /api/integrations/g2/invoices?id_empresa=…&id_cliente=…` (o `id_contrato`). */
+  /** §2: `GET /api/integrations/g2/invoices?id_empresa=…&id_cliente=…`. */
   async facturas(selector: SelectorFacturasG8): Promise<FacturaG8[]> {
     const { base, apiKey } = this.configuracion();
     const url = new URL(RUTA_FACTURAS_G8, base);
     url.searchParams.set('id_empresa', String(selector.idEmpresa));
-    if ('idContrato' in selector) {
-      url.searchParams.set('id_contrato', String(selector.idContrato));
-    } else {
-      url.searchParams.set('id_cliente', String(selector.idCliente));
-    }
+    url.searchParams.set('id_cliente', String(selector.idCliente));
 
     const res = await this.pedir(url, { method: 'GET' }, apiKey);
     const json: unknown = await res.json().catch(() => null);

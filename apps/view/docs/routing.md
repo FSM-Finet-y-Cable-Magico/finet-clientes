@@ -23,7 +23,7 @@ Todas las rutas viven en `app/`. Las protegidas por sesión están marcadas 🔒
 | `/inicio-sesion` | `POST /api/auth/login` | CU-01 |
 | `/recuperar-password` | `POST /api/auth/recuperar-password` | CU-03 |
 | `/restablecer-password` | `POST /api/auth/restablecer-password` | CU-03 / RF-09 |
-| `/consultar-deuda` | `GET /api/deuda-publica/rut`, `GET /api/deuda-publica/abonado` | CU-39 / CU-40 / CU-41 |
+| `/consultar-deuda` | `GET /api/deuda-publica/rut` | CU-39 / CU-41 |
 | `/pagar` | `GET /api/pagos/resumen`, `POST /api/pagos/iniciar` | CU-42 / CU-43 |
 
 El registro de cuenta (CU-04, `POST /api/auth/register`) se sirve desde el mismo flujo de `/inicio-sesion` (`RegisterForm.tsx` + `AuthSwitch.tsx`), no tiene ruta propia.

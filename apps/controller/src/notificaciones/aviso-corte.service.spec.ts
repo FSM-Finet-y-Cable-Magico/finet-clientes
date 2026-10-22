@@ -168,10 +168,7 @@ describe('AvisoCorteService', () => {
 
     const r = await service.ejecutar(HOY, CON_DATOS);
 
-    expect(saldos.facturasDe).toHaveBeenCalledWith(
-      { idCliente: 10, idContrato: null },
-      true,
-    );
+    expect(saldos.facturasDe).toHaveBeenCalledWith({ idCliente: 10 }, true);
     expect(mail.sendAvisoCorte).toHaveBeenCalledWith(
       'ana@b.cl',
       'Ana',

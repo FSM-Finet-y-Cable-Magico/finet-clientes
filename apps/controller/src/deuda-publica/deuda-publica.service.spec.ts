@@ -10,7 +10,7 @@ describe('DeudaPublicaService', () => {
   beforeEach(async () => {
     const mockPrisma = {
       cliente: { findFirst: jest.fn() },
-      contrato: { findUnique: jest.fn(), findMany: jest.fn() },
+      contrato: { findMany: jest.fn() },
       factura: { findMany: jest.fn() },
     };
     const module: TestingModule = await Test.createTestingModule({
@@ -103,23 +103,6 @@ describe('DeudaPublicaService', () => {
     const r = await service.consultarPorRut('123456785');
     expect(r.facturas[0].dias_para_vencer).toBeGreaterThanOrEqual(4);
     expect(r.facturas[0].dias_vencida).toBeNull();
-  });
-
-  it('consultarPorAbonado retorna deuda cuando el contrato existe', async () => {
-    (prisma.contrato.findUnique as jest.Mock).mockResolvedValue({
-      id_contrato: 100,
-      cliente: { nombre_completo: 'Juan Pérez', rut: '123456785' },
-    });
-    (prisma.factura.findMany as jest.Mock).mockResolvedValue([]);
-    const r = await service.consultarPorAbonado(100);
-    expect(r.encontrado).toBe(true);
-    expect(r.cliente?.codigo_abonado).toBe(100);
-  });
-
-  it('consultarPorAbonado retorna encontrado:false si el contrato no existe', async () => {
-    (prisma.contrato.findUnique as jest.Mock).mockResolvedValue(null);
-    const r = await service.consultarPorAbonado(99999);
-    expect(r.encontrado).toBe(false);
   });
 
   it('marca detalle_disponible y informacion_completa en true en el camino feliz', async () => {

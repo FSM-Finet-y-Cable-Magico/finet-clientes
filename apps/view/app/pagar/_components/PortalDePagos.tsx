@@ -29,7 +29,6 @@ type Resumen = {
   cliente: {
     nombre: string;
     rut: string | null;
-    codigo_abonado: number | null;
   } | null;
   /** Lo da G8. `null` mientras no se pueda obtener. */
   saldo: number | null;

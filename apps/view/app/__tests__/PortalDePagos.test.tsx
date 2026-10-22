@@ -19,7 +19,7 @@ function respuesta(body: unknown, ok = true, status = 200) {
 function resumen(saldo: number | null) {
   return respuesta({
     encontrado: true,
-    cliente: { nombre: 'Ana Pérez', rut: 'XX.XXX.678-5', codigo_abonado: null },
+    cliente: { nombre: 'Ana Pérez', rut: 'XX.XXX.678-5' },
     saldo,
     medios: MEDIOS,
   });

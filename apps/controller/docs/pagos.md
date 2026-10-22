@@ -2,26 +2,26 @@
 
 **Construido, pendiente del saldo de G8 y de la pasarela.** Hoy nunca cobra: ver "Lo que falta".
 
-Público, como la consulta de deuda (CU-39/CU-40): se puede pagar la cuenta de alguien más con su
-RUT o su código de abonado. El throttler global limita los intentos por IP.
+Público, como la consulta de deuda (CU-39): se puede pagar la cuenta de alguien más con su RUT. El
+throttler global limita los intentos por IP.
 
 ## Qué se paga
 
-**El total**, sin abonos parciales: todo lo del RUT (todos sus contratos) o todo lo del código de
-abonado (ese contrato). **Ese total no lo calculamos nosotros: lo da G8**
+**El total**, sin abonos parciales: todo lo del RUT (todos sus contratos). **Ese total no lo
+calculamos nosotros: lo da G8**
 (`src/common/saldo/saldo-cliente.service.ts`). El acuerdo v2.0 pone Factura y Pago de su lado (§3)
 y dice que G2 consume "el valor persistido" (§5).
 
 ## Endpoints
 
-### `GET /api/pagos/resumen?rut=… | ?abonado=… | ?t=…`
+### `GET /api/pagos/resumen?rut=… | ?t=…`
 
 Exactamente un identificador. `t` es el enlace firmado del aviso de corte (CU-68) o del portal.
 
 ```json
 {
   "encontrado": true,
-  "cliente": { "nombre": "Ana Pérez", "rut": "XX.XXX.678-5", "codigo_abonado": null },
+  "cliente": { "nombre": "Ana Pérez", "rut": "XX.XXX.678-5" },
   "saldo": null,
   "medios": [
     { "id": "webpay", "nombre": "Webpay", "descripcion": "…", "disponible": false },
@@ -34,7 +34,7 @@ Exactamente un identificador. `t` es el enlace firmado del aviso de corte (CU-68
 - `saldo` es `null` mientras G8 no diga dónde lo deja.
 - Un enlace alterado o vencido responde igual que una cuenta que no existe (`encontrado: false`).
 
-### `POST /api/pagos/iniciar` — `{ rut | abonado | t, medio: "webpay" | "mercadopago" }`
+### `POST /api/pagos/iniciar` — `{ rut | t, medio: "webpay" | "mercadopago" }`
 
 El total **no viene en el body**: se vuelve a pedir a G8 en el servidor. Un `monto` en el body se
 descarta.
@@ -66,6 +66,5 @@ En `src/common/pendientes.ts`; el backend lo lista al arrancar.
 ## En la view
 
 `/pagar` (`apps/view/app/pagar/`), no indexable. Se llega desde el aviso de corte y desde el
-portal (`?t=`), desde la consulta pública (`?rut=` o `?abonado=`), o directo, a identificar la
-cuenta. Tiene dos pasos, "Tu deuda" y "Elige un medio de pago", con el total y el botón Pagar fijos
+portal (`?t=`), desde la consulta pública (`?rut=`), o directo, a identificar la cuenta. Tiene dos pasos, "Tu deuda" y "Elige un medio de pago", con el total y el botón Pagar fijos
 abajo. El botón va en Finet Lime, que el `DESIGN.md` reserva para pagar.

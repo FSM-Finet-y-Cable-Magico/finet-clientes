@@ -16,22 +16,12 @@ export const ConsultaDeudaRutDto = z.object({
 });
 export type ConsultaDeudaRutDto = z.infer<typeof ConsultaDeudaRutDto>;
 
-// CU-40: Consultar deuda pública por código de abonado
-export const ConsultaDeudaAbonado = z.object({
-  codigo_abonado: z
-    .string()
-    .min(1, 'El código de abonado es requerido')
-    .max(20),
-});
-export type ConsultaDeudaAbonado = z.infer<typeof ConsultaDeudaAbonado>;
-
-// ─── Respuesta compartida CU-39 / CU-40 / CU-41 ─────────────────────────────
+// ─── Respuesta compartida CU-39 / CU-41 ──────────────────────────────────────
 export interface DeudaPublicaResponseDto {
   encontrado: boolean;
   cliente: {
     nombre_completo: string;
     rut: string | null;
-    codigo_abonado: number | null; // id_contrato como código de abonado
   } | null;
   tiene_deuda: boolean;
   saldo_total: number;

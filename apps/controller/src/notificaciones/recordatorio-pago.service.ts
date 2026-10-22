@@ -184,7 +184,7 @@ export class RecordatorioPagoService {
     datos: DatosRecordatorio,
   ): Promise<PorVencer | null | undefined> {
     const facturas = await this.saldos.facturasDe(
-      { idCliente: cliente.idCliente, idContrato: null },
+      { idCliente: cliente.idCliente },
       datos.saldoDefinido,
     );
     if (facturas === null) return undefined;

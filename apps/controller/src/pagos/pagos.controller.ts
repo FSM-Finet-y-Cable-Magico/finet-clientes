@@ -8,9 +8,9 @@ import {
 } from './dto/pagos.dto.js';
 
 /**
- * CU-42 / CU-43. Público, como la consulta de deuda (CU-39/CU-40): se puede
- * pagar la cuenta de alguien más con su RUT o su código de abonado, igual que en
- * otros portales de pago. El throttler global limita los intentos por IP.
+ * CU-42 / CU-43. Público, como la consulta de deuda (CU-39): se puede pagar la
+ * cuenta de alguien más con su RUT, igual que en otros portales de pago. El
+ * throttler global limita los intentos por IP.
  *
  * Base path: /api/pagos
  */
@@ -19,7 +19,7 @@ export class PagosController {
   constructor(private readonly pagos: PagosService) {}
 
   /**
-   * GET /pagos/resumen?rut=123456785 | ?abonado=100 | ?t=<enlace firmado>
+   * GET /pagos/resumen?rut=123456785 | ?t=<enlace firmado>
    *
    * 200 { encontrado, cliente, saldo, medios }. `saldo` es `null` mientras G8
    * no diga dónde lo deja; `medios[].disponible` es `false` sin pasarela.
@@ -34,7 +34,7 @@ export class PagosController {
   }
 
   /**
-   * POST /pagos/iniciar { rut | abonado | t, medio: 'webpay' | 'mercadopago' }
+   * POST /pagos/iniciar { rut | t, medio: 'webpay' | 'mercadopago' }
    *
    * 404 cuenta no encontrada · 409 sin deuda · 503 sin saldo de G8 o sin
    * pasarela (Excepción 1 del CU-42 / CU-43, con su mensaje).

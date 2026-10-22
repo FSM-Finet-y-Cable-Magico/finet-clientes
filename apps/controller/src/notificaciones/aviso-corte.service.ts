@@ -183,7 +183,7 @@ export class AvisoCorteService {
         }
 
         const facturas = await this.saldos.facturasDe(
-          { idCliente: c.idCliente, idContrato: null },
+          { idCliente: c.idCliente },
           datos.saldoDefinido,
         );
         if (facturas === null) {

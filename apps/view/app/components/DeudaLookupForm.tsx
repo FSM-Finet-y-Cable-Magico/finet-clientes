@@ -36,7 +36,6 @@ type DeudaData = {
   cliente: {
     nombre_completo: string;
     rut: string;
-    codigo_abonado: number;
   } | null;
   tiene_deuda: boolean;
   saldo_total: number;

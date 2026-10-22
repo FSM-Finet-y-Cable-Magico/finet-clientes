@@ -21,7 +21,6 @@ describe('PagosService', () => {
   let service: PagosService;
   let prisma: {
     cliente: { findUnique: jest.Mock; findFirst: jest.Mock };
-    contrato: { findUnique: jest.Mock };
   };
   let saldos: { saldoDe: jest.Mock };
   let enlaces: { verificarEnlacePago: jest.Mock };
@@ -31,11 +30,6 @@ describe('PagosService', () => {
       cliente: {
         findUnique: jest.fn().mockResolvedValue(ANA),
         findFirst: jest.fn().mockResolvedValue(ANA),
-      },
-      contrato: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id_contrato: 100, cliente: ANA }),
       },
     };
     saldos = { saldoDe: jest.fn().mockResolvedValue(57980) };
@@ -64,14 +58,13 @@ describe('PagosService', () => {
         }),
       );
       expect(saldos.saldoDe).toHaveBeenCalledWith(
-        expect.objectContaining({ idCliente: 10, idContrato: null }),
+        expect.objectContaining({ idCliente: 10 }),
       );
       expect(r).toEqual({
         encontrado: true,
         cliente: {
           nombre: 'Ana Pérez',
           rut: 'XX.XXX.678-5',
-          codigo_abonado: null,
         },
         saldo: 57980,
         medios: [
@@ -79,18 +72,6 @@ describe('PagosService', () => {
           expect.objectContaining({ id: 'mercadopago', disponible: false }),
         ],
       });
-    });
-
-    it('por código de abonado: el saldo de ese contrato', async () => {
-      const r = await service.resumen({ abonado: '100' });
-
-      expect(prisma.contrato.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id_contrato: 100 } }),
-      );
-      expect(saldos.saldoDe).toHaveBeenCalledWith(
-        expect.objectContaining({ idCliente: 10, idContrato: 100 }),
-      );
-      expect(r.cliente?.codigo_abonado).toBe(100);
     });
 
     it('por enlace firmado (aviso de corte o portal)', async () => {
@@ -133,9 +114,7 @@ describe('PagosService', () => {
         g8 as unknown as G8IntegracionService,
       );
 
-      await expect(
-        real.saldoDe({ idCliente: 10, idContrato: null }),
-      ).resolves.toBeNull();
+      await expect(real.saldoDe({ idCliente: 10 })).resolves.toBeNull();
       expect(g8.facturas).not.toHaveBeenCalled();
     });
   });
@@ -178,7 +157,7 @@ describe('PagosService', () => {
 
     it('CU-43 Excepción 1: Mercado Pago se encuentra temporalmente indisponible', async () => {
       await expect(
-        service.iniciar({ abonado: '100' }, 'mercadopago'),
+        service.iniciar({ rut: '123456785' }, 'mercadopago'),
       ).rejects.toThrow('Mercado Pago se encuentra temporalmente indisponible');
     });
 
@@ -195,10 +174,10 @@ describe('PagosService', () => {
     it('exige exactamente un identificador', () => {
       expect(IdentificadorPagoDto.safeParse({}).success).toBe(false);
       expect(
-        IdentificadorPagoDto.safeParse({ rut: '123456785', abonado: '100' })
+        IdentificadorPagoDto.safeParse({ rut: '123456785', t: 'p.a.b.c.d' })
           .success,
       ).toBe(false);
-      expect(IdentificadorPagoDto.safeParse({ abonado: '100' }).success).toBe(
+      expect(IdentificadorPagoDto.safeParse({ t: 'p.a.b.c.d' }).success).toBe(
         true,
       );
     });
@@ -207,12 +186,6 @@ describe('PagosService', () => {
       expect(IdentificadorPagoDto.safeParse({ rut: '123456780' }).success).toBe(
         false,
       );
-    });
-
-    it('rechaza un código de abonado que no es numérico', () => {
-      expect(
-        IdentificadorPagoDto.safeParse({ abonado: '1 OR 1' }).success,
-      ).toBe(false);
     });
 
     it('sin abonos: no hay campo de monto, se paga el total', () => {

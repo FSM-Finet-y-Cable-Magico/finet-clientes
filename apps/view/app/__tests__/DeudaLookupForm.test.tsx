@@ -21,7 +21,7 @@ describe('DeudaLookupForm (CU-39/CU-41)', () => {
       ok: true,
       json: () => Promise.resolve({
         encontrado: true,
-        cliente: { nombre_completo: 'Juan Pérez', rut: '12345678-5', codigo_abonado: null },
+        cliente: { nombre_completo: 'Juan Pérez', rut: '12345678-5' },
         tiene_deuda: true,
         saldo_total: 39980,
         facturas: [

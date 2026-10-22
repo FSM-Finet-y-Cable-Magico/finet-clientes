@@ -24,8 +24,8 @@ type Pagador = Cuenta & { nombre: string; rut: string | null };
 /**
  * CU-42 / CU-43: pagar la deuda con Webpay o con Mercado Pago.
  *
- * Se paga **el total**, sin abonos parciales: todo lo del RUT, o todo lo del
- * código de abonado. Ese total no lo calculamos nosotros: lo da G8
+ * Se paga **el total**, sin abonos parciales: todo lo del RUT. Ese total no lo
+ * calculamos nosotros: lo da G8
  * (`SaldoClienteService`).
  *
  * **Qué falta** (ver `common/pendientes.ts`):
@@ -56,7 +56,6 @@ export class PagosService {
       cliente: {
         nombre: pagador.nombre,
         rut: pagador.rut === null ? null : enmascararRut(pagador.rut),
-        codigo_abonado: pagador.idContrato,
       },
       saldo: await this.saldos.saldoDe(pagador),
       medios: this.medios(),
@@ -100,25 +99,6 @@ export class PagosService {
   }
 
   private async identificar(id: IdentificadorPagoDto): Promise<Pagador | null> {
-    if (id.abonado !== undefined) {
-      const contrato = await this.prisma.contrato.findUnique({
-        where: { id_contrato: Number(id.abonado) },
-        select: {
-          id_contrato: true,
-          cliente: {
-            select: { id_cliente: true, nombre_completo: true, rut: true },
-          },
-        },
-      });
-      if (!contrato?.cliente) return null;
-      return {
-        idCliente: contrato.cliente.id_cliente,
-        idContrato: contrato.id_contrato,
-        nombre: contrato.cliente.nombre_completo,
-        rut: contrato.cliente.rut,
-      };
-    }
-
     const cliente =
       id.t !== undefined
         ? await this.clientePorEnlace(id.t)
@@ -129,7 +109,6 @@ export class PagosService {
     if (!cliente) return null;
     return {
       idCliente: cliente.id_cliente,
-      idContrato: null,
       nombre: cliente.nombre_completo,
       rut: cliente.rut,
     };

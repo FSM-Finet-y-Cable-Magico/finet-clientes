@@ -86,16 +86,6 @@ describe('G8IntegracionService', () => {
       expect(init?.redirect).toBe('error');
     });
 
-    it('por código de abonado pide las del contrato', async () => {
-      fetchMock.mockResolvedValue(respuesta(200, { items: [] }));
-
-      await service.facturas({ idEmpresa: 2, idContrato: 456 });
-
-      expect((fetchMock.mock.calls[0][0] as URL).href).toBe(
-        'https://g8.test/api/integrations/g2/invoices?id_empresa=2&id_contrato=456',
-      );
-    });
-
     it('sin vencimiento efectivo ni aceptaPagos, la factura igual se lee (con null)', async () => {
       fetchMock.mockResolvedValue(
         respuesta(200, { items: [{ idFactura: 7, saldoExigible: 1000 }] }),

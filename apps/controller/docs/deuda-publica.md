@@ -27,8 +27,7 @@ GET /api/deuda-publica/rut?rut=123456785
   "encontrado": true,
   "cliente": {
     "nombre_completo": "Juan Perez",
-    "rut": "12345678-5",
-    "codigo_abonado": null
+    "rut": "12345678-5"
   },
   "tiene_deuda": true,
   "saldo_total": 39980,
@@ -55,8 +54,6 @@ GET /api/deuda-publica/rut?rut=123456785
 }
 ```
 
-> `codigo_abonado` es `null` en consultas por RUT (solo se incluye en consultas por abonado).
-
 > El RUT se busca en sus dos formas, sin guion y con guion (K mayúscula o minúscula). El
 > Documento 0 (§11) pide guardarlo sin guion y así lo escribimos, pero la base es compartida y en
 > producción hay clientes guardados con guion (G3 contó 14 de 25 el 29-09). Lo mismo hacen el
@@ -77,63 +74,7 @@ GET /api/deuda-publica/rut?rut=123456785
 
 ---
 
-## 2. Consultar por código de abonado (CU-40)
-
-Consulta la deuda de un cliente usando su código de abonado (`id_contrato`).
-
-```
-GET /api/deuda-publica/abonado?codigo_abonado=100
-```
-
-**Query params:**
-
-| Param | Tipo | Requerido | Descripción |
-|-------|------|-----------|-------------|
-| `codigo_abonado` | string | Sí | Código de abonado numérico (máx 20 caracteres) |
-
-**Respuesta 200 — Encontrado:**
-
-```json
-{
-  "encontrado": true,
-  "cliente": {
-    "nombre_completo": "Juan Perez",
-    "rut": "12345678-5",
-    "codigo_abonado": 100
-  },
-  "tiene_deuda": true,
-  "saldo_total": 19990,
-  "facturas": [
-    {
-      "id_factura": 201,
-      "periodo": "Mayo 2026",
-      "monto": 19990,
-      "fecha_limite_pago": "2026-05-10",
-      "estado": "pendiente",
-      "dias_vencida": null,
-      "dias_para_vencer": 15
-    }
-  ]
-}
-```
-
-> `codigo_abonado` coincide con el `id_contrato` del sistema.
-
-**Respuesta 200 — No encontrado:**
-
-```json
-{
-  "encontrado": false,
-  "cliente": null,
-  "tiene_deuda": false,
-  "saldo_total": 0,
-  "facturas": []
-}
-```
-
----
-
-## 3. Detalle de factura (CU-41)
+## 2. Detalle de factura (CU-41)
 
 Cada factura en el array `facturas` incluye el siguiente detalle:
 
@@ -160,7 +101,6 @@ Cada factura en el array `facturas` incluye el siguiente detalle:
 | 400 | `"El RUT es requerido"` | Query param `rut` vacío |
 | 400 | `"Formato inválido. Ej: 123456785"` | RUT con formato incorrecto |
 | 400 | `"RUT inválido — dígito verificador incorrecto"` | DV no coincide |
-| 400 | `"El código de abonado es requerido"` | Query param `codigo_abonado` vacío |
 
 ---
 
@@ -192,12 +132,6 @@ if (data.tiene_deuda) {
 } else {
   console.log('Cliente sin deuda pendiente');
 }
-
-// Consultar por código de abonado
-const res2 = await fetch(
-  `${API_URL}/deuda-publica/abonado?codigo_abonado=100`
-);
-const data2 = await res2.json();
 ```
 
 ---

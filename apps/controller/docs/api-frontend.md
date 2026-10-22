@@ -588,8 +588,7 @@ Formatos de RUT aceptados: `12.345.678-9` o `12345678-9`.
   "encontrado": true,
   "cliente": {
     "nombre_completo": "Juan Pérez",
-    "rut": "12345678-9",
-    "codigo_abonado": 100
+    "rut": "12345678-9"
   },
   "tiene_deuda": true,
   "saldo_total": 39980,
@@ -620,13 +619,6 @@ Formatos de RUT aceptados: `12.345.678-9` o `12345678-9`.
 
 ---
 
-### 4.2 Consultar por código de abonado (CU-40)
-
-```
-GET /api/deuda-publica/abonado?codigo_abonado=100
-```
-
-**Respuesta 200:** Misma estructura que consulta por RUT.
 ## 6. Mecanismos de autenticación
 
 | Tipo | Cómo se envía | Dónde se usa |
