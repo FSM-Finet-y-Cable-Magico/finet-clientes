@@ -32,26 +32,17 @@ describe('PortalDePagos', () => {
     global.fetch = jest.fn();
   });
 
-  it('sin cuenta identificada, pide el RUT o el código de abonado', async () => {
+  it('sin cuenta identificada, pide solo el RUT', async () => {
     const user = userEvent.setup();
     render(<PortalDePagos identificador={null} />);
+
+    expect(screen.queryByText(/abonado/i)).not.toBeInTheDocument();
 
     await user.type(screen.getByPlaceholderText('12.345.678-9'), '12345678-5');
     await user.click(screen.getByRole('button', { name: /ver mi deuda/i }));
 
     expect(push).toHaveBeenCalledWith('/pagar?rut=123456785');
     expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('también por código de abonado', async () => {
-    const user = userEvent.setup();
-    render(<PortalDePagos identificador={null} />);
-
-    await user.click(screen.getByRole('button', { name: /código de abonado/i }));
-    await user.type(screen.getByLabelText(/código de abonado/i), '100');
-    await user.click(screen.getByRole('button', { name: /ver mi deuda/i }));
-
-    expect(push).toHaveBeenCalledWith('/pagar?abonado=100');
   });
 
   it('muestra el resumen: de quién es la cuenta y el total a pagar', async () => {
@@ -125,14 +116,14 @@ describe('PortalDePagos', () => {
       .mockResolvedValueOnce(resumen(57980))
       .mockResolvedValueOnce(respuesta({ message: 'x' }, false, 503));
 
-    render(<PortalDePagos identificador={{ abonado: '100' }} />);
+    render(<PortalDePagos identificador={{ rut: '123456785' }} />);
 
     await user.click(await screen.findByRole('radio', { name: /mercado pago/i }));
     await user.click(screen.getByRole('button', { name: /^pagar$/i }));
 
     await waitFor(() => {
       const body = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
-      expect(body).toEqual({ abonado: '100', medio: 'mercadopago' });
+      expect(body).toEqual({ rut: '123456785', medio: 'mercadopago' });
     });
   });
 

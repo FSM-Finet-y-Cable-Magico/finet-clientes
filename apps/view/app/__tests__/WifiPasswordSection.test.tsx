@@ -21,17 +21,20 @@ const mockChange = changeWifiPassword as jest.MockedFunction<
 const CONTRATO_ACTIVO: ContratoWifi = {
   id_contrato: 1,
   estado: "ACTIVO",
+  fecha_inicio: "2025-03-05",
   plan: { nombre_comercial: "Fibra 200" },
 };
 const CONTRATO_SUSPENDIDO: ContratoWifi = {
   id_contrato: 2,
   estado: "SUSPENDIDO",
+  fecha_inicio: "2025-06-01",
   plan: { nombre_comercial: "Fibra 400" },
 };
 // Valor heredado que sigue vivo en la base compartida.
 const CONTRATO_ACTIVO_HEREDADO: ContratoWifi = {
   id_contrato: 3,
   estado: "activo",
+  fecha_inicio: "2024-11-20",
   plan: { nombre_comercial: "Fibra 600" },
 };
 
@@ -76,7 +79,7 @@ describe("WifiPasswordSection (CU-31 / CU-32)", () => {
         contratos={[
           CONTRATO_ACTIVO,
           CONTRATO_SUSPENDIDO,
-          { ...CONTRATO_ACTIVO, id_contrato: 3 },
+          { ...CONTRATO_ACTIVO, id_contrato: 3, fecha_inicio: "2026-08-10" },
         ]}
       />,
     );
@@ -84,8 +87,29 @@ describe("WifiPasswordSection (CU-31 / CU-32)", () => {
     expect(screen.getByLabelText("Servicio")).toBeInTheDocument();
     expect(screen.getAllByRole("option")).toHaveLength(3); // placeholder + 2 activos
     expect(
-      screen.queryByRole("option", { name: /abonado #2/i }),
+      screen.queryByRole("option", { name: /fibra 400/i }),
     ).not.toBeInTheDocument();
+  });
+
+  // Sin código de abonado: dos servicios con el mismo plan se distinguen por la
+  // fecha en que empezaron (§11.4, DD/MM/AAAA, sin correrse un día en Chile).
+  it("nombra cada servicio por su plan y su fecha de inicio", () => {
+    render(
+      <WifiPasswordSection
+        contratos={[
+          CONTRATO_ACTIVO,
+          { ...CONTRATO_ACTIVO, id_contrato: 3, fecha_inicio: "2026-08-10" },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("option", { name: "Fibra 200 · desde 05/03/2025" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Fibra 200 · desde 10/08/2026" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/abonado/i)).not.toBeInTheDocument();
   });
 
   // CU-31 Excepcion 1: campo vacio.

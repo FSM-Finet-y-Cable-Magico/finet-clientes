@@ -140,17 +140,12 @@ export default function ServiciosPage() {
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                      Abonado #{c.id_contrato}
-                    </p>
                     {c.plan ? (
-                      <p className="mt-1 text-lg font-semibold text-foreground">
+                      <p className="text-lg font-semibold text-foreground">
                         {c.plan.nombre_comercial}
                       </p>
                     ) : (
-                      <p className="mt-1 text-sm text-muted">
-                        Sin plan asociado
-                      </p>
+                      <p className="text-sm text-muted">Sin plan asociado</p>
                     )}
                   </div>
                   <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>

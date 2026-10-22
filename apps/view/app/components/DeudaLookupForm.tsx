@@ -63,11 +63,8 @@ function formatFecha(iso: string) {
 }
 
 export default function DeudaLookupForm() {
-  const [modo, setModo] = useState<"rut" | "abonado">("rut");
   const [rut, setRut] = useState("");
   const [rutError, setRutError] = useState("");
-  const [codigo, setCodigo] = useState("");
-  const [codigoError, setCodigoError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<DeudaData | null>(null);
@@ -82,41 +79,22 @@ export default function DeudaLookupForm() {
     }
   }
 
-  function validateCodigo(value: string) {
-    if (!value || value.trim() === "") {
-      setCodigoError("El código de abonado es obligatorio");
-    } else {
-      setCodigoError("");
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setResult(null);
 
-    if (modo === "rut") {
-      const r = recoverySchema.safeParse({ rut });
-      if (!r.success) {
-        const issue = r.error.issues.find((i) => i.path[0] === "rut");
-        setRutError(issue?.message ?? "RUT inválido");
-        return;
-      }
-      setRutError("");
-    } else {
-      if (!codigo || codigo.trim() === "") {
-        setCodigoError("El código de abonado es obligatorio");
-        return;
-      }
-      setCodigoError("");
+    const r = recoverySchema.safeParse({ rut });
+    if (!r.success) {
+      const issue = r.error.issues.find((i) => i.path[0] === "rut");
+      setRutError(issue?.message ?? "RUT inválido");
+      return;
     }
+    setRutError("");
 
     setLoading(true);
 
-    const endpoint =
-      modo === "rut"
-        ? `${API_URL}/deuda-publica/rut?rut=${encodeURIComponent(cleanRut(rut))}`
-        : `${API_URL}/deuda-publica/abonado?codigo_abonado=${encodeURIComponent(codigo.trim())}`;
+    const endpoint = `${API_URL}/deuda-publica/rut?rut=${encodeURIComponent(cleanRut(rut))}`;
 
     try {
       const res = await fetch(endpoint, { credentials: "include" });
@@ -129,18 +107,6 @@ export default function DeudaLookupForm() {
       setError("No se pudo consultar la deuda. Intenta nuevamente.");
     } finally {
       setLoading(false);
-    }
-  }
-
-  function resetAll() {
-    setResult(null);
-    setError("");
-    if (modo === "rut") {
-      setRut("");
-      setRutError("");
-    } else {
-      setCodigo("");
-      setCodigoError("");
     }
   }
 
@@ -160,38 +126,6 @@ export default function DeudaLookupForm() {
         </div>
       </div>
 
-      {/* Toggle RUT / Abonado */}
-      <div className="flex w-full rounded-lg bg-border p-1 mb-6">
-        <button
-          type="button"
-          onClick={() => {
-            setModo("rut");
-            resetAll();
-          }}
-          className={`flex-1 cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-all duration-200 ${
-            modo === "rut"
-              ? "bg-primary text-background shadow-sm"
-              : "text-muted hover:text-foreground"
-          }`}
-        >
-          Por RUT
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setModo("abonado");
-            resetAll();
-          }}
-          className={`flex-1 cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-all duration-200 ${
-            modo === "abonado"
-              ? "bg-primary text-background shadow-sm"
-              : "text-muted hover:text-foreground"
-          }`}
-        >
-          Por Código Abonado
-        </button>
-      </div>
-
       <form
         onSubmit={handleSubmit}
         className="border border-border rounded-xl p-6 bg-background mb-6"
@@ -199,47 +133,16 @@ export default function DeudaLookupForm() {
       >
         <div className="flex gap-3 items-start">
           <div className="flex-1">
-            {modo === "rut" ? (
-              <RutInput
-                value={rut}
-                error={rutError}
-                onChange={(v) => {
-                  setRut(v);
-                  setRutError("");
-                  setResult(null);
-                }}
-                onBlur={() => validateRut(rut)}
-              />
-            ) : (
-              <div>
-                <label
-                  htmlFor="codigoAbonado"
-                  className="mb-1.5 block text-sm font-medium text-foreground"
-                >
-                  Código de Abonado
-                </label>
-                <input
-                  id="codigoAbonado"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="100"
-                  value={codigo}
-                  onChange={(e) => {
-                    setCodigo(e.target.value.replace(/\D/g, ""));
-                    setCodigoError("");
-                    setResult(null);
-                  }}
-                  onBlur={() => validateCodigo(codigo)}
-                  data-error={!!codigoError}
-                  className={`w-full rounded-lg border px-4 py-2.5 text-sm outline-none transition-colors duration-200
-                    data-[error=false]:border-border data-[error=false]:bg-background data-[error=false]:text-foreground data-[error=false]:placeholder:text-muted data-[error=false]:focus-visible:outline data-[error=false]:focus-visible:outline-2 data-[error=false]:focus-visible:outline-offset-0 data-[error=false]:focus-visible:outline-primary
-                    border-error bg-error-container text-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-error`}
-                />
-                {codigoError && (
-                  <p className="mt-1 text-xs text-error">{codigoError}</p>
-                )}
-              </div>
-            )}
+            <RutInput
+              value={rut}
+              error={rutError}
+              onChange={(v) => {
+                setRut(v);
+                setRutError("");
+                setResult(null);
+              }}
+              onBlur={() => validateRut(rut)}
+            />
           </div>
           <button
             type="submit"
@@ -304,7 +207,7 @@ export default function DeudaLookupForm() {
                   {result.cliente!.nombre_completo}
                 </p>
                 <p className="text-xs text-muted mt-0.5">
-                  RUT {result.cliente!.rut} — Abonado {result.cliente!.codigo_abonado}
+                  RUT {result.cliente!.rut}
                 </p>
               </div>
             </div>
@@ -318,11 +221,7 @@ export default function DeudaLookupForm() {
                   Saldo pendiente
                 </p>
                 <Link
-                  href={
-                    modo === "rut"
-                      ? `/pagar?rut=${encodeURIComponent(cleanRut(rut))}`
-                      : `/pagar?abonado=${encodeURIComponent(codigo.trim())}`
-                  }
+                  href={`/pagar?rut=${encodeURIComponent(cleanRut(rut))}`}
                   className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-2.5 text-sm font-semibold text-on-accent shadow-sm transition-all hover:shadow-md hover:brightness-105 active:scale-[0.98]"
                 >
                   <CreditCard size={16} aria-hidden />
@@ -422,9 +321,7 @@ export default function DeudaLookupForm() {
             No se encontraron coincidencias
           </p>
           <p className="mt-1 text-sm text-muted">
-            {modo === "rut"
-              ? "No existe un cliente asociado al RUT ingresado."
-              : "No existe un cliente asociado al código de abonado ingresado."}
+            No existe un cliente asociado al RUT ingresado.
           </p>
         </div>
       )}

@@ -13,7 +13,7 @@ import {
 import { api } from "@/app/utils/api";
 import IdentificarCuenta from "./IdentificarCuenta";
 
-export type Identificador = { rut: string } | { abonado: string } | { t: string };
+export type Identificador = { rut: string } | { t: string };
 
 type MedioId = "webpay" | "mercadopago";
 
@@ -91,8 +91,8 @@ export default function PortalDePagos({
         {!identificador ? (
           <div className="p-6">
             <p className="mb-5 text-sm text-muted">
-              Paga el total de tu deuda con tu RUT o tu código de abonado. No
-              necesitas iniciar sesión.
+              Paga el total de tu deuda con tu RUT. No necesitas iniciar
+              sesión.
             </p>
             <IdentificarCuenta />
           </div>
@@ -147,12 +147,9 @@ function Encabezado({
               {cliente.nombre}
             </strong>
           </p>
-          <p className="mt-0.5 font-mono text-xs">
-            {cliente.rut ? `RUT ${cliente.rut}` : null}
-            {cliente.codigo_abonado !== null
-              ? ` · Abonado ${cliente.codigo_abonado}`
-              : null}
-          </p>
+          {cliente.rut ? (
+            <p className="mt-0.5 font-mono text-xs">RUT {cliente.rut}</p>
+          ) : null}
         </div>
       ) : null}
       {conCuenta ? (
@@ -177,7 +174,7 @@ function Cuenta({
   if (!resumen.encontrado) {
     return (
       <Aviso tono="neutro" titulo="No encontramos una cuenta con esos datos">
-        <p className="mt-1">Revisa el RUT o el código de abonado.</p>
+        <p className="mt-1">Revisa el RUT.</p>
       </Aviso>
     );
   }

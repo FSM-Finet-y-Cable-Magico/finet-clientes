@@ -16,8 +16,35 @@ const MAX_LEN = 63;
 export type ContratoWifi = {
   id_contrato: number;
   estado: string;
+  /** `YYYY-MM-DD`, como lo devuelve `/portal/contratos/vigentes`. */
+  fecha_inicio: string;
   plan: { nombre_comercial: string } | null;
 };
+
+/**
+ * §11.4 del Documento 0: DD/MM/AAAA. `fecha_inicio` es una fecha de calendario,
+ * no un instante: se formatea en UTC para que en hora de Chile no muestre el
+ * día anterior.
+ */
+function formatFechaInicio(fecha: string) {
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat("es-CL", {
+      timeZone: "UTC",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+      .formatToParts(new Date(fecha))
+      .map((p) => [p.type, p.value])
+  );
+  return `${partes.day}/${partes.month}/${partes.year}`;
+}
+
+/** Cómo distingue el cliente sus servicios: el plan y desde cuándo lo tiene. */
+function nombreServicio(c: ContratoWifi) {
+  const plan = c.plan?.nombre_comercial ?? "Servicio sin plan";
+  return `${plan} · desde ${formatFechaInicio(c.fecha_inicio)}`;
+}
 
 // CU-31: valida el formato y devuelve el motivo cuando no se cumple.
 function validarClave(valor: string): string {
@@ -192,8 +219,7 @@ export default function WifiPasswordSection({ contratos }: Props) {
               <option value="">Selecciona un servicio</option>
               {activos.map((c) => (
                 <option key={c.id_contrato} value={c.id_contrato}>
-                  Abonado #{c.id_contrato}
-                  {c.plan ? ` — ${c.plan.nombre_comercial}` : ""}
+                  {nombreServicio(c)}
                 </option>
               ))}
             </select>

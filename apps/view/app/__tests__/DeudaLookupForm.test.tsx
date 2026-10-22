@@ -3,17 +3,16 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DeudaLookupForm from '@/app/components/DeudaLookupForm';
 
-describe('DeudaLookupForm (CU-39/CU-40)', () => {
+describe('DeudaLookupForm (CU-39/CU-41)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = jest.fn();
   });
 
-  it('renderiza campos de búsqueda por RUT y selector de modo', () => {
+  it('busca solo por RUT: no hay código de abonado', () => {
     render(<DeudaLookupForm />);
     expect(screen.getByPlaceholderText('12.345.678-9')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /por rut/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /por código abonado/i })).toBeInTheDocument();
+    expect(screen.queryByText(/abonado/i)).not.toBeInTheDocument();
   });
 
   it('consulta por RUT y muestra resultado (CU-39)', async () => {
@@ -49,6 +48,7 @@ describe('DeudaLookupForm (CU-39/CU-40)', () => {
       );
       expect(screen.getByText(/juan pérez/i)).toBeInTheDocument();
     });
+    expect(screen.getByText('RUT 12345678-5')).toBeInTheDocument();
 
     // Detalle del plan y "Pagar ahora", que lleva a /pagar con el mismo RUT (CU-42/43)
     expect(screen.getByText(/plan 200 mbps/i)).toBeInTheDocument();
@@ -56,33 +56,6 @@ describe('DeudaLookupForm (CU-39/CU-40)', () => {
       'href',
       '/pagar?rut=123456785',
     );
-  });
-
-  it('cambia a modo código de abonado y consulta (CU-40)', async () => {
-    const user = userEvent.setup();
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        encontrado: true,
-        cliente: { nombre_completo: 'María López', rut: '98765432-1', codigo_abonado: 100 },
-        tiene_deuda: false,
-        saldo_total: 0,
-        facturas: [],
-        planes: [],
-        detalle_disponible: true,
-        informacion_completa: true,
-      }),
-    });
-
-    render(<DeudaLookupForm />);
-
-    await user.click(screen.getByRole('button', { name: /por código abonado/i }));
-    await user.type(screen.getByPlaceholderText('100'), '100');
-    await user.click(screen.getByRole('button', { name: /consultar/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/maría lópez/i)).toBeInTheDocument();
-    });
   });
 
   it('muestra "no encontrado" si el RUT no existe (CU-39 Excepción 3)', async () => {
