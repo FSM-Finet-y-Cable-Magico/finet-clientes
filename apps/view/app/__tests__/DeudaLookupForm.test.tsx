@@ -64,6 +64,47 @@ describe('DeudaLookupForm (CU-39/CU-41)', () => {
     );
   });
 
+  it('llama a la consulta pública con el RUT limpio y la cookie de sesión', async () => {
+    const user = userEvent.setup();
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ encontrado: false, cliente: null, tiene_deuda: false, saldo_total: 0, facturas: [] }),
+    });
+
+    render(<DeudaLookupForm />);
+
+    await user.type(screen.getByPlaceholderText('12.345.678-9'), '12.345.678-5');
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const [url, opciones] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toMatch(/\/deuda-publica\/rut\?rut=123456785$/);
+    expect(opciones).toEqual(expect.objectContaining({ credentials: 'include' }));
+  });
+
+  it.each([
+    ['el backend responde con error (por ejemplo, el límite de consultas)', () =>
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({ message: 'Demasiadas consultas' }),
+      })],
+    ['no hay conexión', () =>
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'))],
+  ])('si %s, muestra el mensaje genérico', async (_caso, responder) => {
+    const user = userEvent.setup();
+    responder();
+
+    render(<DeudaLookupForm />);
+
+    await user.type(screen.getByPlaceholderText('12.345.678-9'), '12345678-5');
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    expect(
+      await screen.findByText('No se pudo consultar la deuda. Intenta nuevamente.'),
+    ).toBeInTheDocument();
+  });
+
   it('muestra "no encontrado" si el RUT no existe (CU-39 Excepción 3)', async () => {
     const user = userEvent.setup();
     (global.fetch as jest.Mock).mockResolvedValueOnce({

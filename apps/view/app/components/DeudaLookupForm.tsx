@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { API_URL } from "@/app/_lib/consts";
+import { api } from "@/app/utils/api";
 import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
 import {
   Search,
@@ -82,14 +82,10 @@ export default function DeudaLookupForm() {
 
     setLoading(true);
 
-    const endpoint = `${API_URL}/deuda-publica/rut?rut=${encodeURIComponent(cleanRut(rut))}`;
-
     try {
-      const res = await fetch(endpoint, { credentials: "include" });
-
-      if (!res.ok) throw res;
-
-      const data: DeudaData = await res.json();
+      const data = await api.get<DeudaData>(
+        `/deuda-publica/rut?rut=${encodeURIComponent(cleanRut(rut))}`,
+      );
       setResult(data);
     } catch {
       setError("No se pudo consultar la deuda. Intenta nuevamente.");
