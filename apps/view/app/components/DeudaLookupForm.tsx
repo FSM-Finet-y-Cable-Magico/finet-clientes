@@ -15,6 +15,7 @@ import {
 import { cleanRut } from "../utils/login-schema";
 import { recoverySchema } from "../utils/login-schema";
 import RutInput from "../components/RutInput";
+import { FilaFactura, TablaFacturas } from "@/app/_components/deuda/TablaFacturas";
 
 type Factura = {
   id_factura: number;
@@ -253,47 +254,27 @@ export default function DeudaLookupForm() {
           )}
 
           {result.tiene_deuda && result.facturas.length > 0 && (
-            <div className="p-6">
-              <h3 className="text-sm font-semibold text-foreground mb-3">
-                Detalle de facturas
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs text-muted border-b border-border">
-                      <th className="pb-2 font-medium">Periodo</th>
-                      <th className="pb-2 font-medium">Monto</th>
-                      <th className="pb-2 font-medium">Vence</th>
-                      <th className="pb-2 font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {result.facturas.map((f) => (
-                      <tr key={f.id_factura}>
-                        <td className="py-2 text-foreground">{f.periodo}</td>
-                        <td className="py-2 text-foreground">
-                          {formatPrecio(f.monto)}
-                        </td>
-                        <td className="py-2 text-muted">
-                          {fechaCalendario(f.fecha_limite_pago, "corta")}
-                        </td>
-                        <td className="py-2">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${
-                              f.estado === "vencida"
-                                ? "bg-error-container text-error border-error"
-                                : "bg-warning-container text-on-warning-container border-warning"
-                            }`}
-                          >
-                            {f.estado === "vencida" ? "Vencida" : "Pendiente"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <TablaFacturas>
+              {result.facturas.map((f) => (
+                <FilaFactura
+                  key={f.id_factura}
+                  periodo={f.periodo}
+                  monto={f.monto}
+                  vence={fechaCalendario(f.fecha_limite_pago, "corta")}
+                  estado={
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${
+                        f.estado === "vencida"
+                          ? "bg-error-container text-error border-error"
+                          : "bg-warning-container text-on-warning-container border-warning"
+                      }`}
+                    >
+                      {f.estado === "vencida" ? "Vencida" : "Pendiente"}
+                    </span>
+                  }
+                />
+              ))}
+            </TablaFacturas>
           )}
         </div>
       )}
