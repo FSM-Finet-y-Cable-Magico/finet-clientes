@@ -30,6 +30,7 @@ import {
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
 import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
+import { formatPeriodo } from '../common/utils/periodo.js';
 import { MailService } from '../mail/mail.service.js';
 import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
@@ -269,7 +270,7 @@ export class PortalService {
 
       return {
         id_factura: f.id_factura,
-        periodo: this.formatPeriodo(f.periodo_mes, f.periodo_anio),
+        periodo: formatPeriodo(f.periodo_mes, f.periodo_anio),
         monto: Number(f.monto ?? 0),
         fecha_limite_pago: limite.toISOString().split('T')[0],
         estado: f.estado,
@@ -340,7 +341,7 @@ export class PortalService {
         id_pago: p.id_pago,
         fecha_pago: p.fecha_pago.toISOString(),
         periodo: p.factura
-          ? this.formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
+          ? formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
           : null,
         monto: Number(p.monto),
         pasarela: this.nombreMedio(p.pasarela),
@@ -976,24 +977,5 @@ export class PortalService {
       );
       return null;
     }
-  }
-
-  // variables meses xD
-  private formatPeriodo(mes: number, anio: number): string {
-    const meses = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ];
-    return `${meses[mes - 1]} ${anio}`;
   }
 }

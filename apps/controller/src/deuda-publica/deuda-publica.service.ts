@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { formatPeriodo } from '../common/utils/periodo.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import {
   DetalleFacturaPublicaDto,
@@ -129,7 +130,7 @@ export class DeudaPublicaService {
 
       return {
         id_factura: f.id_factura,
-        periodo: this.formatPeriodo(f.periodo_mes, f.periodo_anio),
+        periodo: formatPeriodo(f.periodo_mes, f.periodo_anio),
         monto: Number(f.monto ?? 0),
         fecha_limite_pago: fechaInvalida
           ? ''
@@ -188,23 +189,5 @@ export class DeudaPublicaService {
       });
     }
     return [...porNombre.values()];
-  }
-
-  private formatPeriodo(mes: number, anio: number): string {
-    const meses = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ];
-    return `${meses[mes - 1]} ${anio}`;
   }
 }

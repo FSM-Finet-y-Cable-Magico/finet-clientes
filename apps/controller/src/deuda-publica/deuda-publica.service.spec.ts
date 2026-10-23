@@ -127,6 +127,38 @@ describe('DeudaPublicaService', () => {
     expect(r.informacion_completa).toBe(true);
   });
 
+  it('muestra el periodo como "Mes AAAA", de enero a diciembre', async () => {
+    (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
+      id_cliente: 1,
+      nombre_completo: 'Juan',
+      rut: '123456785',
+      contrato: [{ id_contrato: 100 }],
+    });
+    (prisma.factura.findMany as jest.Mock).mockResolvedValue([
+      {
+        id_factura: 1,
+        periodo_mes: 1,
+        periodo_anio: 2026,
+        monto: 23890,
+        fecha_limite_pago: new Date(),
+        estado: 'pendiente',
+      },
+      {
+        id_factura: 2,
+        periodo_mes: 12,
+        periodo_anio: 2025,
+        monto: 23890,
+        fecha_limite_pago: new Date(),
+        estado: 'vencida',
+      },
+    ]);
+    const r = await service.consultarPorRut('123456785');
+    expect(r.facturas.map((f) => f.periodo)).toEqual([
+      'Enero 2026',
+      'Diciembre 2025',
+    ]);
+  });
+
   it('CU-41 Exc 1: detalle_disponible:false si la consulta de facturas falla', async () => {
     (prisma.cliente.findFirst as jest.Mock).mockResolvedValue({
       id_cliente: 1,
