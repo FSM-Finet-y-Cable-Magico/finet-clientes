@@ -142,7 +142,7 @@ POST /api/auth/restablecer-password
 }
 ```
 
-El token viene del enlace en el email de recuperación. Expira en **15 minutos**.
+El token viene del enlace en el email de recuperación. Expira en **30 minutos** (RNF-04.1).
 
 **Respuesta 200:**
 ```json

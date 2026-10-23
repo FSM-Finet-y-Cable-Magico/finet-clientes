@@ -255,7 +255,7 @@ export class MailService {
     <p style="text-align: center;">
       <a href="${link}" style="display: inline-block; background: #1a56db; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Restablecer contraseña</a>
     </p>
-    <p style="font-size: 12px; color: #666;">Este enlace expira en 15 minutos. Si no solicitaste este cambio, ignora este mensaje.</p>
+    <p style="font-size: 12px; color: #666;">Este enlace expira en 30 minutos. Si no solicitaste este cambio, ignora este mensaje.</p>
   </div>
 </body>
 </html>`;

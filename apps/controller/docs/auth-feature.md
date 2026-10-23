@@ -130,7 +130,7 @@ Content-Type: application/json
 ```
 
 **Comportamiento interno:**
-- RUT registrado con email → genera token JWT `type: "reset"` (15 min), envía email con enlace (token en fragmento `#token=...`, no visible al servidor)
+- RUT registrado con email → genera token JWT `type: "reset"` (30 min), envía email con enlace (token en fragmento `#token=...`, no visible al servidor)
 - RUT registrado sin email → registra incidente en `intento_fallido`, no envía email
 - RUT no registrado → no hace nada, mismo mensaje genérico
 
@@ -141,7 +141,7 @@ Content-Type: application/json
 | 429 | ThrottlerException | Excede 3 req/min |
 
 **Notas:**
-- El token en el enlace es un JWT firmado con claim `type: "reset"`, expira en 15 minutos.
+- El token en el enlace es un JWT firmado con claim `type: "reset"`, expira en 30 minutos (RNF-04.1).
 - Si falla el envío del email, se registra en el log del servidor y se devuelve el mensaje genérico igualmente.
 
 ---
@@ -175,7 +175,7 @@ Content-Type: application/json
 **Errores:**
 | Código | Mensaje | Causa |
 |---|---|---|
-| 400 | Token inválido o expirado | Token expiró (>15 min) o firma inválida |
+| 400 | Token inválido o expirado | Token expiró (>30 min) o firma inválida |
 | 400 | Token inválido | El token no es de tipo `reset` (ej: token de sesión) |
 | 429 | ThrottlerException | Excede 3 req/min |
 

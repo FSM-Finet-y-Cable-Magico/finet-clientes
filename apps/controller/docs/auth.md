@@ -145,7 +145,7 @@ POST /api/auth/recuperar-password
 }
 ```
 
-Si el RUT existe y tiene email registrado, se envia un enlace de recuperacion al correo. El enlace expira en **15 minutos**.
+Si el RUT existe y tiene email registrado, se envia un enlace de recuperacion al correo. El enlace expira en **30 minutos**.
 
 Por seguridad, la respuesta siempre es identica, sin revelar si el RUT existe o no.
 
@@ -187,7 +187,7 @@ POST /api/auth/restablecer-password
 }
 ```
 
-El token viene del enlace en el email de recuperacion. Expira en **15 minutos**. Es un JWT de tipo `'reset'`.
+El token viene del enlace en el email de recuperacion. Expira en **30 minutos**. Es un JWT de tipo `'reset'`.
 
 Al cambiar la contrasena se invalidan todas las sesiones activas del cliente.
 

@@ -146,7 +146,7 @@ export class AuthController {
    * RF-03: Solicitar recuperación de contraseña
    *
    * Si el RUT existe y tiene email registrado, envía un enlace de recuperación
-   * al correo del cliente. El enlace expira en 15 minutos.
+   * al correo del cliente. El enlace expira en 30 minutos (RNF-04.1).
    *
    * POST /auth/recuperar-password
    *
@@ -176,7 +176,7 @@ export class AuthController {
    * RF-09: Restablecer contraseña con token
    *
    * El token se recibe por email (el link apunta a /restablecer-password?token=...).
-   * Valida que el token sea de tipo 'reset' y no esté expirado (15 min).
+   * Valida que el token sea de tipo 'reset' y no esté expirado (30 min).
    * Al cambiar la contraseña, invalida todas las sesiones activas del cliente.
    *
    * POST /auth/restablecer-password

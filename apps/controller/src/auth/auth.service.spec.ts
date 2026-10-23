@@ -433,7 +433,7 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('message');
       expect(jwtService.signAsync).toHaveBeenCalledWith(
         { sub: 1, type: 'reset' },
-        { expiresIn: '15m' },
+        { expiresIn: '30m' },
       );
     });
 

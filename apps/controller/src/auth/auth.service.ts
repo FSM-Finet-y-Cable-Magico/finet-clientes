@@ -445,8 +445,9 @@ export class AuthService {
 
     try {
       const payload = { sub: cliente.id_cliente, type: 'reset' };
+      // RNF-04.1: el enlace de recuperación dura 30 minutos.
       const token = await this.jwtService.signAsync(payload, {
-        expiresIn: '15m',
+        expiresIn: '30m',
       });
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
