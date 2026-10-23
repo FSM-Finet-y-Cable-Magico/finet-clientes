@@ -107,6 +107,8 @@ export default function ResetPasswordForm({ token }: Props) {
           onBlur={() => validateField("password", password)}
         />
         <PasswordInput
+          id="confirmPassword"
+          label="Confirmar contraseña"
           value={confirmPassword}
           error={errors.confirmPassword}
           onChange={(v) => {

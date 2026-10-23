@@ -198,24 +198,17 @@ export default function RegisterForm() {
           onBlur={() => validateField("password", password)}
         />
 
-        <div>
-          <label
-            htmlFor="confirmPassword"
-            className="mb-1.5 block text-sm font-medium text-foreground"
-          >
-            Confirmar Contraseña
-          </label>
-          <PasswordInput
-            id="confirmPassword"
-            value={confirmPassword}
-            error={errors.confirmPassword}
-            onChange={(v) => {
-              setConfirmPassword(v);
-              setErrors((prev) => ({ ...prev, confirmPassword: "" }));
-            }}
-            onBlur={() => validateField("confirmPassword", confirmPassword)}
-          />
-        </div>
+        <PasswordInput
+          id="confirmPassword"
+          label="Confirmar Contraseña"
+          value={confirmPassword}
+          error={errors.confirmPassword}
+          onChange={(v) => {
+            setConfirmPassword(v);
+            setErrors((prev) => ({ ...prev, confirmPassword: "" }));
+          }}
+          onBlur={() => validateField("confirmPassword", confirmPassword)}
+        />
 
         <CasillaPoliticaPrivacidad
           checked={aceptaPolitica}
