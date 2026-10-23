@@ -112,8 +112,12 @@ describe("contraseña (CU-11 / RF-09)", () => {
     ]);
   });
 
-  it.each(conPassword)("%s: más de 128", (_n, esquema, datos, campo) => {
-    expect(mensajes(esquema, datos("A1" + "a".repeat(127)), campo)).toEqual([
+  it.each(conPassword)("%s: acepta justo 72", (_n, esquema, datos, campo) => {
+    expect(mensajes(esquema, datos("A1" + "a".repeat(70)), campo)).toEqual([]);
+  });
+
+  it.each(conPassword)("%s: más de 72, el tope del backend", (_n, esquema, datos, campo) => {
+    expect(mensajes(esquema, datos("A1" + "a".repeat(71)), campo)).toEqual([
       "La contraseña es demasiado larga",
     ]);
   });

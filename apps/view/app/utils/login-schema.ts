@@ -46,11 +46,12 @@ const rutField = z
   .min(1, "El RUT es obligatorio")
   .refine((val) => validateRut(val), "RUT inválido");
 
-// RF-09 / CU-11: 8 caracteres como mínimo, una mayúscula y un número.
+// RF-09 / CU-11: 8 caracteres como mínimo, una mayúscula y un número. El tope
+// de 72 es el del backend: bcrypt no usa lo que pasa de ahí.
 const passwordField = z
   .string({ message: "La contraseña es obligatoria" })
   .min(8, "Mínimo 8 caracteres")
-  .max(128, "La contraseña es demasiado larga")
+  .max(72, "La contraseña es demasiado larga")
   .regex(/^(?=.*[A-Z])(?=.*\d).+$/, "Al menos 1 mayúscula y 1 número");
 
 export const loginSchema = z.object({
