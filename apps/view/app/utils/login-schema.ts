@@ -41,15 +41,21 @@ function validateTelefonoChileno(telefono: string) {
   return false;
 }
 
+const rutField = z
+  .string({ message: "El RUT es obligatorio" })
+  .min(1, "El RUT es obligatorio")
+  .refine((val) => validateRut(val), "RUT inválido");
+
+// RF-09 / CU-11: 8 caracteres como mínimo, una mayúscula y un número.
+const passwordField = z
+  .string({ message: "La contraseña es obligatoria" })
+  .min(8, "Mínimo 8 caracteres")
+  .max(128, "La contraseña es demasiado larga")
+  .regex(/^(?=.*[A-Z])(?=.*\d).+$/, "Al menos 1 mayúscula y 1 número");
+
 export const loginSchema = z.object({
-  rut: z
-    .string({ message: "El RUT es obligatorio" })
-    .min(1, "El RUT es obligatorio")
-    .refine((val) => validateRut(val), "RUT inválido"),
-  password: z
-    .string({ message: "La contraseña es obligatoria" })
-    .min(8, "Mínimo 8 caracteres")
-    .regex(/^(?=.*[A-Z])(?=.*\d).+$/, "Al menos 1 mayúscula y 1 número"),
+  rut: rutField,
+  password: passwordField,
 });
 
 export const registerSchema = z
@@ -71,15 +77,8 @@ export const registerSchema = z
         (val) => !val || val === "" || validateTelefonoChileno(val),
         "Teléfono chileno inválido",
       ),
-    rut: z
-      .string({ message: "El RUT es obligatorio" })
-      .min(1, "El RUT es obligatorio")
-      .refine((val) => validateRut(val), "RUT inválido"),
-    password: z
-      .string({ message: "La contraseña es obligatoria" })
-      .min(8, "Mínimo 8 caracteres")
-      .max(128, "La contraseña es demasiado larga")
-      .regex(/^(?=.*[A-Z])(?=.*\d).+$/, "Al menos 1 mayúscula y 1 número"),
+    rut: rutField,
+    password: passwordField,
     confirmPassword: z
       .string({ message: "Debes confirmar la contraseña" })
       .min(1, "Debes confirmar la contraseña"),
@@ -92,17 +91,8 @@ export const registerSchema = z
   });
 
 export const recoverySchema = z.object({
-  rut: z
-    .string({ message: "El RUT es obligatorio" })
-    .min(1, "El RUT es obligatorio")
-    .refine((val) => validateRut(val), "RUT inválido"),
+  rut: rutField,
 });
-
-const passwordField = z
-  .string({ message: "La contraseña es obligatoria" })
-  .min(8, "Mínimo 8 caracteres")
-  .max(128, "La contraseña es demasiado larga")
-  .regex(/^(?=.*[A-Z])(?=.*\d).+$/, "Al menos 1 mayúscula y 1 número");
 
 export const resetPasswordSchema = z
   .object({
@@ -121,13 +111,8 @@ export const changePasswordSchema = z
     passwordActual: z
       .string({ message: "La contraseña actual es requerida" })
       .min(1, "La contraseña actual es requerida"),
-    // RF-09 / CU-11: misma regla que registro y recuperación (8 + mayúscula + número)
-    passwordNuevo: z
-      .string({ message: "La nueva contraseña es obligatoria" })
-      .min(8, "Mínimo 8 caracteres")
-      .max(128, "La contraseña es demasiado larga")
-      .regex(/[A-Z]/, "Al menos 1 letra mayúscula")
-      .regex(/[0-9]/, "Al menos 1 número"),
+    // RF-09 / CU-11: misma regla que registro y recuperación
+    passwordNuevo: passwordField,
     passwordConfirmacion: z
       .string({ message: "Debes confirmar la nueva contraseña" })
       .min(1, "Debes confirmar la nueva contraseña"),

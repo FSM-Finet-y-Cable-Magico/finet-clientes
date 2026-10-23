@@ -2,15 +2,11 @@
 
 import { cookies } from 'next/headers';
 import { apiUrl } from '@/app/_lib/api-servidor';
-
-// CU-31, su Excepción 2 y RF-24 dicen "únicamente alfanuméricos"; se decidió
-// permitir símbolos igual (pedido de Dani, confirmado por Emilio) — diverge
-// del CU escrito, ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md. Se mantienen
-// prohibidos los espacios en blanco. No se hace trim() de la clave: recortarla
-// cambiaría la clave que el cliente escribió.
-const WIFI_PASSWORD_REGEX = /^\S+$/;
-const WIFI_PASSWORD_MIN = 8;
-const WIFI_PASSWORD_MAX = 63; // WPA2 máximo
+import {
+  CLAVE_WIFI_MAX,
+  CLAVE_WIFI_MIN,
+  CLAVE_WIFI_REGEX,
+} from '@/app/_lib/clave-wifi';
 
 async function authHeaders(): Promise<HeadersInit> {
   const cookieStore = await cookies();
@@ -37,13 +33,13 @@ export async function changeWifiPassword(
   if (typeof password !== 'string' || password.length === 0) {
     return { success: false, error: 'Ingresa la nueva contraseña' };
   }
-  if (password.length < WIFI_PASSWORD_MIN || password.length > WIFI_PASSWORD_MAX) {
+  if (password.length < CLAVE_WIFI_MIN || password.length > CLAVE_WIFI_MAX) {
     return {
       success: false,
-      error: `La contraseña debe tener entre ${WIFI_PASSWORD_MIN} y ${WIFI_PASSWORD_MAX} caracteres`,
+      error: `La contraseña debe tener entre ${CLAVE_WIFI_MIN} y ${CLAVE_WIFI_MAX} caracteres`,
     };
   }
-  if (!WIFI_PASSWORD_REGEX.test(password)) {
+  if (!CLAVE_WIFI_REGEX.test(password)) {
     return {
       success: false,
       error: 'No se permiten espacios en blanco',
