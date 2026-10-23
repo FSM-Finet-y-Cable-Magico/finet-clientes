@@ -9,6 +9,8 @@ import { api } from "../utils/api";
 import type { ApiError } from "../utils/api";
 import LoginBranding from "./LoginBranding";
 import RutInput from "./RutInput";
+import { MensajeError } from "./MensajesFormulario";
+import { errorDeCampo, validarCampo } from "../utils/errores-formulario";
 
 export default function RecoveryForm() {
   const [rut, setRut] = useState("");
@@ -18,13 +20,7 @@ export default function RecoveryForm() {
   const [sent, setSent] = useState(false);
 
   function validateField(value: string) {
-    const result = recoverySchema.safeParse({ rut: value });
-    if (!result.success) {
-      const issue = result.error.issues.find((i) => i.path[0] === "rut");
-      setError(issue?.message ?? "");
-    } else {
-      setError("");
-    }
+    setError(validarCampo(recoverySchema, { rut: value }, "rut"));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,8 +29,7 @@ export default function RecoveryForm() {
 
     const result = recoverySchema.safeParse({ rut });
     if (!result.success) {
-      const issue = result.error.issues.find((i) => i.path[0] === "rut");
-      setError(issue?.message ?? "RUT inválido");
+      setError(errorDeCampo(result.error.issues, "rut") || "RUT inválido");
       return;
     }
 
@@ -93,9 +88,7 @@ export default function RecoveryForm() {
       </div>
 
       {serverError && (
-        <div className="mt-5 rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm text-error">
-          {serverError}
-        </div>
+        <MensajeError margen="mt-5">{serverError}</MensajeError>
       )}
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-5" noValidate>

@@ -8,6 +8,8 @@ import { api } from "../utils/api";
 import type { ApiError } from "../utils/api";
 import LoginBranding from "../components/LoginBranding";
 import PasswordInput from "../components/PasswordInput";
+import { MensajeError } from "./MensajesFormulario";
+import { erroresPorCampo, validarCampo } from "../utils/errores-formulario";
 
 type Props = {
   token: string;
@@ -23,13 +25,8 @@ export default function ResetPasswordForm({ token }: Props) {
 
   function validateField(field: string, value: string) {
     const data: Record<string, string> = { password, confirmPassword, [field]: value };
-    const result = resetPasswordSchema.safeParse(data);
-    if (!result.success) {
-      const fieldError = result.error.issues.find((i) => i.path[0] === field);
-      setErrors((prev) => ({ ...prev, [field]: fieldError?.message ?? "" }));
-    } else {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
+    const error = validarCampo(resetPasswordSchema, data, field);
+    setErrors((prev) => ({ ...prev, [field]: error }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -38,12 +35,7 @@ export default function ResetPasswordForm({ token }: Props) {
 
     const result = resetPasswordSchema.safeParse({ password, confirmPassword });
     if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      for (const issue of result.error.issues) {
-        const key = String(issue.path[0]);
-        if (!fieldErrors[key]) fieldErrors[key] = issue.message;
-      }
-      setErrors(fieldErrors);
+      setErrors(erroresPorCampo(result.error.issues));
       return;
     }
 
@@ -101,9 +93,7 @@ export default function ResetPasswordForm({ token }: Props) {
       </div>
 
       {serverError && (
-        <div className="mt-5 rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm text-error">
-          {serverError}
-        </div>
+        <MensajeError margen="mt-5">{serverError}</MensajeError>
       )}
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-5" noValidate>

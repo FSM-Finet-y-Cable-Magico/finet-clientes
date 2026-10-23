@@ -15,6 +15,7 @@ import {
 import { cleanRut } from "../utils/login-schema";
 import { recoverySchema } from "../utils/login-schema";
 import RutInput from "../components/RutInput";
+import { errorDeCampo, validarCampo } from "../utils/errores-formulario";
 import { FilaFactura, TablaFacturas } from "@/app/_components/deuda/TablaFacturas";
 
 type Factura = {
@@ -59,13 +60,7 @@ export default function DeudaLookupForm() {
   const [result, setResult] = useState<DeudaData | null>(null);
 
   function validateRut(value: string) {
-    const r = recoverySchema.safeParse({ rut: value });
-    if (!r.success) {
-      const issue = r.error.issues.find((i) => i.path[0] === "rut");
-      setRutError(issue?.message ?? "");
-    } else {
-      setRutError("");
-    }
+    setRutError(validarCampo(recoverySchema, { rut: value }, "rut"));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -75,8 +70,7 @@ export default function DeudaLookupForm() {
 
     const r = recoverySchema.safeParse({ rut });
     if (!r.success) {
-      const issue = r.error.issues.find((i) => i.path[0] === "rut");
-      setRutError(issue?.message ?? "RUT inválido");
+      setRutError(errorDeCampo(r.error.issues, "rut") || "RUT inválido");
       return;
     }
     setRutError("");

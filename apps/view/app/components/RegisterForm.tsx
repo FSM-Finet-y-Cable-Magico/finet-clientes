@@ -13,6 +13,8 @@ import LoginBranding from "./LoginBranding";
 import RutInput from "./RutInput";
 import PasswordInput from "./PasswordInput";
 import TelefonoInput from "./TelefonoInput";
+import { MensajeError } from "./MensajesFormulario";
+import { erroresPorCampo, validarCampo } from "../utils/errores-formulario";
 import CasillaPoliticaPrivacidad from "../_components/legal/CasillaPoliticaPrivacidad";
 import { POLITICA_PRIVACIDAD_VERSION } from "../_lib/legal";
 
@@ -49,20 +51,8 @@ export default function RegisterForm() {
       aceptaPolitica,
       [field]: value,
     };
-    const result = registerSchema.safeParse(current);
-    if (!result.success) {
-      const fieldError = result.error.issues.find(
-        (i) =>
-          i.path[0] === field ||
-          (field === "confirmPassword" && i.path[0] === "confirmPassword"),
-      );
-      setErrors((prev) => ({
-        ...prev,
-        [field]: fieldError?.message ?? "",
-      }));
-    } else {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
+    const error = validarCampo(registerSchema, current, field);
+    setErrors((prev) => ({ ...prev, [field]: error }));
   }
 
   async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
@@ -79,12 +69,7 @@ export default function RegisterForm() {
       aceptaPolitica,
     });
     if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      for (const issue of result.error.issues) {
-        const key = String(issue.path[0]);
-        if (!fieldErrors[key]) fieldErrors[key] = issue.message;
-      }
-      setErrors(fieldErrors);
+      setErrors(erroresPorCampo(result.error.issues));
       return;
     }
 
@@ -125,9 +110,7 @@ export default function RegisterForm() {
       <LoginBranding subtitle="Crea tu cuenta" />
 
       {serverError && (
-        <div className="mb-5 rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm text-error">
-          {serverError}
-        </div>
+        <MensajeError margen="mb-5">{serverError}</MensajeError>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
