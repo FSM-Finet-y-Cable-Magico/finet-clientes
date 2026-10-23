@@ -335,7 +335,7 @@ describe('PerfilService', () => {
 
       await expect(
         service.cambiarPassword(1, dto, '127.0.0.1'),
-      ).rejects.toThrow('La contrasena actual es incorrecta');
+      ).rejects.toThrow('La contraseña actual es incorrecta');
     });
 
     it('CU-10: lanza BadRequestException si nueva password igual a actual', async () => {
