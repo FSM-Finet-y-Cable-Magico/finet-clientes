@@ -1,6 +1,6 @@
+import { API_URL } from "../_lib/consts";
 import { securityLogger } from "../_lib/logger";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 
 type ApiError = {
   message: string;

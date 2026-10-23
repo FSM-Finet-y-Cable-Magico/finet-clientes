@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { API_URL } from "./consts";
 import { securityLogger } from "./logger";
 
 export type Cliente = {
@@ -64,9 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const API_URL =
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
-
     async function checkAuth() {
       try {
         const res = await fetchWithRetry(`${API_URL}/auth/perfil`, {
@@ -108,9 +106,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async (): Promise<boolean> => {
-    const API_URL =
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
-
     try {
       const res = await fetch(`${API_URL}/auth/logout`, {
         method: "POST",

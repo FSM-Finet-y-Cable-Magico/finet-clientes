@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Download, History, RefreshCw } from "lucide-react";
-import { api, API_URL } from "@/app/utils/api";
+import { API_URL } from "@/app/_lib/consts";
+import { api } from "@/app/utils/api";
 import { fechaInstante, formatPrecio } from "@/app/_lib/formato";
 
 type PagoAnterior = {

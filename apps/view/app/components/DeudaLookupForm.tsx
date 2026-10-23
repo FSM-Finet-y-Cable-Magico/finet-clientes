@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { API_URL } from "@/app/_lib/consts";
 import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
 import {
   Search,
@@ -48,8 +49,6 @@ type DeudaData = {
   // CU-41 Exc 2: false si hay montos o fechas inconsistentes
   informacion_completa: boolean;
 };
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 
 export default function DeudaLookupForm() {
   const [rut, setRut] = useState("");

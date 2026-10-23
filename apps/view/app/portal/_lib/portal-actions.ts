@@ -1,6 +1,7 @@
 'use server';
 
 import { cookies } from 'next/headers';
+import { apiUrl } from '@/app/_lib/api-servidor';
 
 // CU-31, su Excepción 2 y RF-24 dicen "únicamente alfanuméricos"; se decidió
 // permitir símbolos igual (pedido de Dani, confirmado por Emilio) — diverge
@@ -10,12 +11,6 @@ import { cookies } from 'next/headers';
 const WIFI_PASSWORD_REGEX = /^\S+$/;
 const WIFI_PASSWORD_MIN = 8;
 const WIFI_PASSWORD_MAX = 63; // WPA2 máximo
-
-function apiUrl(path: string): string {
-  const base = process.env.API_URL;
-  if (!base) throw new Error('API_URL no está configurada en las variables de entorno');
-  return `${base}${path}`;
-}
 
 async function authHeaders(): Promise<HeadersInit> {
   const cookieStore = await cookies();
