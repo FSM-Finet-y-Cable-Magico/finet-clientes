@@ -7,8 +7,7 @@
  * el Incremento 4.
  */
 
-/** §11: la zona horaria del sistema. La misma que usan las tareas programadas. */
-const ZONA_HORARIA = 'America/Santiago';
+import { ZONA_HORARIA } from '../common/constants/zona-horaria.js';
 
 /**
  * §11 "Fecha (display)": DD/MM/AAAA.

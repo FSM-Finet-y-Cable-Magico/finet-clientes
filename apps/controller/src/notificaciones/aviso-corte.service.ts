@@ -24,8 +24,8 @@ import {
 import {
   PAUSA_ENTRE_TANDAS_MS,
   TANDA_MAXIMA,
-  ZONA_HORARIA,
 } from './recordatorio-pago.constantes.js';
+import { ZONA_HORARIA } from '../common/constants/zona-horaria.js';
 import {
   clientesConFacturasImpagas,
   diaG8,

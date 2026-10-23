@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import { API_URL } from "./consts";
+import { API_URL, EVENTO_SESION_EXPIRADA } from "./consts";
 import { securityLogger } from "./logger";
 
 export type Cliente = {
@@ -96,9 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.push("/inicio-sesion?expired=1");
     }
 
-    window.addEventListener("auth:session-expired", handleSessionExpired);
+    window.addEventListener(EVENTO_SESION_EXPIRADA, handleSessionExpired);
     return () =>
-      window.removeEventListener("auth:session-expired", handleSessionExpired);
+      window.removeEventListener(EVENTO_SESION_EXPIRADA, handleSessionExpired);
   }, [router]);
 
   const login = useCallback((clienteData: Cliente) => {
