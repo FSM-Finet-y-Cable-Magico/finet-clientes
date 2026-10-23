@@ -12,10 +12,16 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
-import { loginSchema } from './dto/login.dto.js';
-import { registerSchema } from './dto/register.dto.js';
-import { recuperarPasswordSchema } from './dto/recuperar-password.dto.js';
-import { restablecerPasswordSchema } from './dto/restablecer-password.dto.js';
+import { loginSchema, type LoginDto } from './dto/login.dto.js';
+import { registerSchema, type RegisterDto } from './dto/register.dto.js';
+import {
+  recuperarPasswordSchema,
+  type RecuperarPasswordDto,
+} from './dto/recuperar-password.dto.js';
+import {
+  restablecerPasswordSchema,
+  type RestablecerPasswordDto,
+} from './dto/restablecer-password.dto.js';
 import { ZodValidationPipe } from './pipes/zod-validation.pipe.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { CurrentClient } from './decorators/current-client.decorator.js';
@@ -61,10 +67,7 @@ export class AuthController {
   @HttpCode(200)
   async login(
     @Body(new ZodValidationPipe(loginSchema))
-    body: {
-      rut: string;
-      password: string;
-    },
+    body: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -116,16 +119,7 @@ export class AuthController {
   @HttpCode(201)
   async register(
     @Body(new ZodValidationPipe(registerSchema))
-    body: {
-      rut: string;
-      nombre_completo: string;
-      email: string;
-      telefono?: string;
-      password: string;
-      password_confirmation: string;
-      acepta_politica_privacidad: true;
-      version_politica_privacidad: string;
-    },
+    body: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -172,7 +166,7 @@ export class AuthController {
   @HttpCode(200)
   async recuperarPassword(
     @Body(new ZodValidationPipe(recuperarPasswordSchema))
-    body: { rut: string },
+    body: RecuperarPasswordDto,
     @Req() req: Request,
   ) {
     return this.authService.recuperarPassword(body.rut, req.ip);
@@ -205,10 +199,7 @@ export class AuthController {
   @HttpCode(200)
   async restablecerPassword(
     @Body(new ZodValidationPipe(restablecerPasswordSchema))
-    body: {
-      token: string;
-      password: string;
-    },
+    body: RestablecerPasswordDto,
   ) {
     return this.authService.restablecerPassword(body.token, body.password);
   }
