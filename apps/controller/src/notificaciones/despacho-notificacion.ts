@@ -15,7 +15,7 @@ export type Despacho = {
 };
 
 /**
- * Lo que el CU-68 y el CU-69 hacen igual que el CU-67 al avisarle algo al
+ * Lo que el CU-67, el CU-68 y el CU-69 hacen igual al avisarle algo al
  * cliente:
  *
  * - la plantilla que identifica el tipo de aviso en `log_notificacion`;
@@ -24,9 +24,6 @@ export type Despacho = {
  *   proceso muere justo después del envío;
  * - **Excepción 2** — si falla se reintenta una vez, y si vuelve a fallar queda
  *   `fallido` para revisión manual.
- *
- * El CU-67 conserva su propia copia a propósito: está en revisión en el PR #18 y
- * migrarlo acá queda para el Incremento 4.
  */
 export class DespachoNotificacion {
   constructor(

@@ -6,6 +6,12 @@ import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
 import { SALDO_CLIENTE_DEFINIDO } from '../common/pendientes.js';
 import { conCandado } from './candado.js';
 import {
+  DespachoNotificacion,
+  inicioDelDiaUTC,
+  mensaje,
+  pausa,
+} from './despacho-notificacion.js';
+import {
   clientesConFacturasImpagas,
   diaG8,
   facturasQueVencenEl,
@@ -15,7 +21,6 @@ import {
   CANAL_CORREO,
   CANDADO_RECORDATORIO_PAGO,
   DIAS_ANTES_DEL_VENCIMIENTO,
-  ESTADO_ENVIO,
   PAUSA_ENTRE_TANDAS_MS,
   TANDA_MAXIMA,
   TIPO_EVENTO_RECORDATORIO,
@@ -68,12 +73,20 @@ export type ResumenTanda = {
 @Injectable()
 export class RecordatorioPagoService {
   private readonly logger = new Logger(RecordatorioPagoService.name);
+  private readonly despacho: DespachoNotificacion;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly saldos: SaldoClienteService,
-  ) {}
+  ) {
+    this.despacho = new DespachoNotificacion(
+      prisma,
+      this.logger,
+      TIPO_EVENTO_RECORDATORIO,
+      'CU-67',
+    );
+  }
 
   /**
    * Una vez al día. La hora no la fija el RF-49 (solo el "tres días antes"), y
@@ -123,7 +136,7 @@ export class RecordatorioPagoService {
       return r.resultado;
     } catch (error) {
       this.logger.error(
-        `[CU-67] la tanda no se pudo completar: ${this.mensaje(error)}`,
+        `[CU-67] la tanda no se pudo completar: ${mensaje(error)}`,
       );
       return vacio;
     }
@@ -135,12 +148,12 @@ export class RecordatorioPagoService {
     datos: DatosRecordatorio,
   ): Promise<ResumenTanda> {
     const objetivo = this.fechaObjetivo(ahora);
-    const idPlantilla = await this.plantilla();
+    const idPlantilla = await this.despacho.plantilla();
     const candidatos = await clientesConFacturasImpagas(this.prisma);
     const resumen: ResumenTanda = { ...vacio, ejecutada: true };
 
     for (let i = 0; i < candidatos.length; i += TANDA_MAXIMA) {
-      if (i > 0) await this.pausa(PAUSA_ENTRE_TANDAS_MS);
+      if (i > 0) await pausa(PAUSA_ENTRE_TANDAS_MS);
       for (const cliente of candidatos.slice(i, i + TANDA_MAXIMA)) {
         const porVencer = await this.porVencer(cliente, objetivo, datos);
         if (porVencer === undefined) {
@@ -210,45 +223,37 @@ export class RecordatorioPagoService {
     idPlantilla: number | null,
     resumen: ResumenTanda,
   ): Promise<void> {
-    if (await this.yaSeLeAviso(factura, ahora, idPlantilla)) {
+    // Segundo candado, contra el reintento: si el job se cayó a mitad y alguien
+    // lo vuelve a correr el mismo día, el que ya tiene registro se salta.
+    if (
+      await this.despacho.yaSeLeAvisoDesde(
+        factura.id_cliente,
+        idPlantilla,
+        inicioDelDiaUTC(ahora),
+      )
+    ) {
       resumen.yaAvisados++;
       return;
     }
 
-    // Excepción 1: sin canales de contacto no se despacha, pero el evento queda
-    // registrado como no notificado.
-    if (!factura.email?.trim()) {
-      await this.registrar(
-        factura,
-        ESTADO_ENVIO.NO_NOTIFICADO,
-        ahora,
-        idPlantilla,
-      );
-      resumen.sinCanal++;
-      return;
-    }
-
-    // La fila va antes del envío: si el proceso muere justo después de que el
-    // correo salga, el registro ya existe y nadie recibe el aviso dos veces.
-    const id = await this.registrar(
-      factura,
-      ESTADO_ENVIO.EN_CURSO,
-      ahora,
+    // Excepciones 1 y 2, y el registro antes del envío: ver DespachoNotificacion.
+    const estado = await this.despacho.despachar({
+      idCliente: factura.id_cliente,
+      email: factura.email,
       idPlantilla,
-    );
+      ahora,
+      referencia: `cliente ${factura.id_cliente}, facturas ${factura.facturas.join(', ')}`,
+      enviar: () =>
+        this.mail.sendRecordatorioPago(
+          factura.email!,
+          factura.nombre,
+          factura.monto,
+          factura.fechaLimite,
+        ),
+    });
 
-    // Excepción 2: si falla el despacho se reintenta una vez; si el reintento
-    // también falla, queda como fallido para revisión manual.
-    const enviado =
-      (await this.intentarEnvio(factura)) ||
-      (await this.intentarEnvio(factura));
-
-    await this.marcar(
-      id,
-      enviado ? ESTADO_ENVIO.ENVIADO : ESTADO_ENVIO.FALLIDO,
-      new Date(),
-    );
-    if (enviado) resumen.enviados++;
+    if (estado === 'enviado') resumen.enviados++;
+    else if (estado === 'omitido') resumen.sinCanal++;
     else resumen.fallidos++;
   }
 
