@@ -31,31 +31,35 @@ interface IntentoFallidoMemoria {
  * cuando la base de datos no está disponible (CU-05 Excepción 1).
  *
  * Los registros expiran automáticamente después de 30 minutos.
+ *
+ * Cada intento se guarda una vez y se indexa por IP y por RUT, así que cada
+ * consulta recorre solo los intentos de esa IP o ese RUT (O(k)), no todos los
+ * de los últimos 30 minutos: durante un ataque, que es cuando se usa, la lista
+ * completa crece con cada intento.
  */
-class BruteForceFallback {
-  private intentos: IntentoFallidoMemoria[] = [];
+export class BruteForceFallback {
+  private readonly porIp = new Map<string, IntentoFallidoMemoria[]>();
+  private readonly porRut = new Map<string, IntentoFallidoMemoria[]>();
   private readonly TTL = 30 * 60 * 1000; // 30 min
+  /**
+   * Cada consulta descarta lo vencido de su propia clave. Las claves que nadie
+   * vuelve a consultar se barren cada tanto, para que no se acumulen.
+   */
+  private readonly BARRIDO = 60 * 1000; // 1 min
+  private ultimoBarrido = 0;
 
-  limpiarExpirados(): void {
-    const ahora = new Date();
-    const limite = new Date(ahora.getTime() - this.TTL);
-    this.intentos = this.intentos.filter((i) => i.timestamp > limite);
-  }
+  /** El reloj entra por parámetro para probar las ventanas sin esperar. */
+  constructor(private readonly reloj: () => Date = () => new Date()) {}
 
   estaBloqueado(rut: string, ip: string): { ip: boolean; rut: boolean } {
-    this.limpiarExpirados();
-    const ahora = new Date();
-    const ipBloqueada = this.intentos.some(
-      (i) =>
-        i.ip_address === ip && i.bloqueado_hasta && i.bloqueado_hasta > ahora,
-    );
-    const rutBloqueado = this.intentos.some(
-      (i) =>
-        i.rut_intentado === rut &&
-        i.bloqueado_hasta &&
-        i.bloqueado_hasta > ahora,
-    );
-    return { ip: ipBloqueada, rut: rutBloqueado };
+    const ahora = this.reloj();
+    this.barrer(ahora);
+    const bloqueado = (intentos: IntentoFallidoMemoria[]) =>
+      intentos.some((i) => i.bloqueado_hasta && i.bloqueado_hasta > ahora);
+    return {
+      ip: bloqueado(this.vigentes(this.porIp, ip, ahora)),
+      rut: bloqueado(this.vigentes(this.porRut, rut, ahora)),
+    };
   }
 
   registrarIntento(
@@ -66,17 +70,17 @@ class BruteForceFallback {
     bloquearIp: boolean;
     bloquearHasta: Date | null;
   } {
-    this.limpiarExpirados();
-    const ahora = new Date();
+    const ahora = this.reloj();
+    this.barrer(ahora);
 
     const ventanaRut = new Date(ahora.getTime() - 10 * 60 * 1000);
-    const intentosRut = this.intentos.filter(
-      (i) => i.rut_intentado === rut && i.timestamp >= ventanaRut,
+    const intentosRut = this.vigentes(this.porRut, rut, ahora).filter(
+      (i) => i.timestamp >= ventanaRut,
     ).length;
 
     const ventanaIp = new Date(ahora.getTime() - 5 * 60 * 1000);
-    const intentosIp = this.intentos.filter(
-      (i) => i.ip_address === ip && i.timestamp >= ventanaIp,
+    const intentosIp = this.vigentes(this.porIp, ip, ahora).filter(
+      (i) => i.timestamp >= ventanaIp,
     ).length;
 
     const bloquearRut = intentosRut + 1 >= 5;
@@ -86,18 +90,74 @@ class BruteForceFallback {
         ? new Date(ahora.getTime() + 15 * 60 * 1000)
         : null;
 
-    this.intentos.push({
+    // Un solo registro en los dos índices: el intento que bloquea deja
+    // bloqueados su IP y su RUT.
+    const intento: IntentoFallidoMemoria = {
       rut_intentado: rut,
       ip_address: ip,
       timestamp: ahora,
       bloqueado_hasta: bloquearHasta,
-    });
+    };
+    this.agregar(this.porIp, ip, intento);
+    this.agregar(this.porRut, rut, intento);
 
     return { bloquearRut, bloquearIp, bloquearHasta };
   }
 
+  /** Borra los intentos del RUT, también del conteo de las IPs desde donde se hicieron. */
   limpiarBloqueoRut(rut: string): void {
-    this.intentos = this.intentos.filter((i) => !(i.rut_intentado === rut));
+    const intentos = this.porRut.get(rut);
+    if (!intentos) return;
+    this.porRut.delete(rut);
+    for (const ip of new Set(intentos.map((i) => i.ip_address))) {
+      this.guardar(
+        this.porIp,
+        ip,
+        (this.porIp.get(ip) ?? []).filter((i) => i.rut_intentado !== rut),
+      );
+    }
+  }
+
+  /** Los intentos de esa clave de los últimos 30 minutos; descarta los demás. */
+  private vigentes(
+    indice: Map<string, IntentoFallidoMemoria[]>,
+    clave: string,
+    ahora: Date,
+  ): IntentoFallidoMemoria[] {
+    const intentos = indice.get(clave);
+    if (!intentos) return [];
+    const limite = new Date(ahora.getTime() - this.TTL);
+    const vivos = intentos.filter((i) => i.timestamp > limite);
+    this.guardar(indice, clave, vivos);
+    return vivos;
+  }
+
+  private barrer(ahora: Date): void {
+    if (ahora.getTime() - this.ultimoBarrido < this.BARRIDO) return;
+    this.ultimoBarrido = ahora.getTime();
+    for (const indice of [this.porIp, this.porRut]) {
+      for (const clave of [...indice.keys()])
+        this.vigentes(indice, clave, ahora);
+    }
+  }
+
+  private agregar(
+    indice: Map<string, IntentoFallidoMemoria[]>,
+    clave: string,
+    intento: IntentoFallidoMemoria,
+  ): void {
+    const intentos = indice.get(clave);
+    if (intentos) intentos.push(intento);
+    else indice.set(clave, [intento]);
+  }
+
+  private guardar(
+    indice: Map<string, IntentoFallidoMemoria[]>,
+    clave: string,
+    intentos: IntentoFallidoMemoria[],
+  ): void {
+    if (intentos.length > 0) indice.set(clave, intentos);
+    else indice.delete(clave);
   }
 }
 
