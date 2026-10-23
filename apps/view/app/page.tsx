@@ -4,7 +4,7 @@ import { metadataSeccion, resumenPlanes } from "./_lib/seo";
 import { Hero } from "./_components/layout/hero/Hero";
 import PlanCard from "./_components/catalog/PlanCard";
 import PrimaryButton from "./_components/ui/PrimaryButton";
-import { getLandingPlanes } from "./_lib/api";
+import { getLandingPlanes, idPlanDestacado, ordenarPorPrecio } from "./_lib/api";
 import {
   Zap,
   Wifi,
@@ -63,11 +63,8 @@ const comunas = [
 export default async function HomePage() {
   const planes = await getLandingPlanes();
 
-  const sorted = [...planes].sort(
-    (a, b) => a.precio_mensual - b.precio_mensual,
-  );
-  const featuredId =
-    sorted.length >= 2 ? sorted[Math.floor(sorted.length / 2)].id_plan : null;
+  const sorted = ordenarPorPrecio(planes);
+  const featuredId = idPlanDestacado(sorted);
 
   return (
     <>

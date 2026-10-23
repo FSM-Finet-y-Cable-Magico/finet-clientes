@@ -10,6 +10,21 @@ export type PlanBackend = {
   descripcion: string | null;
 };
 
+/** Del más barato al más caro, sin reordenar el arreglo que recibe. */
+export function ordenarPorPrecio(planes: PlanBackend[]): PlanBackend[] {
+  return [...planes].sort((a, b) => a.precio_mensual - b.precio_mensual);
+}
+
+/**
+ * El plan que se marca "Mas popular": el del medio de la lista ya ordenada.
+ * Con menos de dos planes no se destaca ninguno.
+ */
+export function idPlanDestacado(ordenados: PlanBackend[]): number | null {
+  return ordenados.length >= 2
+    ? ordenados[Math.floor(ordenados.length / 2)].id_plan
+    : null;
+}
+
 /**
  * Catalogo que lanza si el backend falla, para quien no puede confundir
  * "backend caido" con "catalogo vacio", como el sitemap (CU-74).

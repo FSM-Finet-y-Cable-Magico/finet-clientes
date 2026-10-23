@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { metadataSeccion } from "../_lib/seo";
 import PlanCard from "../_components/catalog/PlanCard";
-import { getLandingPlanes } from "../_lib/api";
+import { getLandingPlanes, ordenarPorPrecio } from "../_lib/api";
 import { COMPANY_PHONE_DISPLAY, WHATSAPP_URL } from "../_lib/company";
 
 export const metadata: Metadata = metadataSeccion({
@@ -16,7 +16,7 @@ export const metadata: Metadata = metadataSeccion({
 
 export default async function EmpresasPage() {
   const planes = await getLandingPlanes("EMPRESARIAL");
-  const sorted = [...planes].sort((a, b) => a.precio_mensual - b.precio_mensual);
+  const sorted = ordenarPorPrecio(planes);
 
   return (
     <section className="px-4 py-12">
