@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
 import {
   Search,
   AlertCircle,
@@ -49,22 +50,6 @@ type DeudaData = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
-
-function formatPrecio(precio: number) {
-  return `$${precio.toLocaleString("es-CL")}`;
-}
-
-/**
- * `fecha_limite_pago` es una fecha de calendario (@db.Date), no un instante: se formatea
- * en UTC. En hora de Chile, sin `timeZone`, la medianoche UTC cae el día anterior.
- */
-function formatFecha(iso: string) {
-  return new Date(iso).toLocaleDateString("es-CL", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
 
 export default function DeudaLookupForm() {
   const [rut, setRut] = useState("");
@@ -295,7 +280,7 @@ export default function DeudaLookupForm() {
                           {formatPrecio(f.monto)}
                         </td>
                         <td className="py-2 text-muted">
-                          {formatFecha(f.fecha_limite_pago)}
+                          {fechaCalendario(f.fecha_limite_pago, "corta")}
                         </td>
                         <td className="py-2">
                           <span

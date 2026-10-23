@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Wifi, Zap, Calendar, AlertCircle, RefreshCw } from "lucide-react";
 import { api } from "../../utils/api";
+import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
 import StatusBadge from "@/app/_components/ui/StatusBadge";
 import { estadoContratoBadge } from "@/app/_lib/estado-contrato";
 import WifiPasswordSection from "@/app/_components/portal/WifiPasswordSection";
@@ -22,23 +23,6 @@ type Contrato = {
   dia_vencimiento: number;
   plan: Plan;
 };
-
-function formatPrecio(precio: number) {
-  return `$${precio.toLocaleString("es-CL")}`;
-}
-
-/**
- * `fecha_inicio` es una fecha de calendario (@db.Date), no un instante: se formatea
- * en UTC. En hora de Chile, sin `timeZone`, la medianoche UTC cae el día anterior.
- */
-function formatFecha(iso: string) {
-  return new Date(iso).toLocaleDateString("es-CL", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 
 export default function ServiciosPage() {
@@ -174,7 +158,7 @@ export default function ServiciosPage() {
                 <div className="mt-4 grid gap-2 border-t border-border pt-4 text-sm sm:grid-cols-2">
                   <div className="flex items-center gap-2 text-muted">
                     <Calendar size={14} aria-hidden />
-                    <span>Inicio: {formatFecha(c.fecha_inicio)}</span>
+                    <span>Inicio: {fechaCalendario(c.fecha_inicio, "larga")}</span>
                   </div>
                   <div className="flex items-center gap-2 text-muted">
                     <Calendar size={14} aria-hidden />

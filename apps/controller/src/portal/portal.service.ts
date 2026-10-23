@@ -508,7 +508,7 @@ export class PortalService {
     };
   }
 
-  // CU-29 / CU-30: Tickets de soporte :DDDDDDDDD AHGG AYUDA
+  // CU-29 / CU-30: tickets de soporte del cliente
   async getTickets(
     idCliente: number,
     limite?: number,

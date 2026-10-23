@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { fechaInstante } from "@/app/_lib/formato";
 import {
   AlertCircle,
   CheckCircle2,
@@ -61,14 +62,6 @@ function prioridadBadge(prioridad: string): {
     baja: { label: "Baja", tone: "success" },
   };
   return map[prioridad] ?? { label: prioridad, tone: "neutral" };
-}
-
-function formatFecha(iso: string) {
-  return new Date(iso).toLocaleDateString("es-CL", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 }
 
 export default function TicketsPage() {
@@ -383,9 +376,9 @@ export default function TicketsPage() {
                   {t.descripcion ?? "Sin descripción"}
                 </p>
                 <p className="mt-2 text-xs text-muted">
-                  {formatFecha(t.fecha_creacion)}
+                  {fechaInstante(t.fecha_creacion, "larga")}
                   {t.fecha_cierre &&
-                    ` — Cerrado: ${formatFecha(t.fecha_cierre)}`}
+                    ` — Cerrado: ${fechaInstante(t.fecha_cierre, "larga")}`}
                 </p>
               </div>
             );

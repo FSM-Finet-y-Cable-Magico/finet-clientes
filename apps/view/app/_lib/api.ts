@@ -10,14 +10,6 @@ export type PlanBackend = {
   descripcion: string | null;
 };
 
-function formatPrecio(precio: number): string {
-  return `$${precio.toLocaleString("es-CL")}`;
-}
-
-export function formatPrecioMensual(precio: number): string {
-  return formatPrecio(precio);
-}
-
 /**
  * Catalogo que lanza si el backend falla, para quien no puede confundir
  * "backend caido" con "catalogo vacio", como el sitemap (CU-74).

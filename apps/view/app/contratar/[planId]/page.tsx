@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import FormularioContratacion from "../../_components/catalog/FormularioContratacion";
-import { getLandingPlanes, getPlanById, formatPrecioMensual } from "../../_lib/api";
+import { getLandingPlanes, getPlanById } from "../../_lib/api";
+import { formatPrecio } from "../../_lib/formato";
 import { productJsonLd, breadcrumbJsonLd } from "../../_lib/jsonld";
 import { BASE_URL } from "../../_lib/consts";
 import { metadataPlan } from "../../_lib/seo";
@@ -77,7 +78,7 @@ export default async function ContratarPlanPage({ params }: ContratarPlanPagePro
         <h1 className="text-2xl font-medium">Solicitud de contratacion</h1>
         <p className="text-muted">
           Plan seleccionado: <strong>{plan.nombre_comercial}</strong> &mdash;{" "}
-          {formatPrecioMensual(plan.precio_mensual)}/mes
+          {formatPrecio(plan.precio_mensual)}/mes
         </p>
         <FormularioContratacion plan={plan} />
       </div>

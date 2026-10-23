@@ -8,6 +8,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { api } from "../../utils/api";
+import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
 import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
 import IrAPagarButton from "@/app/_components/portal/IrAPagarButton";
 import PagosAnteriores from "@/app/_components/portal/PagosAnteriores";
@@ -27,23 +28,6 @@ type DeudaData = {
   saldo_confirmado: boolean;
   facturas_pendientes: Factura[];
 };
-
-function formatPrecio(precio: number) {
-  return `$${precio.toLocaleString("es-CL")}`;
-}
-
-/**
- * `fecha_limite_pago` es una fecha de calendario (@db.Date), no un instante: se formatea
- * en UTC. En hora de Chile, sin `timeZone`, la medianoche UTC cae el día anterior.
- */
-function formatFecha(iso: string) {
-  return new Date(iso).toLocaleDateString("es-CL", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 function estadoBadge(estado: string): { label: string; tone: StatusTone } {
   const map: Record<string, { label: string; tone: StatusTone }> = {
@@ -188,7 +172,7 @@ export default function DeudaPage() {
                               {formatPrecio(f.monto)}
                             </td>
                             <td className="py-2 text-muted">
-                              {formatFecha(f.fecha_limite_pago)}
+                              {fechaCalendario(f.fecha_limite_pago, "larga")}
                               {f.dias_vencida != null && f.dias_vencida > 0 && (
                                 <span className="block text-xs text-error">
                                   Hace {f.dias_vencida} día

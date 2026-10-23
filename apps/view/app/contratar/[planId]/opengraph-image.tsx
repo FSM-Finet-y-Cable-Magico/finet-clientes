@@ -1,4 +1,5 @@
-import { formatPrecioMensual, getPlanById } from "../../_lib/api";
+import { getPlanById } from "../../_lib/api";
+import { formatPrecio } from "../../_lib/formato";
 import { ogCard, OG_CARD_GENERICA, OG_SIZE } from "../../_lib/og-card";
 import { SEO_DEFAULTS } from "../../_lib/seo";
 
@@ -18,7 +19,7 @@ export default async function Image({ params }: Props) {
 
   return ogCard({
     titulo: plan.nombre_comercial,
-    destacado: `${formatPrecioMensual(plan.precio_mensual)}/mes`,
+    destacado: `${formatPrecio(plan.precio_mensual)}/mes`,
     bajada: plan.velocidad_mbps
       ? `${plan.velocidad_mbps} Mbps · Fibra optica en La Pintana y Puente Alto`
       : "Fibra optica en La Pintana y Puente Alto",

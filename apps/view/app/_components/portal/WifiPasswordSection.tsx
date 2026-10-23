@@ -4,6 +4,7 @@ import { useId, useState, useTransition } from "react";
 import { Wifi, CheckCircle2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { changeWifiPassword } from "@/app/portal/_lib/portal-actions";
 import { esContratoActivo } from "@/app/_lib/estado-contrato";
+import { fechaCalendario } from "@/app/_lib/formato";
 
 // CU-31, su Excepcion 2 y RF-24 dicen "unicamente alfanumericos". Se decidio
 // permitir simbolos igual (pedido de Dani, confirmado por Emilio) — diverge
@@ -21,29 +22,10 @@ export type ContratoWifi = {
   plan: { nombre_comercial: string } | null;
 };
 
-/**
- * §11.4 del Documento 0: DD/MM/AAAA. `fecha_inicio` es una fecha de calendario,
- * no un instante: se formatea en UTC para que en hora de Chile no muestre el
- * día anterior.
- */
-function formatFechaInicio(fecha: string) {
-  const partes = Object.fromEntries(
-    new Intl.DateTimeFormat("es-CL", {
-      timeZone: "UTC",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-      .formatToParts(new Date(fecha))
-      .map((p) => [p.type, p.value])
-  );
-  return `${partes.day}/${partes.month}/${partes.year}`;
-}
-
 /** Cómo distingue el cliente sus servicios: el plan y desde cuándo lo tiene. */
 function nombreServicio(c: ContratoWifi) {
   const plan = c.plan?.nombre_comercial ?? "Servicio sin plan";
-  return `${plan} · desde ${formatFechaInicio(c.fecha_inicio)}`;
+  return `${plan} · desde ${fechaCalendario(c.fecha_inicio, "numerica")}`;
 }
 
 // CU-31: valida el formato y devuelve el motivo cuando no se cumple.

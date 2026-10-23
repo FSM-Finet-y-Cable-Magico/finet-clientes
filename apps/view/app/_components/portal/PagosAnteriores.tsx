@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Download, History, RefreshCw } from "lucide-react";
 import { api, API_URL } from "@/app/utils/api";
+import { fechaInstante, formatPrecio } from "@/app/_lib/formato";
 
 type PagoAnterior = {
   id_pago: number;
@@ -16,29 +17,6 @@ type PagosAnterioresData = {
   comprobante_disponible: boolean;
   pagos: PagoAnterior[];
 };
-
-/** §11.5 del Documento 0: $XX.XXX. */
-function formatPrecio(precio: number) {
-  return `$${precio.toLocaleString("es-CL")}`;
-}
-
-/**
- * §11.4 del Documento 0: DD/MM/AAAA, en hora de Chile. El pago es un instante:
- * uno de las 22:30 en Chile ya es el día siguiente en UTC.
- */
-function formatFechaPago(iso: string) {
-  const partes = Object.fromEntries(
-    new Intl.DateTimeFormat("es-CL", {
-      timeZone: "America/Santiago",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    })
-      .formatToParts(new Date(iso))
-      .map((p) => [p.type, p.value])
-  );
-  return `${partes.day}/${partes.month}/${partes.year}`;
-}
 
 const ID_NOTA = "comprobantes-no-disponibles";
 
@@ -166,7 +144,7 @@ export default function PagosAnteriores() {
                 {data.pagos.map((p) => (
                   <tr key={p.id_pago}>
                     <td className="py-3 text-foreground tabular-nums">
-                      {formatFechaPago(p.fecha_pago)}
+                      {fechaInstante(p.fecha_pago, "numerica")}
                     </td>
                     <td className="py-3 text-foreground">{p.periodo ?? "—"}</td>
                     <td className="py-3 font-semibold text-foreground tabular-nums">
@@ -194,7 +172,7 @@ export default function PagosAnteriores() {
                     {p.periodo ?? "Pago sin período"}
                   </p>
                   <p className="text-xs text-muted tabular-nums">
-                    {formatFechaPago(p.fecha_pago)} · {p.pasarela}
+                    {fechaInstante(p.fecha_pago, "numerica")} · {p.pasarela}
                   </p>
                   <p className="mt-1 text-base font-bold text-foreground tabular-nums">
                     {formatPrecio(p.monto)}
@@ -220,7 +198,7 @@ function BotonComprobante({
   pago: PagoAnterior;
   disponible: boolean;
 }) {
-  const etiqueta = `Descargar comprobante del pago del ${formatFechaPago(pago.fecha_pago)}`;
+  const etiqueta = `Descargar comprobante del pago del ${fechaInstante(pago.fecha_pago, "numerica")}`;
   const clases =
     "inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-primary px-3 py-2 text-sm font-medium text-primary transition-colors";
 

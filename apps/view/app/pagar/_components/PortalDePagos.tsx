@@ -11,6 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { api } from "@/app/utils/api";
+import { formatPrecio } from "@/app/_lib/formato";
 import IdentificarCuenta from "./IdentificarCuenta";
 
 export type Identificador = { rut: string } | { t: string };
@@ -44,10 +45,6 @@ const ICONO_MEDIO: Record<MedioId, typeof CreditCard> = {
   webpay: CreditCard,
   mercadopago: Wallet,
 };
-
-function pesos(monto: number) {
-  return `$${monto.toLocaleString("es-CL")}`;
-}
 
 /**
  * CU-42 / CU-43. El resumen se pide desde el navegador y no desde el servidor
@@ -250,7 +247,7 @@ function Pago({
               </p>
             </div>
             <p className="text-2xl font-extrabold text-foreground">
-              {pesos(saldo)}
+              {formatPrecio(saldo)}
             </p>
           </div>
         </li>
@@ -318,7 +315,7 @@ function Pago({
         <div>
           <p className="text-xs text-muted">Total a pagar</p>
           <p className="text-2xl font-extrabold text-foreground">
-            {pesos(saldo)}
+            {formatPrecio(saldo)}
           </p>
         </div>
         <button
