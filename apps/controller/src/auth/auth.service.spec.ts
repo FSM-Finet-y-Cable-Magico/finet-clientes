@@ -54,6 +54,8 @@ describe('AuthService', () => {
               ),
               create: jest.fn(),
               update: jest.fn(),
+              findUnique: jest.fn(),
+              updateMany: jest.fn(),
             },
             sesion_portal: {
               create: jest.fn(),
@@ -432,7 +434,7 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('message');
       expect(jwtService.signAsync).toHaveBeenCalledWith(
-        { sub: 1, type: 'reset' },
+        { sub: 1, type: 'reset', huella: expect.any(String) },
         { expiresIn: '30m' },
       );
     });
@@ -448,30 +450,99 @@ describe('AuthService', () => {
   });
 
   describe('restablecerPassword', () => {
-    it('update password and invalidate sessions on valid token', async () => {
-      (jwtService.verify as jest.Mock).mockReturnValue({
-        sub: 1,
-        type: 'reset',
+    /** Pide un enlace y devuelve el payload firmado, como lo vería restablecer. */
+    async function pedirEnlace(hashActual: string | null = 'hashedpassword') {
+      porRut.mockResolvedValue({
+        ...mockCliente,
+        password_portal_hash: hashActual,
       });
-      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
-      (prisma.cliente.update as jest.Mock).mockResolvedValue({
-        id_cliente: 1,
+      (jwtService.signAsync as jest.Mock).mockResolvedValue('reset-token');
+      await authService.recuperarPassword('123456785');
+      const [payload] = (jwtService.signAsync as jest.Mock).mock.calls.at(-1)!;
+      (jwtService.verify as jest.Mock).mockReturnValue(payload);
+    }
+
+    function hashEnBase(hash: string | null) {
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+        password_portal_hash: hash,
         email: 'juan@test.cl',
         nombre_completo: 'Juan Pérez',
       });
+    }
+
+    beforeEach(() => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    });
+
+    it('update password and invalidate sessions on valid token', async () => {
+      await pedirEnlace('hashedpassword');
+      hashEnBase('hashedpassword');
 
       const result = await authService.restablecerPassword(
         'reset-token',
         'NewPass1',
       );
 
-      expect(prisma.cliente.update).toHaveBeenCalledWith({
-        where: { id_cliente: 1 },
+      expect(prisma.cliente.updateMany).toHaveBeenCalledWith({
+        where: { id_cliente: 1, password_portal_hash: 'hashedpassword' },
         data: { password_portal_hash: 'new-hash' },
       });
+      expect(prisma.sesion_portal.updateMany).toHaveBeenCalled();
       expect(result).toEqual({
         message: 'Contraseña restablecida exitosamente',
       });
+    });
+
+    it('RNF-04.1: el enlace no sirve una segunda vez', async () => {
+      await pedirEnlace('hashedpassword');
+      // La primera vez cambió la contraseña: en la base ya está el hash nuevo.
+      hashEnBase('new-hash');
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'OtraPass2'),
+      ).rejects.toThrow('Este enlace ya fue usado');
+      expect(prisma.cliente.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('RNF-04.1: si la contraseña cambió por otro lado, el enlace tampoco sirve', async () => {
+      await pedirEnlace('hashedpassword');
+      hashEnBase('hash-cambiado-desde-el-perfil');
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'OtraPass2'),
+      ).rejects.toThrow('Este enlace ya fue usado');
+    });
+
+    it('RNF-04.1: dos envíos a la vez con el mismo enlace, solo uno cambia la contraseña', async () => {
+      await pedirEnlace('hashedpassword');
+      hashEnBase('hashedpassword');
+      (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'OtraPass2'),
+      ).rejects.toThrow('Este enlace ya fue usado');
+      expect(prisma.sesion_portal.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('sirve para un cliente que todavía no tenía contraseña', async () => {
+      await pedirEnlace(null);
+      hashEnBase(null);
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'NewPass1'),
+      ).resolves.toEqual({ message: 'Contraseña restablecida exitosamente' });
+    });
+
+    it('un token de recuperación sin huella no sirve', async () => {
+      (jwtService.verify as jest.Mock).mockReturnValue({
+        sub: 1,
+        type: 'reset',
+      });
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'NewPass1'),
+      ).rejects.toThrow('Token inválido');
     });
 
     it('throw BadRequestException on expired token', async () => {

@@ -187,7 +187,7 @@ POST /api/auth/restablecer-password
 }
 ```
 
-El token viene del enlace en el email de recuperacion. Expira en **30 minutos**. Es un JWT de tipo `'reset'`.
+El token viene del enlace en el email de recuperacion. Expira en **30 minutos** y es de **un solo uso** (RNF-04.1). Es un JWT de tipo `'reset'`; deja de servir cuando la contraseña cambia.
 
 Al cambiar la contrasena se invalidan todas las sesiones activas del cliente.
 
@@ -207,6 +207,7 @@ Al cambiar la contrasena se invalidan todas las sesiones activas del cliente.
 |------|---------|-------|
 | 400 | `"Token inválido o expirado"` | Token JWT expiro o es invalido |
 | 400 | `"Token inválido"` | Token no es de tipo 'reset' o audiencia incorrecta |
+| 400 | `"Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo"` | El enlace ya se usó, o la contraseña cambió después de pedirlo |
 | 400 | `"Contraseña debe tener al menos 8 caracteres"` | Muy corta |
 | 400 | `"Contraseña debe contener al menos una mayúscula"` | Falta mayuscula |
 | 400 | `"Contraseña debe contener al menos un número"` | Falta numero |

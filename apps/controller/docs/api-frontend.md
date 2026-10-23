@@ -142,7 +142,7 @@ POST /api/auth/restablecer-password
 }
 ```
 
-El token viene del enlace en el email de recuperación. Expira en **30 minutos** (RNF-04.1).
+El token viene del enlace en el email de recuperación. Expira en **30 minutos** y es de **un solo uso** (RNF-04.1).
 
 **Respuesta 200:**
 ```json
@@ -158,6 +158,7 @@ Efectos: actualiza la contraseña, invalida todas las sesiones activas del clien
 |------|---------|
 | 400 | `"Token inválido o expirado"` |
 | 400 | `"Token inválido"` (no es de tipo reset) |
+| 400 | `"Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo"` (el enlace ya se usó) |
 
 ---
 

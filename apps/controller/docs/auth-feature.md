@@ -141,7 +141,7 @@ Content-Type: application/json
 | 429 | ThrottlerException | Excede 3 req/min |
 
 **Notas:**
-- El token en el enlace es un JWT firmado con claim `type: "reset"`, expira en 30 minutos (RNF-04.1).
+- El token en el enlace es un JWT firmado con claim `type: "reset"`, expira en 30 minutos y es de un solo uso (RNF-04.1): lleva una huella de la contraseña vigente al pedirlo, y deja de servir cuando la contraseña cambia.
 - Si falla el envío del email, se registra en el log del servidor y se devuelve el mensaje genérico igualmente.
 
 ---
@@ -177,6 +177,7 @@ Content-Type: application/json
 |---|---|---|
 | 400 | Token inválido o expirado | Token expiró (>30 min) o firma inválida |
 | 400 | Token inválido | El token no es de tipo `reset` (ej: token de sesión) |
+| 400 | Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo | El enlace ya se usó, o la contraseña cambió después de pedirlo (RNF-04.1) |
 | 429 | ThrottlerException | Excede 3 req/min |
 
 ---

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
@@ -18,6 +19,25 @@ import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
  * hora y cantidad de intentos, sin panel.
  */
 export const ACCION_BLOQUEO_INTENTOS = 'BLOQUEO_INTENTOS_FALLIDOS';
+
+/**
+ * RNF-04.1: el enlace de recuperación es de un solo uso. El token lleva una
+ * huella de la contraseña que el cliente tenía al pedirlo; cuando la contraseña
+ * cambia (con ese enlace o de cualquier otra forma), la huella deja de coincidir
+ * y el enlace ya no sirve. Así no hace falta una tabla de enlaces usados, que
+ * sería un cambio de schema en la base compartida (acuerdo v2.0, §13).
+ *
+ * Es un SHA-256 del hash bcrypt: no permite recuperar ni el hash ni la clave.
+ */
+function huellaPassword(hash: string | null): string {
+  return createHash('sha256')
+    .update(hash ?? '')
+    .digest('hex')
+    .slice(0, 32);
+}
+
+const MENSAJE_ENLACE_USADO =
+  'Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo';
 
 interface IntentoFallidoMemoria {
   rut_intentado: string;
@@ -444,8 +464,12 @@ export class AuthService {
     }
 
     try {
-      const payload = { sub: cliente.id_cliente, type: 'reset' };
-      // RNF-04.1: el enlace de recuperación dura 30 minutos.
+      const payload = {
+        sub: cliente.id_cliente,
+        type: 'reset',
+        huella: huellaPassword(cliente.password_portal_hash),
+      };
+      // RNF-04.1: el enlace de recuperación dura 30 minutos y es de un solo uso.
       const token = await this.jwtService.signAsync(payload, {
         expiresIn: '30m',
       });
@@ -473,24 +497,53 @@ export class AuthService {
   }
 
   async restablecerPassword(token: string, password: string) {
-    let payload: { sub: number; type: string };
+    let payload: { sub: number; type: string; huella?: string };
 
     try {
-      payload = this.jwtService.verify<{ sub: number; type: string }>(token);
+      payload = this.jwtService.verify<{
+        sub: number;
+        type: string;
+        huella?: string;
+      }>(token);
     } catch {
       throw new BadRequestException('Token inválido o expirado');
     }
 
-    if (payload.type !== 'reset') {
+    if (payload.type !== 'reset' || !payload.huella) {
       throw new BadRequestException('Token inválido');
+    }
+
+    // RNF-04.1, un solo uso: la contraseña tiene que ser la misma que cuando se
+    // pidió el enlace.
+    const cliente = await this.prisma.cliente.findUnique({
+      where: { id_cliente: payload.sub },
+      select: {
+        password_portal_hash: true,
+        email: true,
+        nombre_completo: true,
+      },
+    });
+    if (
+      !cliente ||
+      huellaPassword(cliente.password_portal_hash) !== payload.huella
+    ) {
+      throw new BadRequestException(MENSAJE_ENLACE_USADO);
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const cliente = await this.prisma.cliente.update({
-      where: { id_cliente: payload.sub },
+    // Condicionada al hash anterior: si llegan dos envíos con el mismo enlace a
+    // la vez, solo uno cambia la contraseña.
+    const { count } = await this.prisma.cliente.updateMany({
+      where: {
+        id_cliente: payload.sub,
+        password_portal_hash: cliente.password_portal_hash,
+      },
       data: { password_portal_hash: passwordHash },
     });
+    if (count === 0) {
+      throw new BadRequestException(MENSAJE_ENLACE_USADO);
+    }
 
     this.logger.log(`Password reset completed for cliente id=${payload.sub}`);
     await this.invalidarSesionesAnteriores(payload.sub);
