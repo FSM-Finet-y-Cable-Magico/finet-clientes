@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { passwordSchema } from '../../common/utils/validaciones.js';
 
 // ─── CU-08: Actualizar número de teléfono ─────────────────────────────────────
 export const ActualizarTelefonoDto = z.object({
@@ -25,12 +26,8 @@ export type ActualizarEmailDto = z.infer<typeof ActualizarEmailDto>;
 export const CambiarPasswordDto = z
   .object({
     password_actual: z.string().min(1, 'La contraseña actual es requerida'),
-    // RF-09 / CU-11: misma regla que registro y recuperación (8 + mayúscula + número)
-    password_nuevo: z
-      .string()
-      .min(8, 'Mínimo 8 caracteres')
-      .regex(/[A-Z]/, 'Debe contener al menos una letra mayúscula')
-      .regex(/[0-9]/, 'Debe contener al menos un número'),
+    // RF-09 / CU-11: misma regla que registro y recuperación
+    password_nuevo: passwordSchema,
     password_confirmacion: z
       .string()
       .min(1, 'Debe confirmar la nueva contraseña'),
