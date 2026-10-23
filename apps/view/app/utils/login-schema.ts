@@ -121,13 +121,3 @@ export const changePasswordSchema = z
     message: "Las contraseñas no coinciden",
     path: ["passwordConfirmacion"],
   });
-
-export type LoginInput = z.infer<typeof loginSchema>;
-
-export type RegisterInput = z.infer<typeof registerSchema>;
-
-export type RecoveryInput = z.infer<typeof recoverySchema>;
-
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
-
-export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

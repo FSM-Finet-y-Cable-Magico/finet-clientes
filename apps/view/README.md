@@ -43,12 +43,12 @@ NEXT_PUBLIC_SENTRY_DSN=
 | Variable | Requerida | Descripción |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | Sí | URL del backend, usada por componentes cliente y por casi todo el server-side fetching |
-| `API_URL` | Sí (ver nota) | URL del backend, usada **solo** por `app/portal/_lib/portal-api.ts`. Ver "Quirk conocido" abajo |
+| `API_URL` | Sí (ver nota) | URL del backend para las acciones que corren en el servidor de Next, leída **solo** por `app/_lib/api-servidor.ts`. Ver "Quirk conocido" abajo |
 | `JWT_SECRET` | Sí | Debe ser idéntico al del backend — el proxy verifica el JWT localmente, sin llamar a la API |
 | `NEXT_PUBLIC_SITE_URL` | No | URL pública del sitio (SEO: JSON-LD, sitemap) |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Si está seteada, `securityLogger` reporta eventos de seguridad en producción |
 
-> ⚠️ **Quirk conocido:** hay tres módulos que hacen fetch al backend y **no todos leen la misma variable de entorno**. Ver la sección "Clientes API" abajo antes de tocar cualquiera de los tres.
+> ⚠️ **Quirk conocido:** el navegador y el servidor de Next **no leen la misma variable de entorno**: `NEXT_PUBLIC_API_URL` (en `app/_lib/consts.ts`, con `http://localhost:4000/api` por defecto) y `API_URL` (en `app/_lib/api-servidor.ts`, sin valor por defecto). Ver "Clientes API" en [docs/conventions.md](docs/conventions.md).
 
 ## Scripts
 

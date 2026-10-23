@@ -10,9 +10,12 @@
 
 | Módulo | Uso | Variable de entorno | Notas |
 |---|---|---|---|
-| `app/utils/api.ts` | Client components (`"use client"`) — el que usan las páginas de `portal/*` | `NEXT_PUBLIC_API_URL` | Objeto `api.get/post/put/patch/delete`. Envía `credentials: "include"`. En un 401 dispara `window.dispatchEvent(new CustomEvent("auth:session-expired"))` (lo escucha `AuthProvider`) y loguea con `securityLogger`. |
+| `app/utils/api.ts` | Client components (`"use client"`) — el que usan las páginas de `portal/*` | `NEXT_PUBLIC_API_URL` | Objeto `api.get/post/put/patch/delete`. Envía `credentials: "include"`. En un 401 dispara el evento `EVENTO_SESION_EXPIRADA` de `_lib/consts.ts` (lo escucha `AuthProvider`) y loguea con `securityLogger`. |
 | `app/_lib/api.ts` | Server components de landing (`getLandingPlanes`, `getPlanById`) | `NEXT_PUBLIC_API_URL` | `fetch` con `next: { revalidate: 300 }`. Si el backend no responde, hace fallback silencioso a catálogo vacío (`console.error("Backend no disponible...")` — esto es lo que se ve en el log de `pnpm build`, es esperado). |
-| `app/portal/_lib/portal-api.ts` | Server-side (`getDeuda`, `getTickets`) | **`API_URL`** (sin `NEXT_PUBLIC_`) | `fetch` con `cache: 'no-store'`. Lanza `Error` si la respuesta no es `ok` — no hace fallback silencioso como el de landing. |
+| `app/_lib/api-servidor.ts` | Acciones del servidor (`portal/_lib/portal-actions.ts`, `_lib/cookies-actions.ts`) | **`API_URL`** (sin `NEXT_PUBLIC_`) | `apiUrl(path)` arma la URL; lanza si falta la variable, no tiene valor por defecto. |
+
+`NEXT_PUBLIC_API_URL` se lee una sola vez, en `API_URL` de `app/_lib/consts.ts`: los
+dos primeros módulos y cualquier otro fetch del navegador la importan de ahí.
 
 Antes de agregar otro helper de fetch, revisar si alguno de los módulos activos
 ya cubre el caso y verificar cuál variable de entorno lee realmente (`API_URL`
@@ -23,7 +26,7 @@ vs `NEXT_PUBLIC_API_URL`).
 Dos mecanismos independientes, no los confundas:
 
 1. **`proxy.ts`** (raíz de `apps/view`) — middleware de Next.js, verifica el JWT de la cookie con `jose` para `/portal/*` y `/perfil/*`. Corre en el edge, no llama a la API.
-2. **`app/_lib/auth.tsx`** (`AuthProvider`/`useAuth`) — contexto React del lado cliente. Al montar, llama `GET /auth/perfil` (con reintento exponencial, `MAX_RETRIES=3`) para poblar el navbar/estado de UI. Escucha `auth:session-expired` para desloguear reactivamente cuando `utils/api.ts` recibe un 401 en cualquier fetch posterior.
+2. **`app/_lib/auth.tsx`** (`AuthProvider`/`useAuth`) — contexto React del lado cliente. Al montar, llama `GET /auth/perfil` (con reintento exponencial, `MAX_RETRIES=3`) para poblar el navbar/estado de UI. Escucha `EVENTO_SESION_EXPIRADA` para desloguear reactivamente cuando `utils/api.ts` recibe un 401 en cualquier fetch posterior.
 
 ## Datos de contacto/empresa
 
