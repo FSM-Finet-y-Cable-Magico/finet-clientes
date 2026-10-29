@@ -52,6 +52,25 @@ export class MailService {
     this.logger.log('Password reset email sent');
   }
 
+  /**
+   * CU-04: el enlace de un solo uso para que un cliente que ya existe cree su
+   * contraseña del portal (G8, 01-10, §6).
+   */
+  async sendRegistroCuenta(email: string, nombre: string, link: string) {
+    const from =
+      this.configService.get<string>('MAIL_FROM') ||
+      '"Portal Clientes" <no-reply@finet.cl>';
+
+    await this.transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Crea tu cuenta - Portal Clientes',
+      html: this.registroCuentaTemplate(nombre, link),
+    });
+
+    this.logger.log('Account registration email sent');
+  }
+
   async sendPasswordChanged(email: string, nombre: string) {
     const from =
       this.configService.get<string>('MAIL_FROM') ||
@@ -273,6 +292,21 @@ export class MailService {
         `Hola ${escaparHtml(nombre)}: recibimos una solicitud para restablecer tu contraseña del Portal Clientes. Usa el botón para crear una nueva.` +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Este enlace expira en 30 minutos y sirve una sola vez. Si no solicitaste este cambio, ignora este mensaje.</p>',
       boton: { texto: 'Restablecer contraseña', enlace: link },
+      sitio: this.sitio(),
+    });
+  }
+
+  /** CU-04: el enlace para crear la contraseña de una cuenta nueva. */
+  private registroCuentaTemplate(nombre: string, link: string): string {
+    return plantillaCorreo({
+      resumen:
+        'Usa el enlace para crear la contraseña de tu cuenta. Expira en 30 minutos.',
+      etiqueta: { texto: 'Crear cuenta', tono: 'aviso' },
+      titulo: 'Crea tu contraseña',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: recibimos una solicitud para crear tu cuenta del Portal Clientes. Usa el botón para crear tu contraseña.` +
+        '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Este enlace expira en 30 minutos y sirve una sola vez. Si no lo pediste, ignora este mensaje.</p>',
+      boton: { texto: 'Crear mi contraseña', enlace: link },
       sitio: this.sitio(),
     });
   }

@@ -22,6 +22,12 @@ import {
   restablecerPasswordSchema,
   type RestablecerPasswordDto,
 } from './dto/restablecer-password.dto.js';
+import {
+  confirmacionRegistroSchema,
+  solicitudRegistroSchema,
+  type ConfirmacionRegistroDto,
+  type SolicitudRegistroDto,
+} from './dto/registro.dto.js';
 import { ZodValidationPipe } from './pipes/zod-validation.pipe.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { CurrentClient } from './decorators/current-client.decorator.js';
@@ -76,13 +82,7 @@ export class AuthController {
       body.password,
       req.ip ?? '0.0.0.0',
     );
-    res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    this.ponerCookieSesion(res, result.access_token);
     return result;
   }
 
@@ -132,13 +132,79 @@ export class AuthController {
       body.telefono,
       body.version_politica_privacidad,
     );
-    res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    this.ponerCookieSesion(res, result.access_token);
+    return result;
+  }
+
+  /**
+   * CU-04 / RF-10, paso 1: un cliente que ya existe pide crear su cuenta.
+   *
+   * El cliente lo crea G8; el portal solo le da acceso (acuerdo v2.0, §3 y §4).
+   * Si es cliente activo, no tiene contraseña y tiene correo, se le manda un
+   * enlace de un solo uso a ese correo (G8, 01-10, §6).
+   *
+   * POST /auth/registro
+   *
+   * @body { rut: string }  // formato 123456785 (sin puntos ni guion)
+   *
+   * Respuesta 200: { resultado: 'ENLACE_ENVIADO' | 'YA_REGISTRADO' |
+   * 'SIN_CORREO' | 'NO_CLIENTE' }. La vista muestra un mensaje por cada uno.
+   *
+   * Rate limit: 3 intentos por minuto por IP.
+   *
+   * Errores:
+   *   400 - RUT mal formateado o dígito verificador inválido
+   *   429 - Rate limit excedido (>3 req/min)
+   *   503 - No se pudo enviar el correo
+   */
+  @Post('registro')
+  @Throttle({ default: { limit: 3, ttl: 60 } })
+  @HttpCode(200)
+  solicitarRegistro(
+    @Body(new ZodValidationPipe(solicitudRegistroSchema))
+    body: SolicitudRegistroDto,
+  ) {
+    return this.authService.solicitarRegistro(body.rut);
+  }
+
+  /**
+   * CU-04 / RF-10, paso 2: con el enlace del correo, el cliente crea su
+   * contraseña y queda con la sesión iniciada (devuelve el token y pone la
+   * cookie httpOnly, como el login).
+   *
+   * POST /auth/registro/confirmar
+   *
+   * @body {
+   *   token: string,
+   *   password: string,               // 8-72 char, 1 mayúscula, 1 número
+   *   password_confirmation: string,
+   *   acepta_politica_privacidad: true,
+   *   version_politica_privacidad: string
+   * }
+   *
+   * Rate limit: 3 intentos por minuto por IP.
+   *
+   * Errores:
+   *   400 - Validación (contraseña débil, no coinciden, sin la casilla)
+   *   400 - Token inválido o expirado, o enlace ya usado
+   *   429 - Rate limit excedido (>3 req/min)
+   */
+  @Post('registro/confirmar')
+  @Throttle({ default: { limit: 3, ttl: 60 } })
+  @HttpCode(200)
+  async confirmarRegistro(
+    @Body(new ZodValidationPipe(confirmacionRegistroSchema))
+    body: ConfirmacionRegistroDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.confirmarRegistro(
+      body.token,
+      body.password,
+      body.version_politica_privacidad,
+      req.ip ?? '0.0.0.0',
+    );
+    this.ponerCookieSesion(res, result.access_token);
     return result;
   }
 
@@ -253,5 +319,16 @@ export class AuthController {
 
     res.clearCookie('access_token', { path: '/' });
     return { message: 'Sesión cerrada exitosamente' };
+  }
+
+  /** La cookie de la sesión del portal: la usan el login y el registro. */
+  private ponerCookieSesion(res: Response, token: string) {
+    res.cookie('access_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
   }
 }

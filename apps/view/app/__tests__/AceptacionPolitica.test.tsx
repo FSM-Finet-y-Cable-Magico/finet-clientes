@@ -11,6 +11,7 @@ jest.mock("@/app/utils/api", () => ({ api: { post: jest.fn() } }));
 
 import FormularioContratacion from "@/app/_components/catalog/FormularioContratacion";
 import RegisterForm from "@/app/components/RegisterForm";
+import ConfirmarRegistroForm from "@/app/components/ConfirmarRegistroForm";
 import type { PlanBackend } from "@/app/_lib/api";
 import { POLITICA_PRIVACIDAD_VERSION } from "@/app/_lib/legal";
 import { api } from "@/app/utils/api";
@@ -152,6 +153,54 @@ describe("CU-75: formulario de registro de cuenta", () => {
       "/auth/register",
       expect.objectContaining({
         rut: "111111111",
+        acepta_politica_privacidad: true,
+        version_politica_privacidad: POLITICA_PRIVACIDAD_VERSION,
+      }),
+    );
+    expect(push).toHaveBeenCalledWith("/portal");
+  });
+});
+
+describe("CU-75: crear la cuenta con el enlace del correo (CU-04)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  async function completarContrasena(container: HTMLElement) {
+    const user = userEvent.setup();
+    await user.type(container.querySelector<HTMLInputElement>("#password")!, "Password1");
+    await user.type(container.querySelector<HTMLInputElement>("#confirmPassword")!, "Password1");
+    return user;
+  }
+
+  // Excepción 1
+  it("bloquea la cuenta sin la casilla, informa y lleva el foco a la casilla", async () => {
+    const { container } = render(<ConfirmarRegistroForm token="token-de-prueba" />);
+    const user = await completarContrasena(container);
+
+    await user.click(screen.getByRole("button", { name: "Crear cuenta" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(MENSAJE);
+    expect(screen.getByRole("checkbox")).toHaveFocus();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("envía la aceptación y la versión de la política junto con el enlace", async () => {
+    (api.post as jest.Mock).mockResolvedValue({
+      access_token: "jwt",
+      cliente: { id: 1 },
+    });
+    const { container } = render(<ConfirmarRegistroForm token="token-de-prueba" />);
+    const user = await completarContrasena(container);
+
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Crear cuenta" }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalled());
+    expect(api.post).toHaveBeenCalledWith(
+      "/auth/registro/confirmar",
+      expect.objectContaining({
+        token: "token-de-prueba",
         acepta_politica_privacidad: true,
         version_politica_privacidad: POLITICA_PRIVACIDAD_VERSION,
       }),

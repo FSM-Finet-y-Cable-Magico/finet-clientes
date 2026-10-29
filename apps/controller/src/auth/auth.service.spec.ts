@@ -82,6 +82,7 @@ describe('AuthService', () => {
           useValue: {
             sendPasswordReset: jest.fn().mockResolvedValue(undefined),
             sendPasswordChanged: jest.fn().mockResolvedValue(undefined),
+            sendRegistroCuenta: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -564,6 +565,236 @@ describe('AuthService', () => {
       await expect(
         authService.restablecerPassword('session-token', 'NewPass1'),
       ).rejects.toThrow('Token inválido');
+    });
+  });
+
+  describe('CU-04: registro sobre un cliente que ya existe', () => {
+    const sinCuenta = { ...mockCliente, password_portal_hash: null };
+
+    function correo() {
+      return (
+        authService as unknown as {
+          mailService: { sendRegistroCuenta: jest.Mock };
+        }
+      ).mailService;
+    }
+
+    describe('solicitarRegistro', () => {
+      it('si el RUT no es cliente: NO_CLIENTE, sin correo', async () => {
+        porRut.mockResolvedValue(null);
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'NO_CLIENTE' });
+        expect(correo().sendRegistroCuenta).not.toHaveBeenCalled();
+      });
+
+      it('si el cliente no está activo: NO_CLIENTE, como el login, que tampoco lo deja entrar', async () => {
+        porRut.mockResolvedValue({ ...sinCuenta, estado: 'inactivo' });
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'NO_CLIENTE' });
+        expect(correo().sendRegistroCuenta).not.toHaveBeenCalled();
+      });
+
+      it('Excepción 4: si ya tiene contraseña, YA_REGISTRADO, sin correo', async () => {
+        porRut.mockResolvedValue(mockCliente);
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'YA_REGISTRADO' });
+        expect(correo().sendRegistroCuenta).not.toHaveBeenCalled();
+      });
+
+      it('G8 §6.2: sin correo registrado, SIN_CORREO; la activación es manual', async () => {
+        porRut.mockResolvedValue({ ...sinCuenta, email: null });
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'SIN_CORREO' });
+        expect(correo().sendRegistroCuenta).not.toHaveBeenCalled();
+      });
+
+      it('manda un enlace de un solo uso, de 30 minutos, al correo registrado', async () => {
+        porRut.mockResolvedValue(sinCuenta);
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'ENLACE_ENVIADO' });
+        expect(jwtService.signAsync).toHaveBeenCalledWith(
+          { sub: 1, type: 'registro', huella: expect.any(String) },
+          { expiresIn: '30m' },
+        );
+        expect(correo().sendRegistroCuenta).toHaveBeenCalledWith(
+          'juan@test.cl',
+          'Juan Pérez',
+          expect.stringContaining('/registro/confirmar#token=registro-token'),
+        );
+      });
+
+      it('si el correo no sale, lo dice en vez de decir que se envió', async () => {
+        porRut.mockResolvedValue(sinCuenta);
+        correo().sendRegistroCuenta.mockRejectedValueOnce(
+          new Error('SMTP caído'),
+        );
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).rejects.toThrow('No pudimos enviar el correo');
+      });
+    });
+
+    describe('confirmarRegistro', () => {
+      async function pedirEnlace() {
+        porRut.mockResolvedValue(sinCuenta);
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
+        await authService.solicitarRegistro('123456785');
+        const [payload] = (jwtService.signAsync as jest.Mock).mock.calls.at(
+          -1,
+        )!;
+        (jwtService.verify as jest.Mock).mockReturnValue(payload);
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt-sesion');
+      }
+
+      function enBase(cambios: Record<string, unknown> = {}) {
+        (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+          rut: '123456785',
+          nombre_completo: 'Juan Pérez',
+          email: 'juan@test.cl',
+          telefono: '912345678',
+          estado: 'activo',
+          password_portal_hash: null,
+          ...cambios,
+        });
+      }
+
+      beforeEach(() => {
+        (bcrypt.hash as jest.Mock).mockResolvedValue('nuevo-hash');
+        (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({
+          count: 1,
+        });
+      });
+
+      it('fija la contraseña, registra la aceptación (CU-75) y deja la sesión iniciada', async () => {
+        await pedirEnlace();
+        enBase();
+
+        const r = await authService.confirmarRegistro(
+          'registro-token',
+          'Clave2026',
+          '1.1',
+          '127.0.0.1',
+        );
+
+        expect(prisma.cliente.updateMany).toHaveBeenCalledWith({
+          where: { id_cliente: 1, password_portal_hash: null },
+          data: { password_portal_hash: 'nuevo-hash' },
+        });
+        expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            entidad_afectada: 'cliente',
+            id_entidad_afectada: 1,
+            valor_nuevo: expect.objectContaining({
+              formulario: 'REGISTRO',
+              version_politica: '1.1',
+            }),
+          }),
+        });
+        expect(jwtService.signAsync).toHaveBeenLastCalledWith({
+          sub: 1,
+          rut: '123456785',
+          type: 'access',
+        });
+        expect(prisma.sesion_portal.create).toHaveBeenCalled();
+        expect(r).toEqual({
+          access_token: 'jwt-sesion',
+          cliente: {
+            id: 1,
+            rut: '123456785',
+            nombre_completo: 'Juan Pérez',
+            email: 'juan@test.cl',
+            telefono: '912345678',
+          },
+        });
+      });
+
+      it('RNF-04.1: el enlace no sirve una segunda vez', async () => {
+        await pedirEnlace();
+        enBase({ password_portal_hash: 'nuevo-hash' });
+
+        await expect(
+          authService.confirmarRegistro(
+            'registro-token',
+            'Otra2026',
+            '1.1',
+            '127.0.0.1',
+          ),
+        ).rejects.toThrow('Este enlace ya fue usado');
+        expect(prisma.cliente.updateMany).not.toHaveBeenCalled();
+        expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
+      });
+
+      it('dos envíos a la vez con el mismo enlace: solo uno crea la contraseña', async () => {
+        await pedirEnlace();
+        enBase();
+        (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          authService.confirmarRegistro(
+            'registro-token',
+            'Clave2026',
+            '1.1',
+            '127.0.0.1',
+          ),
+        ).rejects.toThrow('Este enlace ya fue usado');
+        expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
+      });
+
+      it('si el cliente dejó de estar activo, no se le abre la sesión', async () => {
+        await pedirEnlace();
+        enBase({ estado: 'inactivo' });
+
+        await expect(
+          authService.confirmarRegistro(
+            'registro-token',
+            'Clave2026',
+            '1.1',
+            '127.0.0.1',
+          ),
+        ).rejects.toThrow('No encontramos una cuenta de cliente activa');
+        expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+        expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
+      });
+
+      it('un enlace de recuperación (CU-03) no sirve para registrarse', async () => {
+        (jwtService.verify as jest.Mock).mockReturnValue({
+          sub: 1,
+          type: 'reset',
+          huella: 'x',
+        });
+
+        await expect(
+          authService.confirmarRegistro(
+            'reset-token',
+            'Clave2026',
+            '1.1',
+            '127.0.0.1',
+          ),
+        ).rejects.toThrow('Token inválido');
+      });
+
+      it('un enlace de registro no sirve para restablecer la contraseña', async () => {
+        await pedirEnlace();
+        enBase();
+
+        await expect(
+          authService.restablecerPassword('registro-token', 'Clave2026'),
+        ).rejects.toThrow('Token inválido');
+      });
     });
   });
 

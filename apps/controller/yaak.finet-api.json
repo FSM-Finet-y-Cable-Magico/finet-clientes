@@ -213,6 +213,72 @@
       },
       {
         "model": "http_request",
+        "id": "rq_RegistroX1",
+        "createdAt": "2026-10-29T20:00:00.000000000",
+        "updatedAt": "2026-10-29T20:00:00.000000000",
+        "workspaceId": "wk_5ik5FWC6FN",
+        "folderId": "fl_8cLk8xBPLi",
+        "authentication": {},
+        "authenticationType": null,
+        "body": {
+          "text": "{\n  \"rut\": \"12.345.678-5\"\n}"
+        },
+        "bodyType": "application/json",
+        "description": "",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json",
+            "id": "hd_RegistroCTH"
+          }
+        ],
+        "method": "POST",
+        "name": "Registro - Pedir enlace (CU-04)",
+        "sortPriority": -1780120512331.0,
+        "url": "${[ API_URL ]}/auth/registro",
+        "urlParameters": [],
+        "settingSendCookies": { "enabled": false, "value": true },
+        "settingStoreCookies": { "enabled": false, "value": true },
+        "settingValidateCertificates": { "enabled": false, "value": true },
+        "settingFollowRedirects": { "enabled": false, "value": true },
+        "settingRequestTimeout": { "enabled": false, "value": 0 }
+      },
+      {
+        "model": "http_request",
+        "id": "rq_RegistroConfirmarX1",
+        "createdAt": "2026-10-29T20:00:00.000000000",
+        "updatedAt": "2026-10-29T20:00:00.000000000",
+        "workspaceId": "wk_5ik5FWC6FN",
+        "folderId": "fl_8cLk8xBPLi",
+        "authentication": {},
+        "authenticationType": null,
+        "body": {
+          "text": "{\n  \"token\": \"<token_de_registro>\",\n  \"password\": \"<contraseña>\",\n  \"password_confirmation\": \"<contraseña>\",\n  \"acepta_politica_privacidad\": true,\n  \"version_politica_privacidad\": \"1.1\"\n}"
+        },
+        "bodyType": "application/json",
+        "description": "",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json",
+            "id": "hd_RegConfCTH"
+          }
+        ],
+        "method": "POST",
+        "name": "Registro - Confirmar (CU-04)",
+        "sortPriority": -1780120512331.0,
+        "url": "${[ API_URL ]}/auth/registro/confirmar",
+        "urlParameters": [],
+        "settingSendCookies": { "enabled": false, "value": true },
+        "settingStoreCookies": { "enabled": false, "value": true },
+        "settingValidateCertificates": { "enabled": false, "value": true },
+        "settingFollowRedirects": { "enabled": false, "value": true },
+        "settingRequestTimeout": { "enabled": false, "value": 0 }
+      },
+      {
+        "model": "http_request",
         "id": "rq_RestablecerPassX1",
         "createdAt": "2026-05-30T20:00:00.000000000",
         "updatedAt": "2026-05-30T20:00:00.000000000",

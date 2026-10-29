@@ -26,6 +26,8 @@ jest.mock("@/app/utils/api", () => ({
 import { api } from "@/app/utils/api";
 import LoginForm from "@/app/components/LoginForm";
 import RegisterForm from "@/app/components/RegisterForm";
+import RegistroForm from "@/app/components/RegistroForm";
+import ConfirmarRegistroForm from "@/app/components/ConfirmarRegistroForm";
 import RecoveryForm from "@/app/components/RecoveryForm";
 import ResetPasswordForm from "@/app/components/ResetPasswordForm";
 import ChangePasswordForm from "@/app/components/ChangePasswordForm";
@@ -57,6 +59,20 @@ const CASOS: Caso[] = [
     nombre: "registro",
     elemento: () => <RegisterForm />,
     valores: ["Ana Pérez", "ana@example.com", "+56912345678", "12.345.678-5", "Clave2026", "Clave2026"],
+    casilla: true,
+    metodo: "post",
+  },
+  {
+    nombre: "crear cuenta: el RUT",
+    elemento: () => <RegistroForm onIniciarSesion={() => {}} />,
+    valores: ["12.345.678-5"],
+    metodo: "post",
+    exito: { resultado: "ENLACE_ENVIADO" },
+  },
+  {
+    nombre: "crear cuenta: la contraseña",
+    elemento: () => <ConfirmarRegistroForm token="token-de-prueba" />,
+    valores: ["Clave2026", "Clave2026"],
     casilla: true,
     metodo: "post",
   },

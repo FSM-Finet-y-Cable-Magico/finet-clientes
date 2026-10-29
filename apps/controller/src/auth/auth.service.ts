@@ -3,8 +3,10 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  ServiceUnavailableException,
   Logger,
 } from '@nestjs/common';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'node:crypto';
@@ -36,8 +38,52 @@ function huellaPassword(hash: string | null): string {
     .slice(0, 32);
 }
 
-const MENSAJE_ENLACE_USADO =
-  'Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo';
+/**
+ * Los dos enlaces de un solo uso que manda el portal (RNF-04.1): el del CU-03,
+ * para restablecer la contraseña, y el del CU-04, para que un cliente que ya
+ * existe cree la suya. Un enlace de un tipo no sirve para el otro, y ninguno
+ * sirve como sesión: la estrategia JWT solo acepta el tipo `access`.
+ */
+type TipoEnlace = 'reset' | 'registro';
+
+/** Dónde abre cada enlace en la vista. */
+const RUTA_ENLACE: Record<TipoEnlace, string> = {
+  reset: '/restablecer-password',
+  registro: '/registro/confirmar',
+};
+
+const MENSAJE_ENLACE_USADO: Record<TipoEnlace, string> = {
+  reset:
+    'Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo',
+  registro:
+    'Este enlace ya fue usado. Si todavía no tienes contraseña, solicita uno nuevo',
+};
+
+/**
+ * CU-04: qué pasó al pedir el registro. La vista muestra un mensaje por cada
+ * uno. Dice si un RUT es cliente, como ya lo dice la consulta pública de deuda
+ * (CU-39), porque la Excepción 4 del CU-04 pide informar que ya está
+ * registrado.
+ */
+export type ResultadoRegistro =
+  | 'NO_CLIENTE'
+  | 'YA_REGISTRADO'
+  | 'SIN_CORREO'
+  | 'ENLACE_ENVIADO';
+
+/** Solo un cliente activo entra al portal: lo exigen el login y el registro. */
+function clienteActivo(estado: string): boolean {
+  return estado.trim().toLowerCase() === 'activo';
+}
+
+/** Lo que el portal necesita del cliente para abrirle una sesión. */
+type ClienteSesion = {
+  id_cliente: number;
+  rut: string | null;
+  nombre_completo: string;
+  email: string | null;
+  telefono: string | null;
+};
 
 interface IntentoFallidoMemoria {
   rut_intentado: string;
@@ -258,7 +304,7 @@ export class AuthService {
       throw new UnauthorizedException('RUT o contraseña incorrectos');
     }
 
-    if (cliente.estado.trim().toLowerCase() !== 'activo') {
+    if (!clienteActivo(cliente.estado)) {
       this.logger.warn(
         `Login rejected: RUT ${rutLimpio} estado=${cliente.estado}, IP ${ip}`,
       );
@@ -306,37 +352,9 @@ export class AuthService {
       this.fallback.limpiarBloqueoRut(rutLimpio);
     }
 
-    const payload = {
-      sub: cliente.id_cliente,
-      rut: cliente.rut,
-      type: 'access',
-    };
-    const token = await this.jwtService.signAsync(payload);
-
-    await this.invalidarSesionesAnteriores(cliente.id_cliente);
-
-    await this.prisma.sesion_portal.create({
-      data: {
-        id_cliente: cliente.id_cliente,
-        token,
-        fecha_inicio: new Date(),
-        fecha_expiracion: this.calcularExpiracion(),
-        ip_origen: ip,
-      },
-    });
-
+    const sesion = await this.abrirSesion(cliente, ip);
     this.logger.log(`Login success: RUT ${rutLimpio}, IP ${ip}`);
-
-    return {
-      access_token: token,
-      cliente: {
-        id: cliente.id_cliente,
-        rut: cliente.rut,
-        nombre_completo: cliente.nombre_completo,
-        email: cliente.email,
-        telefono: cliente.telefono,
-      },
-    };
+    return sesion;
   }
 
   async register(
@@ -464,18 +482,7 @@ export class AuthService {
     }
 
     try {
-      const payload = {
-        sub: cliente.id_cliente,
-        type: 'reset',
-        huella: huellaPassword(cliente.password_portal_hash),
-      };
-      // RNF-04.1: el enlace de recuperación dura 30 minutos y es de un solo uso.
-      const token = await this.jwtService.signAsync(payload, {
-        expiresIn: '30m',
-      });
-
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      const link = `${frontendUrl}/restablecer-password#token=${token}`;
+      const link = await this.crearEnlace(cliente, 'reset');
 
       try {
         await this.mailService.sendPasswordReset(
@@ -497,56 +504,12 @@ export class AuthService {
   }
 
   async restablecerPassword(token: string, password: string) {
-    let payload: { sub: number; type: string; huella?: string };
+    const cliente = await this.fijarPasswordConEnlace(token, 'reset', password);
 
-    try {
-      payload = this.jwtService.verify<{
-        sub: number;
-        type: string;
-        huella?: string;
-      }>(token);
-    } catch {
-      throw new BadRequestException('Token inválido o expirado');
-    }
-
-    if (payload.type !== 'reset' || !payload.huella) {
-      throw new BadRequestException('Token inválido');
-    }
-
-    // RNF-04.1, un solo uso: la contraseña tiene que ser la misma que cuando se
-    // pidió el enlace.
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { id_cliente: payload.sub },
-      select: {
-        password_portal_hash: true,
-        email: true,
-        nombre_completo: true,
-      },
-    });
-    if (
-      !cliente ||
-      huellaPassword(cliente.password_portal_hash) !== payload.huella
-    ) {
-      throw new BadRequestException(MENSAJE_ENLACE_USADO);
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Condicionada al hash anterior: si llegan dos envíos con el mismo enlace a
-    // la vez, solo uno cambia la contraseña.
-    const { count } = await this.prisma.cliente.updateMany({
-      where: {
-        id_cliente: payload.sub,
-        password_portal_hash: cliente.password_portal_hash,
-      },
-      data: { password_portal_hash: passwordHash },
-    });
-    if (count === 0) {
-      throw new BadRequestException(MENSAJE_ENLACE_USADO);
-    }
-
-    this.logger.log(`Password reset completed for cliente id=${payload.sub}`);
-    await this.invalidarSesionesAnteriores(payload.sub);
+    this.logger.log(
+      `Password reset completed for cliente id=${cliente.id_cliente}`,
+    );
+    await this.invalidarSesionesAnteriores(cliente.id_cliente);
 
     if (cliente.email) {
       try {
@@ -563,6 +526,213 @@ export class AuthService {
     }
 
     return { message: 'Contraseña restablecida exitosamente' };
+  }
+
+  /**
+   * CU-04, paso 1: el cliente que ya existe pide crear su cuenta con su RUT
+   * (G8, 01-10, §6). Conocer el RUT no basta: el enlace va a su correo ya
+   * registrado. Sin correo, la activación es manual (§6.2).
+   */
+  async solicitarRegistro(
+    rut: string,
+  ): Promise<{ resultado: ResultadoRegistro }> {
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { rut: { in: variantesRut(cleanRut(rut)) } },
+    });
+
+    if (!cliente || !clienteActivo(cliente.estado)) {
+      return { resultado: 'NO_CLIENTE' };
+    }
+    if (cliente.password_portal_hash) {
+      return { resultado: 'YA_REGISTRADO' };
+    }
+    if (!cliente.email?.trim()) {
+      return { resultado: 'SIN_CORREO' };
+    }
+
+    const link = await this.crearEnlace(cliente, 'registro');
+    try {
+      await this.mailService.sendRegistroCuenta(
+        cliente.email,
+        cliente.nombre_completo,
+        link,
+      );
+    } catch (error) {
+      this.logger.error(
+        `No se pudo enviar el enlace de registro al cliente id=${cliente.id_cliente}`,
+        error,
+      );
+      throw new ServiceUnavailableException(
+        'No pudimos enviar el correo. Intenta de nuevo en unos minutos',
+      );
+    }
+
+    return { resultado: 'ENLACE_ENVIADO' };
+  }
+
+  /**
+   * CU-04, paso 2: con el enlace del correo, el cliente crea su contraseña,
+   * acepta la Política de Privacidad (CU-75) y queda con la sesión iniciada
+   * (poscondición del CU-04).
+   */
+  async confirmarRegistro(
+    token: string,
+    password: string,
+    versionPolitica: string,
+    ip: string,
+  ) {
+    const cliente = await this.fijarPasswordConEnlace(
+      token,
+      'registro',
+      password,
+      async (tx, c) => {
+        // Pudo dejar de ser cliente activo después de pedir el enlace. Si
+        // lanza, la transacción se revierte y la contraseña no queda.
+        if (!clienteActivo(c.estado)) {
+          throw new BadRequestException(
+            'No encontramos una cuenta de cliente activa para este enlace',
+          );
+        }
+        await registrarAceptacionPolitica(tx, {
+          formulario: 'REGISTRO',
+          entidad: 'cliente',
+          id_entidad: c.id_cliente,
+          version: versionPolitica,
+          ip,
+          datos: { rut: c.rut },
+        });
+      },
+    );
+
+    this.logger.log(`Registro completado: cliente id=${cliente.id_cliente}`);
+    return this.abrirSesion(cliente, ip);
+  }
+
+  /**
+   * RNF-04.1: un enlace de un solo uso, de 30 minutos. Lleva la huella de la
+   * contraseña que el cliente tiene ahora: cuando cambia, el enlace deja de
+   * servir.
+   */
+  private async crearEnlace(
+    cliente: { id_cliente: number; password_portal_hash: string | null },
+    tipo: TipoEnlace,
+  ): Promise<string> {
+    const token = await this.jwtService.signAsync(
+      {
+        sub: cliente.id_cliente,
+        type: tipo,
+        huella: huellaPassword(cliente.password_portal_hash),
+      },
+      { expiresIn: '30m' },
+    );
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    return `${frontendUrl}${RUTA_ENLACE[tipo]}#token=${token}`;
+  }
+
+  /**
+   * Fija la contraseña con un enlace de un solo uso (RNF-04.1). El enlace tiene
+   * que ser del tipo pedido y la contraseña de la base, la misma que cuando se
+   * pidió. El cambio va condicionado al hash anterior: si llegan dos envíos con
+   * el mismo enlace a la vez, solo uno la cambia. `enTransaccion` corre en la
+   * misma transacción, después del cambio.
+   */
+  private async fijarPasswordConEnlace(
+    token: string,
+    tipo: TipoEnlace,
+    password: string,
+    enTransaccion?: (
+      tx: Prisma.TransactionClient,
+      cliente: ClienteSesion & { estado: string },
+    ) => Promise<void>,
+  ): Promise<ClienteSesion & { estado: string }> {
+    let payload: { sub: number; type: string; huella?: string };
+
+    try {
+      payload = this.jwtService.verify<{
+        sub: number;
+        type: string;
+        huella?: string;
+      }>(token);
+    } catch {
+      throw new BadRequestException('Token inválido o expirado');
+    }
+
+    if (payload.type !== tipo || !payload.huella) {
+      throw new BadRequestException('Token inválido');
+    }
+
+    const encontrado = await this.prisma.cliente.findUnique({
+      where: { id_cliente: payload.sub },
+      select: {
+        rut: true,
+        nombre_completo: true,
+        email: true,
+        telefono: true,
+        estado: true,
+        password_portal_hash: true,
+      },
+    });
+    if (
+      !encontrado ||
+      huellaPassword(encontrado.password_portal_hash) !== payload.huella
+    ) {
+      throw new BadRequestException(MENSAJE_ENLACE_USADO[tipo]);
+    }
+    const { password_portal_hash: hashAnterior, ...datos } = encontrado;
+    const cliente = { ...datos, id_cliente: payload.sub };
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.cliente.updateMany({
+        where: {
+          id_cliente: payload.sub,
+          password_portal_hash: hashAnterior,
+        },
+        data: { password_portal_hash: passwordHash },
+      });
+      if (count === 0) {
+        throw new BadRequestException(MENSAJE_ENLACE_USADO[tipo]);
+      }
+      await enTransaccion?.(tx, cliente);
+    });
+
+    return cliente;
+  }
+
+  /**
+   * La sesión del portal: el JWT de tipo `access`, la fila de `sesion_portal`
+   * y los datos del cliente. Cierra las sesiones anteriores del cliente.
+   */
+  private async abrirSesion(cliente: ClienteSesion, ip: string) {
+    const token = await this.jwtService.signAsync({
+      sub: cliente.id_cliente,
+      rut: cliente.rut,
+      type: 'access',
+    });
+
+    await this.invalidarSesionesAnteriores(cliente.id_cliente);
+
+    await this.prisma.sesion_portal.create({
+      data: {
+        id_cliente: cliente.id_cliente,
+        token,
+        fecha_inicio: new Date(),
+        fecha_expiracion: this.calcularExpiracion(),
+        ip_origen: ip,
+      },
+    });
+
+    return {
+      access_token: token,
+      cliente: {
+        id: cliente.id_cliente,
+        rut: cliente.rut,
+        nombre_completo: cliente.nombre_completo,
+        email: cliente.email,
+        telefono: cliente.telefono,
+      },
+    };
   }
 
   private async invalidarSesionesAnteriores(idCliente: number) {

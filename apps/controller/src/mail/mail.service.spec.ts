@@ -329,3 +329,48 @@ describe('MailService — correos del CU-03 y del CU-71', () => {
     });
   });
 });
+
+describe('MailService — correo del CU-04 (crear la cuenta)', () => {
+  let mail: MailService;
+  let sendMail: jest.Mock;
+  const enlace = 'https://portal.finet.cl/registro/confirmar#token=abc.def.ghi';
+
+  function enviado(): { to: string; subject: string; html: string } {
+    return sendMail.mock.calls[0]![0] as {
+      to: string;
+      subject: string;
+      html: string;
+    };
+  }
+
+  beforeEach(async () => {
+    mail = new MailService({
+      get: (_k: string, porDefecto?: unknown) => porDefecto,
+    } as unknown as ConfigService);
+    sendMail = jest.fn().mockResolvedValue({});
+    (mail as unknown as { transporter: unknown }).transporter = { sendMail };
+    await mail.sendRegistroCuenta('ana@b.cl', 'Ana <b>', enlace);
+  });
+
+  it('va al correo registrado del cliente, con su asunto', () => {
+    expect(enviado()).toMatchObject({
+      to: 'ana@b.cl',
+      subject: 'Crea tu cuenta - Portal Clientes',
+    });
+  });
+
+  it('lleva el enlace en el botón para crear la contraseña', () => {
+    expect(enviado().html).toContain(`href="${enlace}"`);
+    expect(enviado().html).toContain('Crear mi contraseña');
+  });
+
+  it('RNF-04.1: dice que expira en 30 minutos y sirve una sola vez', () => {
+    expect(enviado().html).toContain('30 minutos y sirve una sola vez');
+  });
+
+  it('usa el molde del portal y no interpreta como HTML el nombre', () => {
+    expect(enviado().html).toContain('>FI<');
+    expect(enviado().html).toContain('Ana &lt;b&gt;');
+    expect(enviado().html).not.toContain('Ana <b>');
+  });
+});

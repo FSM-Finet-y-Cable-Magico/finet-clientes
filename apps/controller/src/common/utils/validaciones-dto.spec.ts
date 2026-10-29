@@ -2,6 +2,10 @@ import { loginSchema } from '../../auth/dto/login.dto.js';
 import { recuperarPasswordSchema } from '../../auth/dto/recuperar-password.dto.js';
 import { registerSchema } from '../../auth/dto/register.dto.js';
 import { restablecerPasswordSchema } from '../../auth/dto/restablecer-password.dto.js';
+import {
+  confirmacionRegistroSchema,
+  solicitudRegistroSchema,
+} from '../../auth/dto/registro.dto.js';
 import { CambiarPasswordDto } from '../../perfil/dto/perfil.dto.js';
 import { ConsultaDeudaRutDto } from '../../deuda-publica/dto/deuda-publica.dto.js';
 
@@ -44,6 +48,11 @@ describe('regla del RUT', () => {
       },
     ],
     ['consulta pública de deuda', ConsultaDeudaRutDto, {}],
+    [
+      'registro sobre un cliente que ya existe (CU-04)',
+      solicitudRegistroSchema,
+      {},
+    ],
   ];
 
   it.each(conRut)('%s: acepta un RUT válido', (_n, esquema, resto) => {
@@ -101,6 +110,18 @@ describe('regla de la contraseña (CU-11 / RF-09)', () => {
       'password',
     ],
     [
+      'confirmar el registro (CU-04)',
+      confirmacionRegistroSchema,
+      (p) => ({
+        token: 't',
+        password: p,
+        password_confirmation: p,
+        acepta_politica_privacidad: true,
+        version_politica_privacidad: '1.0',
+      }),
+      'password',
+    ],
+    [
       'restablecer',
       restablecerPasswordSchema,
       (p) => ({ token: 't', password: p }),
@@ -150,4 +171,44 @@ describe('regla de la contraseña (CU-11 / RF-09)', () => {
       ).toHaveLength(1);
     },
   );
+});
+
+describe('confirmar el registro (CU-04)', () => {
+  const valido = {
+    token: 't',
+    password: 'Clave2026',
+    password_confirmation: 'Clave2026',
+    acepta_politica_privacidad: true,
+    version_politica_privacidad: '1.0',
+  };
+
+  it('acepta los datos completos', () => {
+    expect(confirmacionRegistroSchema.safeParse(valido).success).toBe(true);
+  });
+
+  it('Excepción 3: la contraseña y su confirmación tienen que coincidir', () => {
+    expect(
+      mensajes(
+        confirmacionRegistroSchema,
+        { ...valido, password_confirmation: 'Otra2026' },
+        'password_confirmation',
+      ),
+    ).toEqual(['Las contraseñas no coinciden']);
+  });
+
+  it('CU-75: sin la casilla de privacidad no se procesa', () => {
+    expect(
+      mensajes(
+        confirmacionRegistroSchema,
+        { ...valido, acepta_politica_privacidad: false },
+        'acepta_politica_privacidad',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('sin el token del enlace no se procesa', () => {
+    expect(
+      mensajes(confirmacionRegistroSchema, { ...valido, token: '' }, 'token'),
+    ).toEqual(['Token es requerido']);
+  });
 });

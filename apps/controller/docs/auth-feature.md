@@ -10,6 +10,8 @@ Base URL: `http://localhost:4000/api`
 |---|---|---|---|---|
 | `POST` | `/auth/login` | No | 5 req/min | Iniciar sesión con RUT y contraseña |
 | `POST` | `/auth/register` | No | 3 req/min | Registrar nuevo cliente + JWT |
+| `POST` | `/auth/registro` | No | 3 req/min | CU-04: pedir el enlace para crear la cuenta |
+| `POST` | `/auth/registro/confirmar` | No | 3 req/min | CU-04: crear la contraseña con el enlace + JWT |
 | `POST` | `/auth/recuperar-password` | No | 3 req/min | Solicitar token de recuperación |
 | `POST` | `/auth/restablecer-password` | No | 3 req/min | Restablecer contraseña con token |
 | `POST` | `/auth/logout` | JWT | 10 req/min | Cerrar sesión activa |
@@ -105,6 +107,96 @@ Content-Type: application/json
 |---|---|---|
 | 400 | Validation failed | Campos inválidos (RUT, email, contraseña débil) |
 | 409 | No se pudo completar el registro | RUT o email duplicado |
+| 429 | ThrottlerException | Excede 3 req/min |
+
+---
+
+## POST /auth/registro
+
+CU-04, paso 1. La cuenta se crea sobre un cliente que ya existe: el cliente lo da de alta G8 (acuerdo v2.0, §3 y §4) y el portal no crea clientes. Conocer el RUT no basta: la contraseña se crea con un enlace de un solo uso que va al correo que el cliente ya tiene registrado (G8, 01-10, §6).
+
+```
+POST /api/auth/registro
+Content-Type: application/json
+
+{
+  "rut": "12.345.678-5"
+}
+```
+
+**Respuesta 200:**
+```json
+{
+  "resultado": "ENLACE_ENVIADO"
+}
+```
+
+| `resultado` | Cuándo | Qué hace |
+|---|---|---|
+| `NO_CLIENTE` | El RUT no es de un cliente, o su estado no es `'activo'` (como en el login) | Nada |
+| `YA_REGISTRADO` | El cliente ya tiene contraseña (Excepción 4 del CU-04) | Nada |
+| `SIN_CORREO` | El cliente no tiene correo registrado | Nada: la activación es manual (G8, 01-10, §6.2) |
+| `ENLACE_ENVIADO` | Cliente activo, sin contraseña y con correo | Envía al correo un enlace `/registro/confirmar#token=...` |
+
+El texto de cada caso lo pone la vista. A diferencia de `recuperar-password`, la respuesta dice si el RUT es cliente: la Excepción 4 del CU-04 pide informar que ya hay una cuenta, y la consulta pública de deuda (CU-39) ya lo dice.
+
+**Errores:**
+| Código | Mensaje | Causa |
+|---|---|---|
+| 400 | Validation failed | RUT con formato inválido o DV incorrecto |
+| 429 | ThrottlerException | Excede 3 req/min |
+| 503 | No pudimos enviar el correo. Intenta de nuevo en unos minutos | Falló el envío del enlace |
+
+**Notas:**
+- El token es un JWT con claim `type: "registro"`, expira en 30 minutos y es de un solo uso (RNF-04.1), con la misma huella que el de recuperación.
+- Un enlace de registro no sirve para restablecer la contraseña, ni al revés, y ninguno sirve como sesión.
+
+---
+
+## POST /auth/registro/confirmar
+
+CU-04, paso 2. Con el enlace del correo, el cliente crea su contraseña (CU-11), acepta la Política de Privacidad (CU-75) y queda con la sesión iniciada (poscondición del CU-04), igual que en el login.
+
+```
+POST /api/auth/registro/confirmar
+Content-Type: application/json
+
+{
+  "token": "eyJhbGciOi...",
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>",
+  "acepta_politica_privacidad": true,
+  "version_politica_privacidad": "1.1"
+}
+```
+
+**Respuesta 200** (y la cookie httpOnly `access_token`, como el login):
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "cliente": {
+    "id": 456,
+    "rut": "123456785",
+    "nombre_completo": "Juan Perez",
+    "email": "juan@ejemplo.cl",
+    "telefono": "912345678"
+  }
+}
+```
+
+**Efectos**, en una sola transacción:
+- Fija `password_portal_hash` en la tabla `cliente`, condicionado a que no haya cambiado desde que se pidió el enlace
+- Registra la aceptación de la política en `log_auditoria` (formulario `REGISTRO`)
+- Después abre la sesión en `sesion_portal` y cierra las anteriores
+
+**Errores:**
+| Código | Mensaje | Causa |
+|---|---|---|
+| 400 | Validation failed | Contraseña débil, contraseñas que no coinciden (Excepción 3), o casilla sin marcar |
+| 400 | Token inválido o expirado | Token expiró (>30 min) o firma inválida |
+| 400 | Token inválido | El token no es de tipo `registro` (ej: de recuperación o de sesión) |
+| 400 | Este enlace ya fue usado. Si todavía no tienes contraseña, solicita uno nuevo | El enlace ya se usó, o la contraseña cambió después de pedirlo (RNF-04.1) |
+| 400 | No encontramos una cuenta de cliente activa para este enlace | El cliente dejó de estar activo después de pedir el enlace |
 | 429 | ThrottlerException | Excede 3 req/min |
 
 ---
@@ -354,7 +446,7 @@ Content-Type: application/json
 | 401 | Sesión expirada por inactividad | Sesión inactiva |
 ## Sesiones e inactividad
 
-- Cada login/register crea una sesión en `sesion_portal` con `fecha_expiracion = now + 15 min`.
+- Cada login/register/registro confirmado crea una sesión en `sesion_portal` con `fecha_expiracion = now + 15 min`.
 - En cada request autenticado, se extiende la sesión otros 15 minutos (sliding window).
 - Si pasan 15 minutos sin requests → `401 Sesión expirada por inactividad`.
 - El JWT tiene expiración de 7 días, pero la sesión en DB vence por inactividad.
@@ -372,6 +464,8 @@ Configurado via `ThrottlerGuard` global en `app.module.ts`:
 |---|---|
 | `POST /auth/login` | 5 req/min |
 | `POST /auth/register` | 3 req/min |
+| `POST /auth/registro` | 3 req/min |
+| `POST /auth/registro/confirmar` | 3 req/min |
 | `POST /auth/recuperar-password` | 3 req/min |
 | `POST /auth/restablecer-password` | 3 req/min |
 | Todos los demás | 10 req/min (default) |
@@ -411,6 +505,16 @@ curl -X POST "$BASE_URL/auth/login" \
 curl -X POST "$BASE_URL/auth/register" \
   -H "Content-Type: application/json" \
   -d '{"rut":"12.345.678-5","nombre_completo":"Juan Perez","email":"juan@test.cl","password":"<contraseña>","password_confirmation":"<contraseña>"}'
+
+# Registro (CU-04): pedir el enlace
+curl -X POST "$BASE_URL/auth/registro" \
+  -H "Content-Type: application/json" \
+  -d '{"rut":"12.345.678-5"}'
+
+# Registro (CU-04): crear la contraseña con el enlace
+curl -X POST "$BASE_URL/auth/registro/confirmar" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<token>","password":"<contraseña>","password_confirmation":"<contraseña>","acepta_politica_privacidad":true,"version_politica_privacidad":"1.1"}'
 
 # Recuperar password
 curl -X POST "$BASE_URL/auth/recuperar-password" \
@@ -461,6 +565,7 @@ curl -X POST "$BASE_URL/auth/logout" \
 - Password hasheada con bcrypt (salt rounds 10)
 - Validación Zod en todos los DTOs
 - Reset token con claim `type: "reset"` para evitar reuso de token de sesión
+- Enlace de registro con claim `type: "registro"`: no sirve para restablecer ni como sesión
 - Reset token enviado en fragmento de URL (`#token=...`) para no exponerlo en logs del servidor
 - Login rechaza cuentas con estado distinto a `'activo'` (mensaje genérico idéntico)
 - Admin protegido con `X-API-Key`
@@ -475,6 +580,7 @@ curl -X POST "$BASE_URL/auth/logout" \
 | `src/auth/auth.service.ts` | Lógica de negocio (login, register, password reset, sesiones) |
 | `src/auth/dto/login.dto.ts` | Validación Zod para login |
 | `src/auth/dto/register.dto.ts` | Validación Zod para register |
+| `src/auth/dto/registro.dto.ts` | Validación Zod para el registro del CU-04 (enlace y confirmación) |
 | `src/auth/dto/recuperar-password.dto.ts` | Validación Zod para recuperar password |
 | `src/auth/dto/restablecer-password.dto.ts` | Validación Zod para restablecer password |
 | `src/auth/strategies/jwt.strategy.ts` | Estrategia JWT + validación de sesión por inactividad |
