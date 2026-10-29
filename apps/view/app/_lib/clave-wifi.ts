@@ -4,8 +4,8 @@
  *
  * El CU-31, su Excepción 2 y el RF-24 dicen "únicamente alfanuméricos"; se
  * decidió permitir símbolos igual (pedido de Dani, confirmado por Emilio) —
- * diverge del CU escrito, ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md. Se
- * mantienen prohibidos los espacios en blanco. No se hace trim(): recortarla
+ * diverge del CU escrito, y se le pidió a documentación que actualice el CU-31 y
+ * el RF-24. Se mantienen prohibidos los espacios en blanco. No se hace trim(): recortarla
  * cambiaría la clave que el cliente escribió.
  */
 export const CLAVE_WIFI_REGEX = /^\S+$/;

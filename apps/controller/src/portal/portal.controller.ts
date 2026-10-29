@@ -242,8 +242,8 @@ export class PortalController {
    *
    * Body: { id_contrato: number, password: string }
    *   - password: 8 a 63 caracteres, sin espacios en blanco. Se permiten
-   *     simbolos (decision del equipo, diverge de CU-31/RF-24 escritos —
-   *     ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md)
+   *     simbolos (decision del equipo, diverge de CU-31/RF-24 escritos; se
+   *     le pidió a documentación que los actualice)
    *   - nunca queda en texto plano. Hoy (v1) se guarda en
    *     `solicitud_contrasena_wifi.password_nueva_cifrada`, cifrada con la llave
    *     publica del CRM. Cuando G8 defina el ticket WiFi (v2, acuerdo v2.0

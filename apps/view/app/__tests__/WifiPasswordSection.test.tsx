@@ -124,8 +124,8 @@ describe("WifiPasswordSection (CU-31 / CU-32)", () => {
   });
 
   // Decision del equipo (pedido de Dani): se permiten simbolos, aunque CU-31
-  // y RF-24 digan "unicamente alfanumericos". Ver
-  // docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md.
+  // y RF-24 digan "unicamente alfanumericos". Se le pidió a documentación que
+  // los actualice.
   it("acepta una clave con símbolos", async () => {
     const user = userEvent.setup();
     render(<WifiPasswordSection contratos={[CONTRATO_ACTIVO]} />);
