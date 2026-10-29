@@ -9,7 +9,6 @@ Base URL: `http://localhost:4000/api`
 | Método | Ruta | Auth | Rate Limit | Descripción |
 |---|---|---|---|---|
 | `POST` | `/auth/login` | No | 5 req/min | Iniciar sesión con RUT y contraseña |
-| `POST` | `/auth/register` | No | 3 req/min | Registrar nuevo cliente + JWT |
 | `POST` | `/auth/registro` | No | 3 req/min | CU-04: pedir el enlace para crear la cuenta |
 | `POST` | `/auth/registro/confirmar` | No | 3 req/min | CU-04: crear la contraseña con el enlace + JWT |
 | `POST` | `/auth/recuperar-password` | No | 3 req/min | Solicitar token de recuperación |
@@ -58,56 +57,6 @@ Content-Type: application/json
 | 401 | RUT bloqueado temporalmente | 5 intentos fallidos contra el mismo RUT en 10 min → bloqueo 15 min |
 | 401 | IP bloqueada temporalmente | 5 intentos fallidos desde la misma IP en 5 min → bloqueo 15 min |
 | 429 | ThrottlerException | Excede 5 req/min |
-
----
-
-## POST /auth/register
-
-Registra un nuevo cliente y devuelve JWT automáticamente.
-
-```
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "rut": "12.345.678-5",
-  "nombre_completo": "Juan Perez",
-  "email": "juan@ejemplo.cl",
-  "telefono": "912345678",
-  "password": "<contraseña>",
-  "password_confirmation": "<contraseña>"
-}
-```
-
-**Validación de contraseña:**
-- Mínimo 8 caracteres
-- Al menos 1 mayúscula
-- Al menos 1 número
-- Máximo 72 caracteres (límite bcrypt)
-
-**Campos obligatorios:** `rut`, `nombre_completo`, `email`, `password`, `password_confirmation`
-**Campo opcional:** `telefono` (puede omitirse o enviarse como `""`)
-
-**Respuesta 201:**
-```json
-{
-  "access_token": "eyJhbGciOi...",
-  "cliente": {
-    "id": 456,
-    "rut": "123456785",
-    "nombre_completo": "Juan Perez",
-    "email": "juan@ejemplo.cl",
-    "telefono": "912345678"
-  }
-}
-```
-
-**Errores:**
-| Código | Mensaje | Causa |
-|---|---|---|
-| 400 | Validation failed | Campos inválidos (RUT, email, contraseña débil) |
-| 409 | No se pudo completar el registro | RUT o email duplicado |
-| 429 | ThrottlerException | Excede 3 req/min |
 
 ---
 
@@ -446,7 +395,7 @@ Content-Type: application/json
 | 401 | Sesión expirada por inactividad | Sesión inactiva |
 ## Sesiones e inactividad
 
-- Cada login/register/registro confirmado crea una sesión en `sesion_portal` con `fecha_expiracion = now + 15 min`.
+- Cada login y cada registro confirmado crea una sesión en `sesion_portal` con `fecha_expiracion = now + 15 min`.
 - En cada request autenticado, se extiende la sesión otros 15 minutos (sliding window).
 - Si pasan 15 minutos sin requests → `401 Sesión expirada por inactividad`.
 - El JWT tiene expiración de 7 días, pero la sesión en DB vence por inactividad.
@@ -463,7 +412,6 @@ Configurado via `ThrottlerGuard` global en `app.module.ts`:
 | Endpoint | Rate Limit |
 |---|---|
 | `POST /auth/login` | 5 req/min |
-| `POST /auth/register` | 3 req/min |
 | `POST /auth/registro` | 3 req/min |
 | `POST /auth/registro/confirmar` | 3 req/min |
 | `POST /auth/recuperar-password` | 3 req/min |
@@ -500,11 +448,6 @@ BASE_URL=http://localhost:4000/api
 curl -X POST "$BASE_URL/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"rut":"12.345.678-5","password":"<contraseña>"}'
-
-# Register
-curl -X POST "$BASE_URL/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{"rut":"12.345.678-5","nombre_completo":"Juan Perez","email":"juan@test.cl","password":"<contraseña>","password_confirmation":"<contraseña>"}'
 
 # Registro (CU-04): pedir el enlace
 curl -X POST "$BASE_URL/auth/registro" \
@@ -577,9 +520,8 @@ curl -X POST "$BASE_URL/auth/logout" \
 | Archivo | Propósito |
 |---|---|
 | `src/auth/auth.controller.ts` | Endpoints de autenticación |
-| `src/auth/auth.service.ts` | Lógica de negocio (login, register, password reset, sesiones) |
+| `src/auth/auth.service.ts` | Lógica de negocio (login, registro, password reset, sesiones) |
 | `src/auth/dto/login.dto.ts` | Validación Zod para login |
-| `src/auth/dto/register.dto.ts` | Validación Zod para register |
 | `src/auth/dto/registro.dto.ts` | Validación Zod para el registro del CU-04 (enlace y confirmación) |
 | `src/auth/dto/recuperar-password.dto.ts` | Validación Zod para recuperar password |
 | `src/auth/dto/restablecer-password.dto.ts` | Validación Zod para restablecer password |

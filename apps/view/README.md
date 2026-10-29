@@ -70,7 +70,7 @@ app/
 │   ├── layout/           #   navbar, footer, hero, theme (dark/light)
 │   ├── portal/           #   UI del portal autenticado: sidebar, skeleton, secciones de dashboard
 │   └── catalog/          #   catálogo de planes y formulario de contratación
-├── components/          # Formularios de auth/perfil (Login, Register, Recovery, Reset,
+├── components/          # Formularios de auth/perfil (Login, Registro, ConfirmarRegistro, Recovery, Reset,
 │                         # ChangePassword, UpdateEmail, UpdateTelefono, DeudaLookupForm, inputs).
 │                         # Histórico — para UI nueva reutilizable, preferir _components/<dominio>.
 ├── _lib/                 # Utilidades globales: company.ts, auth.tsx (AuthProvider), logger.ts,

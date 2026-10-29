@@ -13,7 +13,6 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import { loginSchema, type LoginDto } from './dto/login.dto.js';
-import { registerSchema, type RegisterDto } from './dto/register.dto.js';
 import {
   recuperarPasswordSchema,
   type RecuperarPasswordDto,
@@ -81,56 +80,6 @@ export class AuthController {
       body.rut,
       body.password,
       req.ip ?? '0.0.0.0',
-    );
-    this.ponerCookieSesion(res, result.access_token);
-    return result;
-  }
-
-  /**
-   * RF-10: Registrar una cuenta nueva en el portal
-   *
-   * Crea un cliente nuevo con los datos enviados. Si el registro es exitoso,
-   * inicia sesión automáticamente (devuelve token JWT + cookie httpOnly).
-   *
-   * POST /auth/register
-   *
-   * @body {
-   *   rut: string,              // formato 123456785 (sin puntos ni guion)
-   *   nombre_completo: string,  // 2-120 caracteres
-   *   email: string,            // formato válido, 120 char máx
-   *   telefono?: string,        // opcional, 20 char máx
-   *   password: string,         // 8-72 char, 1 mayúscula, 1 número
-   *   password_confirmation: string
-   * }
-   *
-   * Se asigna automáticamente id_empresa=1 y estado='activo'.
-   *
-   * Rate limit: 3 intentos por minuto por IP.
-   *
-   * Errores:
-   *   400 - Validación Zod (campos requeridos, email inválido, contraseña débil,
-   *         las contraseñas no coinciden)
-   *   409 - El RUT ya está registrado
-   *   409 - El email ya está registrado
-   *   429 - Rate limit excedido (>3 req/min)
-   */
-  @Post('register')
-  @Throttle({ default: { limit: 3, ttl: 60 } })
-  @HttpCode(201)
-  async register(
-    @Body(new ZodValidationPipe(registerSchema))
-    body: RegisterDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.register(
-      body.rut,
-      body.nombre_completo,
-      body.password,
-      req.ip ?? '0.0.0.0',
-      body.email,
-      body.telefono,
-      body.version_politica_privacidad,
     );
     this.ponerCookieSesion(res, result.access_token);
     return result;

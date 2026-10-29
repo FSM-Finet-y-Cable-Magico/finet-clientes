@@ -684,7 +684,7 @@ Todas las respuestas de error siguen este formato:
 |------|---------------|
 | 400 | Validación fallida (Zod). Revisar `message` para el campo específico. |
 | 401 | No autenticado, token expirado, sesión inactiva, IP/RUT bloqueado, o cuenta no activa. Redirigir a login. |
-| 409 | Conflicto (registro duplicado). |
+| 409 | Conflicto con el estado actual: el RUT ya es cliente al contratar, no hay deuda al pagar, o el servicio no está activo al pedir el cambio de clave WiFi. |
 | 429 | Rate limit excedido. Esperar y reintentar. |
 | 500 | `"Error interno del servidor"` — error inesperado. Contactar soporte. |
 

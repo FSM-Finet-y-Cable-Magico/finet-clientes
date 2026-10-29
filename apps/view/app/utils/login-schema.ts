@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { MENSAJE_POLITICA_REQUERIDA } from "../_lib/legal";
 
 export function cleanRut(rut: string) {
   return rut.replace(/[^0-9kK]/g, "").toUpperCase();
@@ -31,16 +30,6 @@ function validateRut(rut: string) {
   return expectedDv === dv;
 }
 
-function validateTelefonoChileno(telefono: string) {
-  const cleaned = telefono.replace(/\s/g, "");
-  if (!/^\+56\d{9}$/.test(cleaned)) return false;
-  const digits = cleaned.slice(3);
-  const first = digits[0];
-  if (first === "9") return /^9\d{8}$/.test(digits);
-  if (["2", "3", "4", "5", "6", "7", "8"].includes(first)) return true;
-  return false;
-}
-
 const rutField = z
   .string({ message: "El RUT es obligatorio" })
   .min(1, "El RUT es obligatorio")
@@ -58,38 +47,6 @@ export const loginSchema = z.object({
   rut: rutField,
   password: passwordField,
 });
-
-export const registerSchema = z
-  .object({
-    nombreCompleto: z
-      .string({ message: "El nombre es obligatorio" })
-      .min(2, "El nombre debe tener al menos 2 caracteres")
-      .max(100, "El nombre es demasiado largo")
-      .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, "Solo letras y espacios"),
-    email: z
-      .string({ message: "El email es obligatorio" })
-      .min(1, "El email es obligatorio")
-      .email("Email inválido")
-      .max(254, "El email es demasiado largo"),
-    telefono: z
-      .string()
-      .optional()
-      .refine(
-        (val) => !val || val === "" || validateTelefonoChileno(val),
-        "Teléfono chileno inválido",
-      ),
-    rut: rutField,
-    password: passwordField,
-    confirmPassword: z
-      .string({ message: "Debes confirmar la contraseña" })
-      .min(1, "Debes confirmar la contraseña"),
-    // CU-75: casilla obligatoria de la Política de Privacidad.
-    aceptaPolitica: z.literal(true, { error: MENSAJE_POLITICA_REQUERIDA }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Las contraseñas no coinciden",
-    path: ["confirmPassword"],
-  });
 
 export const recoverySchema = z.object({
   rut: rutField,

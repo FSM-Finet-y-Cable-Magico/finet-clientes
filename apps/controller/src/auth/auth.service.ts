@@ -1,7 +1,6 @@
 import {
   Injectable,
   UnauthorizedException,
-  ConflictException,
   BadRequestException,
   ServiceUnavailableException,
   Logger,
@@ -355,96 +354,6 @@ export class AuthService {
     const sesion = await this.abrirSesion(cliente, ip);
     this.logger.log(`Login success: RUT ${rutLimpio}, IP ${ip}`);
     return sesion;
-  }
-
-  async register(
-    rut: string,
-    nombreCompleto: string,
-    password: string,
-    ip: string,
-    email: string,
-    telefono: string | null | undefined,
-    versionPolitica: string,
-  ) {
-    const rutLimpio = cleanRut(rut);
-
-    const existenteRut = await this.prisma.cliente.findFirst({
-      where: { rut: { in: variantesRut(rutLimpio) } },
-    });
-
-    if (existenteRut) {
-      this.logger.warn(
-        `Register failed: RUT ${rutLimpio} already exists, IP ${ip}`,
-      );
-      throw new ConflictException('No se pudo completar el registro');
-    }
-
-    const existenteEmail = await this.prisma.cliente.findFirst({
-      where: { email },
-    });
-
-    if (existenteEmail) {
-      this.logger.warn(`Register failed: email already in use, IP ${ip}`);
-      throw new ConflictException('No se pudo completar el registro');
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // CU-75: el cliente y su aceptacion de la Politica de Privacidad se
-    // registran juntos, o no se registra ninguno.
-    const cliente = await this.prisma.$transaction(async (tx) => {
-      const creado = await tx.cliente.create({
-        data: {
-          rut: rutLimpio,
-          nombre_completo: nombreCompleto,
-          email: email,
-          telefono: telefono || null,
-          password_portal_hash: passwordHash,
-          id_empresa: 1,
-          estado: 'activo',
-        },
-      });
-
-      await registrarAceptacionPolitica(tx, {
-        formulario: 'REGISTRO',
-        entidad: 'cliente',
-        id_entidad: creado.id_cliente,
-        version: versionPolitica,
-        ip,
-        datos: {
-          rut: rutLimpio,
-          nombre_completo: nombreCompleto,
-          email,
-          telefono: telefono || null,
-        },
-      });
-
-      return creado;
-    });
-
-    const payload = { sub: cliente.id_cliente, rut: cliente.rut };
-    const token = await this.jwtService.signAsync(payload);
-
-    await this.prisma.sesion_portal.create({
-      data: {
-        id_cliente: cliente.id_cliente,
-        token,
-        fecha_inicio: new Date(),
-        fecha_expiracion: this.calcularExpiracion(),
-        ip_origen: ip,
-      },
-    });
-
-    return {
-      access_token: token,
-      cliente: {
-        id: cliente.id_cliente,
-        rut: cliente.rut,
-        nombre_completo: cliente.nombre_completo,
-        email: cliente.email,
-        telefono: cliente.telefono,
-      },
-    };
   }
 
   async logout(idCliente: number, token: string) {

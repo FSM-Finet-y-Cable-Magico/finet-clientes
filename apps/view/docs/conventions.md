@@ -3,7 +3,7 @@
 ## Componentes
 
 - `app/_components/<dominio>/` — UI organizada por dominio (`ui`, `layout`, `portal`, `catalog`). El prefijo `_` excluye la carpeta del routing de Next.js. **Para UI nueva reutilizable, usar este patrón.**
-- `app/components/` — formularios de auth/perfil (Login, Register, Recovery, Reset, ChangePassword, UpdateEmail, UpdateTelefono, DeudaLookupForm) e inputs asociados (RutInput, TelefonoInput, PasswordInput). Es anterior a la convención de `_components/<dominio>` — se mantiene por continuidad, no es el patrón a copiar para código nuevo.
+- `app/components/` — formularios de auth/perfil (Login, Registro, ConfirmarRegistro, Recovery, Reset, ChangePassword, UpdateEmail, UpdateTelefono, DeudaLookupForm), inputs asociados (RutInput, PasswordInput) y las piezas que comparten el registro y la recuperación de contraseña (SolicitudPorRut, CamposNuevaPassword, PanelAviso). Es anterior a la convención de `_components/<dominio>` — se mantiene por continuidad, no es el patrón a copiar para código nuevo.
 - Páginas de `portal/*` son client components (`"use client"`) que hacen fetch en un `useEffect` con `setTimeout(fn, 0)` (evita el warning de `act()` en tests) y manejan tres estados: loading (skeleton), error (con botón "Reintentar"), y success.
 
 ## Clientes API — módulos distintos, no son intercambiables

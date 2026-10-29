@@ -165,7 +165,7 @@ src/
 ├── common/
 │   ├── filters/               # Filtros de excepciones HTTP
 │   └── utils/                 # Utilidades (RUT chileno)
-├── auth/                      # Autenticación (login, register, password recovery, logout)
+├── auth/                      # Autenticación (login, registro, password recovery, logout)
 ├── perfil/                    # Perfil del cliente (obtener, actualizar datos, cambiar contraseña)
 ├── portal/                    # Portal autenticado (panel, contratos, deuda, tickets)
 ├── landing/                   # Landing page pública (catálogo de planes)
@@ -183,7 +183,7 @@ Documentación de endpoints organizada por feature (bodies, respuestas, errores,
 
 | Feature | Archivo | Endpoints |
 |---------|---------|-----------|
-| **Auth** | [`docs/auth.md`](./docs/auth.md) | Login, register, recuperar/restablecer password, logout |
+| **Auth** | [`docs/auth.md`](./docs/auth.md) | Login, registro (CU-04), recuperar/restablecer password, logout |
 | **Perfil** | [`docs/perfil.md`](./docs/perfil.md) | Obtener perfil, actualizar teléfono/email, cambiar contraseña |
 | **Portal** | [`docs/portal.md`](./docs/portal.md) | Panel, contratos (estado/vigentes), deuda, tickets |
 | **Landing** | [`docs/landing.md`](./docs/landing.md) | Catálogo de planes |

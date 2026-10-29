@@ -10,7 +10,6 @@ jest.mock("@/app/_lib/auth", () => ({
 jest.mock("@/app/utils/api", () => ({ api: { post: jest.fn() } }));
 
 import FormularioContratacion from "@/app/_components/catalog/FormularioContratacion";
-import RegisterForm from "@/app/components/RegisterForm";
 import ConfirmarRegistroForm from "@/app/components/ConfirmarRegistroForm";
 import type { PlanBackend } from "@/app/_lib/api";
 import { POLITICA_PRIVACIDAD_VERSION } from "@/app/_lib/legal";
@@ -108,56 +107,6 @@ describe("CU-75: formulario de contratación", () => {
     fireEvent.submit(screen.getByRole("button", { name: "Enviar solicitud" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("El RUT ya está registrado");
-  });
-});
-
-describe("CU-75: formulario de registro de cuenta", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  async function completarRegistro(container: HTMLElement) {
-    const user = userEvent.setup();
-    await user.type(screen.getByLabelText("Nombre completo"), "Juan Pérez");
-    await user.type(screen.getByLabelText("Email"), "juan@ejemplo.cl");
-    await user.type(container.querySelector<HTMLInputElement>("#rut")!, "11.111.111-1");
-    await user.type(container.querySelector<HTMLInputElement>("#password")!, "Password1");
-    await user.type(container.querySelector<HTMLInputElement>("#confirmPassword")!, "Password1");
-    return user;
-  }
-
-  // Excepción 1
-  it("bloquea el registro sin la casilla e informa que debe aceptar la política", async () => {
-    const { container } = render(<RegisterForm />);
-    const user = await completarRegistro(container);
-
-    await user.click(screen.getByRole("button", { name: "Registrarse" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(MENSAJE);
-    expect(api.post).not.toHaveBeenCalled();
-  });
-
-  it("envía la aceptación y la versión de la política junto con los datos", async () => {
-    (api.post as jest.Mock).mockResolvedValue({
-      access_token: "jwt",
-      cliente: { id: 1 },
-    });
-    const { container } = render(<RegisterForm />);
-    const user = await completarRegistro(container);
-
-    await user.click(screen.getByRole("checkbox"));
-    await user.click(screen.getByRole("button", { name: "Registrarse" }));
-
-    await waitFor(() => expect(api.post).toHaveBeenCalled());
-    expect(api.post).toHaveBeenCalledWith(
-      "/auth/register",
-      expect.objectContaining({
-        rut: "111111111",
-        acepta_politica_privacidad: true,
-        version_politica_privacidad: POLITICA_PRIVACIDAD_VERSION,
-      }),
-    );
-    expect(push).toHaveBeenCalledWith("/portal");
   });
 });
 

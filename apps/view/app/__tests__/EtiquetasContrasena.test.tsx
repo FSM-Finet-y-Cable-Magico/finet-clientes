@@ -9,7 +9,6 @@ jest.mock("@/app/_lib/auth", () => ({
   useAuth: () => ({ login: jest.fn(), isAuthenticated: false, isLoading: false }),
 }));
 
-import RegisterForm from "@/app/components/RegisterForm";
 import ResetPasswordForm from "@/app/components/ResetPasswordForm";
 import ConfirmarRegistroForm from "@/app/components/ConfirmarRegistroForm";
 
@@ -39,17 +38,6 @@ describe("etiquetas de los campos de contraseña", () => {
     idsUnicos(container);
     expect(screen.getByLabelText("Contraseña")).toHaveAttribute("id", "password");
     expect(screen.getByLabelText("Confirmar contraseña")).toHaveAttribute(
-      "id",
-      "confirmPassword",
-    );
-  });
-
-  it("registro: la confirmación tiene una sola etiqueta", () => {
-    const { container } = render(<RegisterForm />);
-
-    idsUnicos(container);
-    expect(container.querySelectorAll('label[for="confirmPassword"]')).toHaveLength(1);
-    expect(screen.getByLabelText("Confirmar Contraseña")).toHaveAttribute(
       "id",
       "confirmPassword",
     );

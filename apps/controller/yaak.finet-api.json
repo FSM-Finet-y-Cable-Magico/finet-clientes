@@ -132,54 +132,6 @@
     "httpRequests": [
       {
         "model": "http_request",
-        "id": "rq_RgPqHvXwKm",
-        "createdAt": "2026-05-30T06:34:13.101588600",
-        "updatedAt": "2026-05-30T06:34:13.101588600",
-        "workspaceId": "wk_5ik5FWC6FN",
-        "folderId": "fl_8cLk8xBPLi",
-        "authentication": {},
-        "authenticationType": null,
-        "body": {
-          "text": "{\n  \"rut\": \"12.345.678-5\",\n  \"nombre_completo\": \"Juan Pérez\",\n  \"email\": \"juan@ejemplo.cl\",\n  \"telefono\": \"912345678\",\n  \"password\": \"Password1\"\n}"
-        },
-        "bodyType": "application/json",
-        "description": "",
-        "headers": [
-          {
-            "enabled": true,
-            "name": "Content-Type",
-            "value": "application/json",
-            "id": "hdERtWqLzP"
-          }
-        ],
-        "method": "POST",
-        "name": "Register",
-        "sortPriority": -1780120512331.0,
-        "url": "${[ API_URL ]}/auth/register",
-        "urlParameters": [],
-        "settingSendCookies": {
-          "enabled": false,
-          "value": true
-        },
-        "settingStoreCookies": {
-          "enabled": false,
-          "value": true
-        },
-        "settingValidateCertificates": {
-          "enabled": false,
-          "value": true
-        },
-        "settingFollowRedirects": {
-          "enabled": false,
-          "value": true
-        },
-        "settingRequestTimeout": {
-          "enabled": false,
-          "value": 0
-        }
-      },
-      {
-        "model": "http_request",
         "id": "rq_RecuperarPassX1",
         "createdAt": "2026-05-30T20:00:00.000000000",
         "updatedAt": "2026-05-30T20:00:00.000000000",

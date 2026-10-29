@@ -4,8 +4,8 @@ import type { InputHTMLAttributes } from "react";
 
 /**
  * Un campo de texto con su etiqueta y su error, con el estilo de los
- * formularios de acceso. Lo usan `RutInput` y `TelefonoInput`, que agregan el
- * formato mientras se escribe.
+ * formularios de acceso. Lo usa `RutInput`, que agrega el formato mientras se
+ * escribe.
  */
 export default function CampoTexto({
   id,

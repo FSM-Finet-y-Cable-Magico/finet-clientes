@@ -1,6 +1,5 @@
 import { loginSchema } from '../../auth/dto/login.dto.js';
 import { recuperarPasswordSchema } from '../../auth/dto/recuperar-password.dto.js';
-import { registerSchema } from '../../auth/dto/register.dto.js';
 import { restablecerPasswordSchema } from '../../auth/dto/restablecer-password.dto.js';
 import {
   confirmacionRegistroSchema,
@@ -35,18 +34,6 @@ describe('regla del RUT', () => {
   const conRut: [string, Esquema, Record<string, unknown>][] = [
     ['login', loginSchema, { password: 'x' }],
     ['recuperar contraseña', recuperarPasswordSchema, {}],
-    [
-      'registro',
-      registerSchema,
-      {
-        nombre_completo: 'Ana Pérez',
-        email: 'ana@example.com',
-        password: 'Clave2026',
-        password_confirmation: 'Clave2026',
-        acepta_politica_privacidad: true,
-        version_politica_privacidad: '1.0',
-      },
-    ],
     ['consulta pública de deuda', ConsultaDeudaRutDto, {}],
     [
       'registro sobre un cliente que ya existe (CU-04)',
@@ -95,20 +82,6 @@ describe('regla de la contraseña (CU-11 / RF-09)', () => {
   };
 
   const conPassword: [string, Esquema, (p: string) => unknown, string][] = [
-    [
-      'registro',
-      registerSchema,
-      (p) => ({
-        rut: RUT_VALIDO,
-        nombre_completo: 'Ana Pérez',
-        email: 'ana@example.com',
-        password: p,
-        password_confirmation: p,
-        acepta_politica_privacidad: true,
-        version_politica_privacidad: '1.0',
-      }),
-      'password',
-    ],
     [
       'confirmar el registro (CU-04)',
       confirmacionRegistroSchema,

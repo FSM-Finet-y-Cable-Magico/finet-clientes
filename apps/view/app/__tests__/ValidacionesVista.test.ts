@@ -2,7 +2,6 @@ import {
   changePasswordSchema,
   loginSchema,
   recoverySchema,
-  registerSchema,
   resetPasswordSchema,
 } from "@/app/utils/login-schema";
 import { changeWifiPassword } from "@/app/portal/_lib/portal-actions";
@@ -33,17 +32,6 @@ describe("RUT", () => {
   const conRut: [string, Esquema, Record<string, unknown>][] = [
     ["login", loginSchema, { password: "Clave2026" }],
     ["recuperar", recoverySchema, {}],
-    [
-      "registro",
-      registerSchema,
-      {
-        nombreCompleto: "Ana Pérez",
-        email: "ana@example.com",
-        password: "Clave2026",
-        confirmPassword: "Clave2026",
-        aceptaPolitica: true,
-      },
-    ],
   ];
 
   it.each(conRut)("%s: acepta con o sin puntos y guion", (_n, esquema, resto) => {
@@ -64,19 +52,6 @@ describe("RUT", () => {
 describe("contraseña (CU-11 / RF-09)", () => {
   const conPassword: [string, Esquema, (p: string) => unknown, string][] = [
     ["login", loginSchema, (p) => ({ rut: "123456785", password: p }), "password"],
-    [
-      "registro",
-      registerSchema,
-      (p) => ({
-        rut: "123456785",
-        nombreCompleto: "Ana Pérez",
-        email: "ana@example.com",
-        password: p,
-        confirmPassword: p,
-        aceptaPolitica: true,
-      }),
-      "password",
-    ],
     [
       "restablecer",
       resetPasswordSchema,
