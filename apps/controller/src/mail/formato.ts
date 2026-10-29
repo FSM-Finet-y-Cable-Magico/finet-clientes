@@ -1,10 +1,7 @@
 /**
  * Cómo se le muestra al cliente lo que va dentro de un correo, según el §11 del
- * Documento 0.
- *
- * Las plantillas anteriores al CU-68 todavía muestran la fecha como se guarda en
- * la base (AAAA-MM-DD) e interpolan el nombre sin escapar: alinearlas queda para
- * el Incremento 4.
+ * Documento 0. Todos los correos del portal usan el molde de
+ * `plantilla-correo.ts`, con el nombre escapado y las fechas en DD/MM/AAAA.
  */
 
 import { ZONA_HORARIA } from '../common/constants/zona-horaria.js';

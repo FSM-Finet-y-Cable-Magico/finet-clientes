@@ -172,3 +172,160 @@ describe('MailService — correos del Incremento 3', () => {
     );
   });
 });
+
+/**
+ * Los correos del CU-03 (recuperar contraseña) y del CU-71 (ticket creado).
+ * "Lo que se mantiene" pasa con las plantillas anteriores; "lo que cambia" es
+ * el paso al molde de los demás correos del portal.
+ */
+describe('MailService — correos del CU-03 y del CU-71', () => {
+  let mail: MailService;
+  let sendMail: jest.Mock;
+
+  function enviado(): {
+    to: string;
+    subject: string;
+    html?: string;
+    text?: string;
+  } {
+    return sendMail.mock.calls[0]![0] as {
+      to: string;
+      subject: string;
+      html?: string;
+      text?: string;
+    };
+  }
+
+  function contenido(): string {
+    const c = enviado();
+    return `${c.html ?? ''}${c.text ?? ''}`;
+  }
+
+  beforeEach(() => {
+    mail = new MailService({
+      get: (_k: string, porDefecto?: unknown) => porDefecto,
+    } as unknown as ConfigService);
+    sendMail = jest.fn().mockResolvedValue({});
+    (mail as unknown as { transporter: unknown }).transporter = { sendMail };
+  });
+
+  describe('CU-03: enlace para restablecer la contraseña', () => {
+    const enlace =
+      'https://portal.finet.cl/restablecer-password#token=abc.def.ghi';
+
+    beforeEach(async () => {
+      await mail.sendPasswordReset('ana@b.cl', 'Ana <b>', enlace);
+    });
+
+    describe('lo que se mantiene', () => {
+      it('va al cliente con el asunto de la recuperación', () => {
+        expect(enviado()).toMatchObject({
+          to: 'ana@b.cl',
+          subject: 'Recuperación de contraseña - Portal Clientes',
+        });
+      });
+
+      it('lleva el enlace en un botón para restablecer la contraseña', () => {
+        expect(contenido()).toContain(`href="${enlace}"`);
+        expect(contenido()).toContain('Restablecer contraseña');
+      });
+
+      it('RNF-04.1: dice que el enlace expira en 30 minutos', () => {
+        expect(contenido()).toContain('30 minutos');
+      });
+
+      it('dice qué hacer si no lo pidió', () => {
+        expect(contenido()).toContain('Si no solicitaste este cambio');
+      });
+    });
+
+    describe('lo que cambia', () => {
+      it('usa el molde de los correos del portal', () => {
+        expect(contenido()).toContain('>FI<');
+        expect(contenido()).toContain('Recuperar contraseña');
+      });
+
+      it('no interpreta como HTML lo que escribió el cliente', () => {
+        expect(contenido()).toContain('Ana &lt;b&gt;');
+        expect(contenido()).not.toContain('Ana <b>');
+      });
+    });
+  });
+
+  describe('CU-03: aviso de contraseña cambiada', () => {
+    beforeEach(async () => {
+      await mail.sendPasswordChanged('ana@b.cl', 'Ana <b>');
+    });
+
+    describe('lo que se mantiene', () => {
+      it('va al cliente con el asunto del cambio', () => {
+        expect(enviado()).toMatchObject({
+          to: 'ana@b.cl',
+          subject: 'Contraseña actualizada - Portal Clientes',
+        });
+      });
+
+      it('avisa el cambio y qué hacer si no fue él', () => {
+        expect(contenido()).toContain('actualizada exitosamente');
+        expect(contenido()).toContain(
+          'Si no realizaste este cambio, contacta a soporte de inmediato.',
+        );
+      });
+    });
+
+    describe('lo que cambia', () => {
+      it('usa el molde de los correos del portal', () => {
+        expect(contenido()).toContain('>FI<');
+        expect(contenido()).toContain('Contraseña actualizada');
+      });
+
+      it('no interpreta como HTML lo que escribió el cliente', () => {
+        expect(contenido()).toContain('Ana &lt;b&gt;');
+        expect(contenido()).not.toContain('Ana <b>');
+      });
+    });
+  });
+
+  describe('CU-71: ticket creado', () => {
+    beforeEach(async () => {
+      await mail.sendTicketCreated(
+        'ana@b.cl',
+        'Ana <b>',
+        'FIN-2026-000042',
+        'Falla de Internet',
+      );
+    });
+
+    describe('lo que se mantiene', () => {
+      it('va al cliente con el código en el asunto', () => {
+        expect(enviado()).toMatchObject({
+          to: 'ana@b.cl',
+          subject: 'Solicitud de soporte FIN-2026-000042',
+        });
+      });
+
+      it('dice el código de seguimiento y la categoría', () => {
+        expect(contenido()).toContain('FIN-2026-000042');
+        expect(contenido()).toContain('Falla de Internet');
+      });
+    });
+
+    describe('lo que cambia', () => {
+      it('usa el molde de los correos del portal', () => {
+        expect(enviado().html).toContain('>FI<');
+        expect(enviado().html).toContain('Solicitud de soporte');
+      });
+
+      it('escribe "código" y "categoría" con tilde', () => {
+        expect(contenido()).toContain('Código de seguimiento');
+        expect(contenido()).toContain('Categoría');
+        expect(contenido()).not.toMatch(/codigo|categoria/);
+      });
+
+      it('no interpreta como HTML lo que escribió el cliente', () => {
+        expect(contenido()).toContain('Ana &lt;b&gt;');
+        expect(contenido()).not.toContain('Ana <b>');
+      });
+    });
+  });
+});

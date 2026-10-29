@@ -166,7 +166,7 @@ export class MailService {
       from,
       to: email,
       subject: `Solicitud de soporte ${codigoSeguimiento}`,
-      text: `Hola ${nombre}, registramos tu solicitud en la categoria ${categoria}. Tu codigo de seguimiento es ${codigoSeguimiento}.`,
+      html: this.ticketCreadoTemplate(nombre, codigoSeguimiento, categoria),
     });
 
     this.logger.log('Ticket created email sent');
@@ -237,43 +237,56 @@ export class MailService {
     });
   }
 
+  /** CU-71: el código de seguimiento y la categoría del ticket recién creado. */
+  private ticketCreadoTemplate(
+    nombre: string,
+    codigoSeguimiento: string,
+    categoria: string,
+  ): string {
+    return plantillaCorreo({
+      resumen: `Registramos tu solicitud ${codigoSeguimiento}.`,
+      etiqueta: { texto: 'Solicitud de soporte', tono: 'aviso' },
+      titulo: 'Registramos tu solicitud',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: registramos tu solicitud de soporte. Guarda el código para hacerle seguimiento.` +
+        comprobante([
+          ['Código de seguimiento', codigoSeguimiento],
+          ['Categoría', categoria],
+        ]),
+      sitio: this.sitio(),
+    });
+  }
+
   /** Para el logo de los correos. Sin la URL del sitio va el nombre en texto. */
   private sitio(): string | undefined {
     return this.configService.get<string>('FRONTEND_URL') || undefined;
   }
 
+  /** CU-03: el enlace de un solo uso para crear una contraseña nueva (RNF-04.1). */
   private resetTemplate(nombre: string, link: string): string {
-    return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; color: #333;">
-  <div style="max-width: 480px; margin: 0 auto; padding: 24px;">
-    <h2 style="color: #1a56db;">Portal Clientes</h2>
-    <p>Hola ${nombre},</p>
-    <p>Recibimos una solicitud para restablecer tu contraseña. Haz clic en el botón de abajo para continuar:</p>
-    <p style="text-align: center;">
-      <a href="${link}" style="display: inline-block; background: #1a56db; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Restablecer contraseña</a>
-    </p>
-    <p style="font-size: 12px; color: #666;">Este enlace expira en 30 minutos. Si no solicitaste este cambio, ignora este mensaje.</p>
-  </div>
-</body>
-</html>`;
+    return plantillaCorreo({
+      resumen:
+        'Usa el enlace para crear una contraseña nueva. Expira en 30 minutos.',
+      etiqueta: { texto: 'Recuperar contraseña', tono: 'aviso' },
+      titulo: 'Restablece tu contraseña',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: recibimos una solicitud para restablecer tu contraseña del Portal Clientes. Usa el botón para crear una nueva.` +
+        '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Este enlace expira en 30 minutos y sirve una sola vez. Si no solicitaste este cambio, ignora este mensaje.</p>',
+      boton: { texto: 'Restablecer contraseña', enlace: link },
+      sitio: this.sitio(),
+    });
   }
 
+  /** CU-03: el aviso de que la contraseña cambió. */
   private changedTemplate(nombre: string): string {
-    return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; color: #333;">
-  <div style="max-width: 480px; margin: 0 auto; padding: 24px;">
-    <h2 style="color: #1a56db;">Portal Clientes</h2>
-    <p>Hola ${nombre},</p>
-    <p>Tu contraseña ha sido actualizada exitosamente.</p>
-    <p style="font-size: 12px; color: #666;">Si no realizaste este cambio, contacta a soporte de inmediato.</p>
-  </div>
-</body>
-</html>`;
+    return plantillaCorreo({
+      resumen: 'La contraseña de tu cuenta del Portal Clientes cambió.',
+      etiqueta: { texto: 'Contraseña actualizada', tono: 'exito' },
+      titulo: 'Tu contraseña fue actualizada',
+      cuerpo:
+        `Hola ${escaparHtml(nombre)}: tu contraseña ha sido actualizada exitosamente.` +
+        '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si no realizaste este cambio, contacta a soporte de inmediato.</p>',
+      sitio: this.sitio(),
+    });
   }
 }
