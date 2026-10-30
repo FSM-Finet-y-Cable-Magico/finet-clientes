@@ -10,6 +10,9 @@
 /** §2: las facturas de un cliente o de un contrato, con su saldo. */
 export const RUTA_FACTURAS_G8 = '/api/integrations/g2/invoices';
 
+/** §4: el pago que confirmó la pasarela, para que G8 lo registre (CU-42). */
+export const RUTA_PAGOS_G8 = '/api/integrations/g2/payments';
+
 /** §12: el resultado técnico del cambio de clave WiFi de un ticket. */
 export const rutaResultadoWifiG8 = (idTicket: number) =>
   `/api/integrations/g2/tickets/${idTicket}/wifi-result`;

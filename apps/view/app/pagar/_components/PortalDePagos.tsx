@@ -11,8 +11,10 @@ import {
   Wallet,
 } from "lucide-react";
 import { api } from "@/app/utils/api";
-import { formatPrecio } from "@/app/_lib/formato";
+import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
+import { WHATSAPP_URL } from "@/app/_lib/company";
 import IdentificarCuenta from "./IdentificarCuenta";
+import RedireccionWebpay from "./RedireccionWebpay";
 
 export type Identificador = { rut: string } | { t: string };
 
@@ -25,6 +27,13 @@ type Medio = {
   disponible: boolean;
 };
 
+/** Una factura que G8 deja pagar, con su saldo y su vencimiento efectivo. */
+type FacturaPagable = {
+  id_factura: number;
+  saldo: number;
+  vence: string | null;
+};
+
 type Resumen = {
   encontrado: boolean;
   cliente: {
@@ -33,6 +42,8 @@ type Resumen = {
   } | null;
   /** Lo da G8. `null` mientras no se pueda obtener. */
   saldo: number | null;
+  /** Las que se pueden pagar, según G8. `null` igual que `saldo`. */
+  facturas: FacturaPagable[] | null;
   medios: Medio[];
 };
 
@@ -87,8 +98,7 @@ export default function PortalDePagos({
         {!identificador ? (
           <div className="p-6">
             <p className="mb-5 text-sm text-muted">
-              Paga el total de tu deuda con tu RUT. No necesitas iniciar
-              sesión.
+              Paga tus facturas con tu RUT. No necesitas iniciar sesión.
             </p>
             <IdentificarCuenta />
           </div>
@@ -174,8 +184,8 @@ function Cuenta({
       </Aviso>
     );
   }
-  // Precondición del CU-42 y del CU-43: "una deuda pendiente identificada".
-  if (resumen.saldo === null) {
+  // Precondición del CU-42: "una deuda pendiente identificada", que da G8.
+  if (resumen.saldo === null || resumen.facturas === null) {
     return (
       <Aviso tono="alerta" titulo="No pudimos obtener tu deuda en este momento">
         <p className="mt-1">Intenta más tarde.</p>
@@ -191,9 +201,28 @@ function Cuenta({
       </div>
     );
   }
+  if (resumen.facturas.length === 0) {
+    return (
+      <Aviso tono="alerta" titulo="Tu deuda no se puede pagar en línea">
+        <p className="mt-1">
+          Escríbenos por{" "}
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium underline"
+          >
+            WhatsApp
+            <span className="sr-only"> (se abre en una pestaña nueva)</span>
+          </a>{" "}
+          y te ayudamos.
+        </p>
+      </Aviso>
+    );
+  }
   return (
     <Pago
-      saldo={resumen.saldo}
+      facturas={resumen.facturas}
       medios={resumen.medios}
       identificador={identificador}
     />
@@ -201,55 +230,88 @@ function Cuenta({
 }
 
 function Pago({
-  saldo,
+  facturas,
   medios,
   identificador,
 }: {
-  saldo: number;
+  facturas: FacturaPagable[];
   medios: Medio[];
   identificador: Identificador;
 }) {
+  const [idFactura, setIdFactura] = useState<number | null>(null);
   const [medio, setMedio] = useState<MedioId | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState("");
+  const [webpay, setWebpay] = useState<{ url: string; token: string } | null>(
+    null,
+  );
+  const elegida = facturas.find((f) => f.id_factura === idFactura) ?? null;
 
   async function pagar() {
-    if (!medio) return;
+    if (!elegida || !medio) return;
     setEnviando(true);
     setAviso("");
     try {
-      // La respuesta exitosa se define con la pasarela: cómo se va y se vuelve
-      // de Webpay o de Mercado Pago depende de cuál se elija.
-      await api.post("/pagos/iniciar", { ...identificador, medio });
+      // Se manda la factura, no el monto: lo que se cobra lo dice G8.
+      const inicio = await api.post<{ url: string; token: string }>(
+        "/pagos/iniciar",
+        { ...identificador, id_factura: elegida.id_factura, medio },
+      );
+      setWebpay(inicio);
     } catch (e) {
-      // Excepción 1 del CU-42 / CU-43: el medio no está disponible.
+      // Excepción 1 del CU-42: el medio no está disponible.
       setAviso(
         (e as { message?: string }).message ??
           "No pudimos iniciar el pago. Intenta más tarde.",
       );
-    } finally {
       setEnviando(false);
     }
   }
+
+  if (webpay) return <RedireccionWebpay url={webpay.url} token={webpay.token} />;
 
   return (
     <>
       <ol className="divide-y divide-border">
         <li className="p-6">
-          <Paso numero={1} titulo="Tu deuda" />
-          <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border-2 border-primary bg-surface px-5 py-4">
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                Saldo total
-              </p>
-              <p className="text-xs text-muted">
-                Se paga el total de tu deuda.
-              </p>
+          <fieldset>
+            <legend className="contents">
+              <Paso numero={1} titulo="Elige la factura" />
+            </legend>
+            <div className="mt-4 grid gap-3">
+              {facturas.map((f) => (
+                <label
+                  key={f.id_factura}
+                  className="flex cursor-pointer items-center gap-4 rounded-2xl border border-border px-4 py-3.5 transition-all hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-surface has-[:checked]:shadow-[0_12px_24px_rgba(47,174,201,0.08)]"
+                >
+                  <input
+                    type="radio"
+                    name="factura"
+                    value={f.id_factura}
+                    checked={idFactura === f.id_factura}
+                    onChange={() => {
+                      setIdFactura(f.id_factura);
+                      setAviso("");
+                    }}
+                    className="h-4 w-4 accent-primary-bright"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-foreground">
+                      Factura N° {f.id_factura}
+                    </span>
+                    {f.vence ? (
+                      <span className="mt-0.5 block text-xs text-muted">
+                        Vence el {fechaCalendario(f.vence, "larga")}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="text-base font-bold text-foreground">
+                    {formatPrecio(f.saldo)}
+                  </span>
+                </label>
+              ))}
             </div>
-            <p className="text-2xl font-extrabold text-foreground">
-              {formatPrecio(saldo)}
-            </p>
-          </div>
+          </fieldset>
         </li>
         <li className="p-6">
           <fieldset>
@@ -315,13 +377,13 @@ function Pago({
         <div>
           <p className="text-xs text-muted">Total a pagar</p>
           <p className="text-2xl font-extrabold text-foreground">
-            {formatPrecio(saldo)}
+            {elegida ? formatPrecio(elegida.saldo) : "—"}
           </p>
         </div>
         <button
           type="button"
           onClick={() => void pagar()}
-          disabled={!medio || enviando}
+          disabled={!elegida || !medio || enviando}
           className="min-w-32 rounded-xl bg-accent px-7 py-3 text-base font-bold text-on-accent shadow-sm transition-all hover:shadow-md hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {enviando ? "Un momento…" : "Pagar"}

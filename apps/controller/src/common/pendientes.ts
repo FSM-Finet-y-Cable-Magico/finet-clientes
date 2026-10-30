@@ -13,9 +13,11 @@
 /**
  * Si hay una pasarela de pagos operativa. La precondición del CU-68 lo exige: el
  * aviso de corte lleva un enlace para pagar, y sin pasarela ese enlace no lleva a
- * ningún lado. Se rellena cuando se construya el pago (CU-42 y CU-43).
+ * ningún lado. Webpay Plus (CU-42) ya está construido, en el ambiente que diga
+ * `WEBPAY_AMBIENTE`: de integración mientras Finet no entregue su código de
+ * comercio. Para cobrar falta además el registro de G8 (abajo).
  */
-export const PASARELA_ACTIVA = false;
+export const PASARELA_ACTIVA = true;
 
 /**
  * El registro de un pago confirmado (RF-32: fecha, monto y código de

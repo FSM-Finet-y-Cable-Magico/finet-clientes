@@ -9,6 +9,11 @@ import { SALDO_CLIENTE_DEFINIDO } from '../pendientes.js';
 /** A quién se le cobra: el cliente, con todos sus contratos. */
 export type Cuenta = { idCliente: number };
 
+/** El saldo de la cuenta: la suma del `saldoExigible` que dio G8 por factura. */
+export function sumarSaldo(facturas: readonly FacturaG8[]): number {
+  return facturas.reduce((total, f) => total + f.saldoExigible, 0);
+}
+
 /**
  * El saldo que debe un cliente, tal como lo deja Grupo 8.
  *
@@ -40,9 +45,7 @@ export class SaldoClienteService {
     saldoDefinido = SALDO_CLIENTE_DEFINIDO,
   ): Promise<number | null> {
     const facturas = await this.facturasDe(cuenta, saldoDefinido);
-    return facturas === null
-      ? null
-      : facturas.reduce((total, f) => total + f.saldoExigible, 0);
+    return facturas === null ? null : sumarSaldo(facturas);
   }
 
   /**

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   REINTENTOS_G8,
   RUTA_FACTURAS_G8,
+  RUTA_PAGOS_G8,
   TIMEOUT_G8_MS,
   rutaResultadoWifiG8,
 } from './g8-integracion.constantes.js';
@@ -44,6 +45,35 @@ const respuestaFacturas = z.object({
       aceptaPagos: z.boolean().nullish(),
     }),
   ),
+});
+
+/**
+ * §4: el pago que la pasarela confirmó. G8 lo valida (factura, empresa, saldo,
+ * sobrepago y duplicidad) y lo registra; G2 no toca Factura ni Pago.
+ * `requestId` y `codigoTransaccion` lo hacen idempotente: repetirlo no crea un
+ * segundo pago.
+ */
+export type PagoG8 = {
+  requestId: string;
+  idEmpresa: number;
+  idFactura: number;
+  monto: number;
+  /** La fecha y hora que confirmó la pasarela (ISO 8601). */
+  fechaPago: string;
+  codigoAutorizacion: string;
+  codigoTransaccion: string;
+  pasarela: string;
+};
+
+/** Lo que importa de la respuesta: si el pago ya estaba registrado. */
+export type RegistroPagoG8 = { idPago: number; duplicado: boolean };
+
+const respuestaPago = z.object({
+  success: z.literal(true),
+  data: z.object({
+    id_pago: z.number(),
+    duplicado: z.boolean().nullish(),
+  }),
 });
 
 /**
@@ -109,6 +139,39 @@ export class G8IntegracionService {
       fechaVencimientoEfectiva: f.fechaVencimientoEfectiva ?? null,
       aceptaPagos: f.aceptaPagos ?? null,
     }));
+  }
+
+  /**
+   * §4: `POST /api/integrations/g2/payments`. Si la respuesta no se puede leer,
+   * se informa como error aunque sea 2xx: no se puede saber si quedó registrado.
+   */
+  async registrarPago(pago: PagoG8): Promise<RegistroPagoG8> {
+    const { base, apiKey } = this.configuracion();
+    const url = new URL(RUTA_PAGOS_G8, base);
+    const body = JSON.stringify({
+      request_id: pago.requestId,
+      id_empresa: pago.idEmpresa,
+      id_factura: pago.idFactura,
+      monto: pago.monto,
+      fecha_pago: pago.fechaPago,
+      codigo_autorizacion: pago.codigoAutorizacion,
+      codigo_transaccion: pago.codigoTransaccion,
+      pasarela: pago.pasarela,
+    });
+
+    const res = await this.pedir(url, { method: 'POST', body }, apiKey);
+    const json: unknown = await res.json().catch(() => null);
+    const leido = respuestaPago.safeParse(json);
+    if (!leido.success) {
+      throw new ErrorIntegracionG8(
+        res.status,
+        `G8 respondió ${res.status} sin el pago registrado`,
+      );
+    }
+    return {
+      idPago: leido.data.data.id_pago,
+      duplicado: leido.data.data.duplicado ?? false,
+    };
   }
 
   /** §12: `POST /api/integrations/g2/tickets/{idTicket}/wifi-result`. */

@@ -15,14 +15,22 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
  * Reusarlo no hace daño —abrirlo dos veces muestra la misma deuda—, así que no se
  * lleva registro de los ya usados.
  *
- * Solo resuelve **a quién** le corresponde el pago. Cómo se paga depende de la
- * pasarela, que todavía no se elige.
+ * Solo resuelve **a quién** le corresponde el pago. Con la misma clave firma la
+ * sesión de cada pago en Webpay (CU-42).
  */
+
+/** A quién y qué factura se le cobra en una transacción de Webpay (CU-42). */
+export type SesionPago = {
+  idEmpresa: number;
+  idCliente: number;
+  idFactura: number;
+};
 
 /** Siete días: una semana para pagar desde que llega el aviso. */
 export const VIGENCIA_ENLACE_PAGO_MS = 7 * 24 * 60 * 60 * 1000;
 
 const PREFIJO = 'p';
+const PREFIJO_SESION = 's';
 /** 16 bytes de HMAC: 128 bits, de sobra para que no se pueda adivinar. */
 const BYTES_FIRMA = 16;
 const BYTES_NONCE = 8;
@@ -47,15 +55,70 @@ export class EnlacePagoService {
 
   /** El `id_cliente` del enlace, o `null` si la firma no calza o ya venció. */
   verificarEnlacePago(token: string, ahora = new Date()): number | null {
-    if (typeof token !== 'string' || token.length > 100) return null;
-    const corte = token.lastIndexOf('.');
+    const partes = this.partesFirmadas(token, PREFIJO);
+    if (!partes) return null;
+
+    const idCliente = this.leerNum(partes[1]);
+    const vence = this.leerNum(partes[2]);
+    if (idCliente === null || vence === null) return null;
+    if (vence * 1000 <= ahora.getTime()) return null;
+    return idCliente;
+  }
+
+  /**
+   * CU-42: el `session_id` que viaja por Webpay y vuelve en su respuesta. Dice a
+   * quién y qué factura se cobra, sin una tabla de transacciones pendientes. La
+   * firma asegura que la transacción la creó el portal: el código de comercio de
+   * integración es público, y cualquiera puede crear una con él.
+   *
+   * Formato: `s.empresa.cliente.factura.firma`, en base36 y base64url.
+   */
+  firmarSesionPago(sesion: SesionPago): string {
+    const cuerpo = [
+      PREFIJO_SESION,
+      this.num(sesion.idEmpresa),
+      this.num(sesion.idCliente),
+      this.num(sesion.idFactura),
+    ].join('.');
+    return `${cuerpo}.${this.hmac(cuerpo)}`;
+  }
+
+  /** Lo que firmó `firmarSesionPago`, o `null` si la firma no calza. */
+  verificarSesionPago(sesion: string): SesionPago | null {
+    const partes = this.partesFirmadas(sesion, PREFIJO_SESION);
+    if (!partes) return null;
+
+    const [idEmpresa, idCliente, idFactura] = partes
+      .slice(1)
+      .map((p) => this.leerNum(p));
+    if (idEmpresa === null || idCliente === null || idFactura === null) {
+      return null;
+    }
+    return { idEmpresa, idCliente, idFactura };
+  }
+
+  /**
+   * Falla si falta la clave. Para comprobarlo antes de despachar una tanda, y
+   * no a mitad de camino con la mitad de los correos ya enviados.
+   */
+  verificarClave(): void {
+    this.secreto();
+  }
+
+  /**
+   * Las cuatro partes del cuerpo, si la firma calza y el prefijo es el pedido.
+   * El prefijo separa el enlace de la sesión: una no sirve como la otra.
+   */
+  private partesFirmadas(texto: string, prefijo: string): string[] | null {
+    if (typeof texto !== 'string' || texto.length > 100) return null;
+    const corte = texto.lastIndexOf('.');
     if (corte <= 0) return null;
 
-    const cuerpo = token.slice(0, corte);
+    const cuerpo = texto.slice(0, corte);
     // Se compara el texto de la firma y no los bytes que decodifica: en base64
     // el último carácter lleva bits de relleno, y comparando bytes el mismo
     // enlace tendría varias escrituras válidas. Dejaría de ser único.
-    const recibida = Buffer.from(token.slice(corte + 1));
+    const recibida = Buffer.from(texto.slice(corte + 1));
     const esperada = Buffer.from(this.hmac(cuerpo));
     // En tiempo constante: si no, se podría adivinar la firma byte a byte
     // midiendo cuánto demora el rechazo.
@@ -67,21 +130,8 @@ export class EnlacePagoService {
     }
 
     const partes = cuerpo.split('.');
-    if (partes.length !== 4 || partes[0] !== PREFIJO) return null;
-
-    const idCliente = this.leerNum(partes[1]);
-    const vence = this.leerNum(partes[2]);
-    if (idCliente === null || vence === null) return null;
-    if (vence * 1000 <= ahora.getTime()) return null;
-    return idCliente;
-  }
-
-  /**
-   * Falla si falta la clave. Para comprobarlo antes de despachar una tanda, y
-   * no a mitad de camino con la mitad de los correos ya enviados.
-   */
-  verificarClave(): void {
-    this.secreto();
+    if (partes.length !== 4 || partes[0] !== prefijo) return null;
+    return partes;
   }
 
   private hmac(cuerpo: string): string {

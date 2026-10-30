@@ -7,6 +7,7 @@ import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
 import {
   PASARELA_ACTIVA,
+  REGISTRO_PAGO_DEFINIDO,
   SALDO_CLIENTE_DEFINIDO,
 } from '../common/pendientes.js';
 import { conCandado } from './candado.js';
@@ -106,7 +107,8 @@ export class AvisoCorteService {
   async ejecutar(
     ahora: Date,
     datos: DatosAvisoCorte = {
-      pasarelaActiva: PASARELA_ACTIVA,
+      // Sin el registro de G8 el enlace del aviso no deja pagar (CU-42).
+      pasarelaActiva: PASARELA_ACTIVA && REGISTRO_PAGO_DEFINIDO,
       saldoDefinido: SALDO_CLIENTE_DEFINIDO,
     },
   ): Promise<ResumenAvisoCorte> {

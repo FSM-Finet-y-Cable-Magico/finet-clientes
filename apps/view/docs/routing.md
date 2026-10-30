@@ -26,6 +26,7 @@ Todas las rutas viven en `app/`. Las protegidas por sesión están marcadas 🔒
 | `/registro/confirmar` | `POST /api/auth/registro/confirmar` | CU-04 / CU-75 |
 | `/consultar-deuda` | `GET /api/deuda-publica/rut` | CU-39 / CU-41 |
 | `/pagar` | `GET /api/pagos/resumen`, `POST /api/pagos/iniciar` | CU-42 / CU-43 |
+| `/pagar/resultado` | `GET /api/pagos/webpay/resultado` (Webpay vuelve a `/api/pagos/webpay/retorno`, que redirige acá) | CU-42 |
 
 El registro de cuenta (CU-04) empieza en la pestaña "Registrarse" de `/inicio-sesion` (`RegistroForm.tsx` + `AuthSwitch.tsx`): pide el RUT (`POST /api/auth/registro`) y muestra un aviso según la respuesta. Si el cliente puede crear su cuenta, le llega un correo con el enlace a `/registro/confirmar#token=...`, donde crea la contraseña, acepta la Política de Privacidad y entra al portal. La cuenta es de un cliente que G8 ya dio de alta: el portal no crea clientes (acuerdo v2.0, §3 y §4).
 
@@ -46,7 +47,7 @@ Si el JWT falta o es inválido, `proxy.ts` redirige a `/inicio-sesion?redirect=<
 Cada ruta pública se declara en [`app/_lib/rutas-publicas.ts`](../app/_lib/rutas-publicas.ts). De ese registro salen `sitemap.xml`, `robots.txt` y el `noindex` de las páginas no indexables. Al agregar o borrar una página hay que actualizarlo: `rutas-publicas.test.ts` falla si no coincide con las `page.tsx` de `app/`.
 
 - **`/sitemap.xml`**: rutas indexables más un `/contratar/<id>` por plan del catálogo. Se regenera en cada build y cada 5 minutos.
-- **`/robots.txt`**: bloquea `/api/` y las rutas protegidas. Las públicas no indexables (`/recuperar-password`, `/restablecer-password`, `/registro/confirmar`, `/pagar`) no se bloquean, llevan `noindex` para que el buscador pueda leerlo.
+- **`/robots.txt`**: bloquea `/api/` y las rutas protegidas. Las públicas no indexables (`/recuperar-password`, `/restablecer-password`, `/registro/confirmar`, `/pagar`, `/pagar/resultado`) no se bloquean, llevan `noindex` para que el buscador pueda leerlo.
 - **Si el backend no responde**, no se publica un sitemap sin planes. En el servidor se sigue sirviendo la última versión válida, y el log muestra una línea `[CU-74] sitemap.xml: no se pudo leer el catalogo de planes`. En el build ese error lo hace fallar, para que el deploy anterior siga con sus archivos: **para compilar el view, el controller tiene que estar respondiendo** en `NEXT_PUBLIC_API_URL`.
 
 Para verificar lo publicado, abrir `<NEXT_PUBLIC_SITE_URL>/sitemap.xml` y `<NEXT_PUBLIC_SITE_URL>/robots.txt`.

@@ -29,3 +29,37 @@ export const IDS_MEDIOS_PAGO = MEDIOS_PAGO.map((m) => m.id) as [
   MedioPago,
   ...MedioPago[],
 ];
+
+/**
+ * Cuánto se espera cada llamada a Transbank. El SDK trae 10 minutos, y hay un
+ * cliente esperando la respuesta.
+ */
+export const TIMEOUT_WEBPAY_MS = 15_000;
+
+/**
+ * Con qué se pagó, para G8 (`pasarela`: "identifica medio/proveedor/canal", su
+ * respuesta del 01-10, §4.1). Es el id del medio: así el historial de pagos del
+ * CU-52, que lee `pago.pasarela`, lo muestra como "Webpay". Se confirma en la
+ * prueba conjunta con G8.
+ */
+export const PASARELA_G8: MedioPago = 'webpay';
+
+/**
+ * Cómo terminó un pago, para la pantalla de resultado:
+ * - `aprobado`: Webpay lo aprobó y G8 lo registró;
+ * - `pendiente`: Webpay lo aprobó, pero G8 todavía no lo registra;
+ * - `anulado`: G8 lo rechazó y se anuló en Webpay;
+ * - `rechazado`: Webpay no lo aprobó (Excepción 3 del CU-42);
+ * - `cancelado`: el cliente no lo terminó (Excepción 2);
+ * - `error`: no se pudo saber.
+ */
+export const RESULTADOS_PAGO = [
+  'aprobado',
+  'pendiente',
+  'anulado',
+  'rechazado',
+  'cancelado',
+  'error',
+] as const;
+
+export type ResultadoPago = (typeof RESULTADOS_PAGO)[number];
