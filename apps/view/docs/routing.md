@@ -25,7 +25,7 @@ Todas las rutas viven en `app/`. Las protegidas por sesión están marcadas 🔒
 | `/restablecer-password` | `POST /api/auth/restablecer-password` | CU-03 / RF-09 |
 | `/registro/confirmar` | `POST /api/auth/registro/confirmar` | CU-04 / CU-75 |
 | `/consultar-deuda` | `GET /api/deuda-publica/rut` | CU-39 / CU-41 |
-| `/pagar` | `GET /api/pagos/resumen`, `POST /api/pagos/iniciar` | CU-42 / CU-43 |
+| `/pagar` | `GET /api/pagos/resumen`, `POST /api/pagos/iniciar` | CU-42 |
 | `/pagar/resultado` | `GET /api/pagos/webpay/resultado` (Webpay vuelve a `/api/pagos/webpay/retorno`, que redirige acá) | CU-42 |
 
 El registro de cuenta (CU-04) empieza en la pestaña "Registrarse" de `/inicio-sesion` (`RegistroForm.tsx` + `AuthSwitch.tsx`): pide el RUT (`POST /api/auth/registro`) y muestra un aviso según la respuesta. Si el cliente puede crear su cuenta, le llega un correo con el enlace a `/registro/confirmar#token=...`, donde crea la contraseña, acepta la Política de Privacidad y entra al portal. La cuenta es de un cliente que G8 ya dio de alta: el portal no crea clientes (acuerdo v2.0, §3 y §4).

@@ -65,7 +65,7 @@ export interface PagoAnteriorDto {
   fecha_pago: string; // ISO 8601: es un instante, la vista lo muestra en hora de Chile
   periodo: string | null; // "Abril 2026"; null si el pago no tiene factura asociada
   monto: number;
-  pasarela: string; // "Webpay" o "Mercado Pago"; otro valor va tal cual (el §11.15 no define el enum)
+  pasarela: string; // "Webpay"; otro valor va tal cual (el §11.15 no define el enum)
 }
 
 // ─── CU-29 / CU-30: Tickets de soporte ───────────────────────────────────────

@@ -6,7 +6,7 @@ export const metadata: Metadata = metadataSeccion({
   path: "/pagar",
   title: "Pagar mi cuenta",
   description:
-    "Paga la deuda de tu servicio Finet con Webpay o Mercado Pago, con tu RUT.",
+    "Paga las facturas de tu servicio Finet con Webpay, con tu RUT.",
 });
 
 type Props = {
@@ -14,7 +14,7 @@ type Props = {
 };
 
 /**
- * CU-42 / CU-43: portal de pagos. Se llega por el enlace del aviso de corte
+ * CU-42: portal de pagos. Se llega por el enlace del aviso de corte
  * (`?t=`), por el botón "Pagar ahora" del portal (también `?t=`), por la
  * consulta pública (`?rut=`), o directo, a identificar la cuenta.
  */

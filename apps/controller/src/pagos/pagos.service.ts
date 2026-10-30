@@ -62,8 +62,7 @@ const INTERRUPTORES: Interruptores = {
 };
 
 /**
- * CU-42: pagar una factura con Webpay Plus. Mercado Pago (el CU-43 anterior)
- * no se construye.
+ * CU-42: pagar una factura con Webpay Plus.
  *
  * Se paga una factura entera, la que el cliente elige (diagrama de G8 del 29-10):
  * se cobra su `saldoExigible`, que da G8 (`SaldoClienteService`), sin abonos.
@@ -152,7 +151,7 @@ export class PagosService {
     // Excepción 1: la pasarela no está disponible. Si G8 no puede registrar el
     // pago, tampoco se cobra.
     const elegido = MEDIOS_PAGO.find((m) => m.id === medio)!;
-    if (!this.disponible(medio, interruptores) || pagador.idEmpresa === null) {
+    if (!this.disponible(interruptores) || pagador.idEmpresa === null) {
       throw new ServiceUnavailableException(elegido.noDisponible);
     }
 
@@ -413,10 +412,8 @@ export class PagosService {
     return url.toString();
   }
 
-  private disponible(medio: MedioPago, interruptores: Interruptores): boolean {
-    return (
-      medio === 'webpay' && interruptores.pasarela && interruptores.registro
-    );
+  private disponible(interruptores: Interruptores): boolean {
+    return interruptores.pasarela && interruptores.registro;
   }
 
   private medios(interruptores: Interruptores): MedioPagoDto[] {
@@ -424,7 +421,7 @@ export class PagosService {
       id: m.id,
       nombre: m.nombre,
       descripcion: m.descripcion,
-      disponible: this.disponible(m.id, interruptores),
+      disponible: this.disponible(interruptores),
     }));
   }
 

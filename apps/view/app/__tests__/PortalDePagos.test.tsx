@@ -10,7 +10,6 @@ import { WHATSAPP_URL } from '@/app/_lib/company';
 
 const MEDIOS = [
   { id: 'webpay', nombre: 'Webpay', descripcion: 'Tarjetas', disponible: true },
-  { id: 'mercadopago', nombre: 'Mercado Pago', descripcion: 'Cuenta MP', disponible: false },
 ];
 
 /** Las facturas que G8 deja pagar (su §2 del 02-10). */

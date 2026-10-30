@@ -28,7 +28,7 @@ export function sumarSaldo(facturas: readonly FacturaG8[]): number {
  * deuda pendiente identificada") y el aviso de corte en su Excepción 2, y nunca
  * se cobra ni se avisa un total inventado.
  *
- * Lo usan el pago (CU-42, CU-43: el total a cobrar) y el aviso de corte (CU-68:
+ * Lo usan el pago (CU-42: lo que se cobra de cada factura) y el aviso de corte (CU-68:
  * el monto que se informa): el saldo de todos los contratos del cliente.
  */
 @Injectable()

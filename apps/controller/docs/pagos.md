@@ -2,8 +2,7 @@
 
 **Construido, pendiente de G8.** Webpay funciona (en integración mientras Finet no entregue su
 código de comercio), pero el pago completo corre recién cuando G8 despliegue el saldo y el registro
-de pagos: ver "Lo que falta". Mercado Pago (el CU-43 anterior) no se construye y sigue en la lista
-como no disponible.
+de pagos: ver "Lo que falta". Solo Webpay: Mercado Pago no se construye (decisión del 22-10).
 
 Público, como la consulta de deuda (CU-39): se puede pagar la cuenta de alguien más con su RUT. El
 throttler global limita los intentos por IP.
@@ -59,8 +58,7 @@ Exactamente un identificador. `t` es el enlace firmado del aviso de corte (CU-68
   "saldo": 19990,
   "facturas": [{ "id_factura": 101, "saldo": 14990, "vence": "2026-10-15" }],
   "medios": [
-    { "id": "webpay", "nombre": "Webpay", "descripcion": "…", "disponible": true },
-    { "id": "mercadopago", "nombre": "Mercado Pago", "descripcion": "…", "disponible": false }
+    { "id": "webpay", "nombre": "Webpay", "descripcion": "…", "disponible": true }
   ]
 }
 ```

@@ -275,7 +275,7 @@ export class PortalController {
   }
 
   /**
-   * CU-42 / CU-43 desde el portal: el enlace para pagar la deuda de este
+   * CU-42 desde el portal: el enlace para pagar la deuda de este
    * cliente. Es el mismo enlace firmado del aviso de corte (RNF-50.1), así el
    * RUT no queda en la URL.
    *

@@ -180,10 +180,7 @@ describe('PagosService', () => {
         cliente: { nombre: 'Ana Pérez', rut: 'XX.XXX.678-5' },
         saldo: 19990,
         facturas: [{ id_factura: 101, saldo: 14990, vence: '2026-10-15' }],
-        medios: [
-          expect.objectContaining({ id: 'webpay', disponible: true }),
-          expect.objectContaining({ id: 'mercadopago', disponible: false }),
-        ],
+        medios: [expect.objectContaining({ id: 'webpay', disponible: true })],
       });
     });
 
@@ -306,12 +303,6 @@ describe('PagosService', () => {
         expect(webpay.crear).not.toHaveBeenCalled();
       },
     );
-
-    it('Mercado Pago no está construido: siempre su Excepción 1', async () => {
-      await expect(
-        service.iniciar({ rut: '123456785' }, 101, 'mercadopago', ENCENDIDOS),
-      ).rejects.toThrow('Mercado Pago se encuentra temporalmente indisponible');
-    });
 
     it('crea la transacción por el saldo de G8 de esa factura, con la sesión firmada', async () => {
       const r = await service.iniciar(
@@ -669,15 +660,18 @@ describe('PagosService', () => {
       ).toBe(false);
     });
 
-    it('solo acepta los medios del RF-31', () => {
-      expect(
-        IniciarPagoDto.safeParse({
-          rut: '123456785',
-          id_factura: 101,
-          medio: 'paypal',
-        }).success,
-      ).toBe(false);
-    });
+    it.each(['paypal', 'mercadopago'])(
+      'solo acepta Webpay: "%s" no (Mercado Pago no se construye)',
+      (medio) => {
+        expect(
+          IniciarPagoDto.safeParse({
+            rut: '123456785',
+            id_factura: 101,
+            medio,
+          }).success,
+        ).toBe(false);
+      },
+    );
 
     it('del retorno de Webpay solo acepta tokens alfanuméricos de hasta 64', () => {
       expect(RetornoWebpayDto.safeParse({ token_ws: TOKEN }).success).toBe(

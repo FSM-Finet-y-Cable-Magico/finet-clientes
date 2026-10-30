@@ -8,7 +8,6 @@ import {
   CreditCard,
   Lock,
   RefreshCw,
-  Wallet,
 } from "lucide-react";
 import { api } from "@/app/utils/api";
 import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
@@ -18,7 +17,7 @@ import RedireccionWebpay from "./RedireccionWebpay";
 
 export type Identificador = { rut: string } | { t: string };
 
-type MedioId = "webpay" | "mercadopago";
+type MedioId = "webpay";
 
 type Medio = {
   id: MedioId;
@@ -54,11 +53,10 @@ type Estado =
 
 const ICONO_MEDIO: Record<MedioId, typeof CreditCard> = {
   webpay: CreditCard,
-  mercadopago: Wallet,
 };
 
 /**
- * CU-42 / CU-43. El resumen se pide desde el navegador y no desde el servidor
+ * CU-42. El resumen se pide desde el navegador y no desde el servidor
  * de Next: el backend limita los intentos por IP, y desde el servidor todos los
  * clientes compartirían la misma.
  */
@@ -121,7 +119,7 @@ export default function PortalDePagos({
       </section>
       <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted">
         <Lock size={12} aria-hidden />
-        El pago se hace en el sitio seguro de Webpay o Mercado Pago.
+        El pago se hace en el sitio seguro de Webpay.
       </p>
     </div>
   );
