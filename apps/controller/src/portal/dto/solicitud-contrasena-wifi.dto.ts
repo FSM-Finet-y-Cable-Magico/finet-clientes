@@ -8,9 +8,9 @@ import { z } from 'zod';
 // blanco porque una passphrase WPA2 con espacios sin comillas no es valida en
 // la mayoria de los equipos.
 //
-// Esto es una divergencia respecto del documento fuente: queda registrada en
-// docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md para que se actualice CU-31 y
-// RF-24 alla, no solo aca.
+// Esto es una divergencia respecto del documento fuente: se le pidió al equipo
+// de documentación que actualice el CU-31 y el RF-24 en el Documento 0, no
+// solo aca.
 export const WIFI_PASSWORD_REGEX = /^\S+$/;
 export const WIFI_PASSWORD_MIN = 8;
 export const WIFI_PASSWORD_MAX = 63;

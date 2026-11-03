@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { metadataSeccion, resumenPlanes } from "../_lib/seo";
-import { getLandingPlanes } from "../_lib/api";
+import { getLandingPlanes, ordenarPorPrecio } from "../_lib/api";
 import { itemListJsonLd } from "../_lib/jsonld";
 import PlanesClient from "../_components/catalog/PlanesClient";
 
@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PlanesPage() {
   const planes = await getLandingPlanes();
-  const sorted = [...planes].sort((a, b) => a.precio_mensual - b.precio_mensual);
+  const sorted = ordenarPorPrecio(planes);
 
   return (
     <section className="px-4 py-12">

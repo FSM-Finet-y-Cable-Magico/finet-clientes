@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { formatPeriodo } from '../common/utils/periodo.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import {
   DetalleFacturaPublicaDto,
@@ -44,58 +45,23 @@ export class DeudaPublicaService {
     return this.construirRespuesta(
       cliente.nombre_completo,
       cliente.rut,
-      null,
       cliente.contrato.map((c) => c.id_contrato),
     );
   }
 
   /**
-   * CU-40: Consultar deuda pública mediante código de abonado.
-   * El código de abonado corresponde al id_contrato del sistema.
-   * Endpoint público — no requiere autenticación.
-   */
-  async consultarPorAbonado(
-    codigoAbonado: number,
-  ): Promise<DeudaPublicaResponseDto> {
-    const contrato = await this.prisma.contrato.findUnique({
-      where: { id_contrato: codigoAbonado },
-      include: {
-        cliente: {
-          select: { nombre_completo: true, rut: true },
-        },
-      },
-    });
-
-    if (!contrato || !contrato.cliente) {
-      return this.respuestaNoEncontrada();
-    }
-
-    return this.construirRespuesta(
-      contrato.cliente.nombre_completo,
-      contrato.cliente.rut,
-      codigoAbonado,
-      [codigoAbonado],
-    );
-  }
-
-  /**
-   * CU-41: Lógica compartida que construye el detalle de deuda y vencimientos.
-   * Usado internamente por CU-39 y CU-40.
+   * CU-41: construye el detalle de deuda y vencimientos de la consulta del
+   * CU-39.
    */
   private async construirRespuesta(
     nombreCompleto: string,
     rut: string | null,
-    codigoAbonado: number | null,
     idContratos: number[],
   ): Promise<DeudaPublicaResponseDto> {
     if (!idContratos.length) {
       return {
         encontrado: true,
-        cliente: {
-          nombre_completo: nombreCompleto,
-          rut,
-          codigo_abonado: codigoAbonado,
-        },
+        cliente: { nombre_completo: nombreCompleto, rut },
         tiene_deuda: false,
         saldo_total: 0,
         facturas: [],
@@ -138,11 +104,7 @@ export class DeudaPublicaService {
       // CU-41 Excepción 1: no fue posible determinar/obtener el detalle de facturación
       return {
         encontrado: true,
-        cliente: {
-          nombre_completo: nombreCompleto,
-          rut,
-          codigo_abonado: codigoAbonado,
-        },
+        cliente: { nombre_completo: nombreCompleto, rut },
         tiene_deuda: false,
         saldo_total: 0,
         facturas: [],
@@ -168,7 +130,7 @@ export class DeudaPublicaService {
 
       return {
         id_factura: f.id_factura,
-        periodo: this.formatPeriodo(f.periodo_mes, f.periodo_anio),
+        periodo: formatPeriodo(f.periodo_mes, f.periodo_anio),
         monto: Number(f.monto ?? 0),
         fecha_limite_pago: fechaInvalida
           ? ''
@@ -186,11 +148,7 @@ export class DeudaPublicaService {
 
     return {
       encontrado: true,
-      cliente: {
-        nombre_completo: nombreCompleto,
-        rut,
-        codigo_abonado: codigoAbonado,
-      },
+      cliente: { nombre_completo: nombreCompleto, rut },
       tiene_deuda: facturasMapeadas.length > 0,
       saldo_total,
       facturas: facturasMapeadas,
@@ -231,23 +189,5 @@ export class DeudaPublicaService {
       });
     }
     return [...porNombre.values()];
-  }
-
-  private formatPeriodo(mes: number, anio: number): string {
-    const meses = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ];
-    return `${meses[mes - 1]} ${anio}`;
   }
 }

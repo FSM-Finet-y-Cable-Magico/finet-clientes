@@ -108,3 +108,53 @@ describe('EnlacePagoService', () => {
     expect(() => servicio(CLAVE).verificarClave()).not.toThrow();
   });
 });
+
+/**
+ * CU-42: la sesión de Webpay dice a quién y qué factura se cobra. Solo vale la
+ * que firmó el portal, porque el código de comercio de integración es público.
+ */
+describe('EnlacePagoService: sesión de pago', () => {
+  const SESION = { idEmpresa: 1, idCliente: 130, idFactura: 101 };
+  let enlaces: EnlacePagoService;
+
+  beforeEach(() => {
+    enlaces = servicio(CLAVE);
+  });
+
+  it('devuelve la empresa, el cliente y la factura con que se firmó', () => {
+    const sesion = enlaces.firmarSesionPago(SESION);
+
+    expect(enlaces.verificarSesionPago(sesion)).toEqual(SESION);
+  });
+
+  it('cabe en el session_id de Webpay (61 caracteres como máximo)', () => {
+    const sesion = enlaces.firmarSesionPago({
+      idEmpresa: 99,
+      idCliente: 999_999_999,
+      idFactura: 999_999_999,
+    });
+
+    expect(sesion.length).toBeLessThanOrEqual(61);
+  });
+
+  it('no deja cambiar la factura ni el cliente', () => {
+    const partes = enlaces.firmarSesionPago(SESION).split('.');
+    partes[3] = (102).toString(36);
+
+    expect(enlaces.verificarSesionPago(partes.join('.'))).toBeNull();
+  });
+
+  it('rechaza una sesión firmada con otra clave', () => {
+    const ajena = servicio('otra-clave').firmarSesionPago(SESION);
+
+    expect(enlaces.verificarSesionPago(ajena)).toBeNull();
+  });
+
+  it('una sesión no sirve como enlace de pago, ni al revés', () => {
+    const sesion = enlaces.firmarSesionPago(SESION);
+    const enlace = enlaces.crearEnlacePago(130, AHORA);
+
+    expect(enlaces.verificarEnlacePago(sesion, AHORA)).toBeNull();
+    expect(enlaces.verificarSesionPago(enlace)).toBeNull();
+  });
+});

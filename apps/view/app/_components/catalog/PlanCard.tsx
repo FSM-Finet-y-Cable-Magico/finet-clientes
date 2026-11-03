@@ -1,4 +1,5 @@
-import { formatPrecioMensual, type PlanBackend } from "../../_lib/api";
+import type { PlanBackend } from "../../_lib/api";
+import { formatPrecio } from "../../_lib/formato";
 import PrimaryButton from "../ui/PrimaryButton";
 
 type PlanCardProps = {
@@ -37,7 +38,7 @@ export default function PlanCard({ plan, featured }: PlanCardProps) {
       )}
       <h2 className="text-lg font-medium">{plan.nombre_comercial}</h2>
       <p className="text-4xl font-extrabold text-foreground mt-2">
-        {formatPrecioMensual(plan.precio_mensual)}
+        {formatPrecio(plan.precio_mensual)}
         <span className="text-sm font-normal text-muted">/mes</span>
       </p>
       {plan.descripcion && (

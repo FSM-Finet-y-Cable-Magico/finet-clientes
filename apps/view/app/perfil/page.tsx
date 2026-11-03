@@ -6,6 +6,7 @@ import ChangePasswordForm from "../components/ChangePasswordForm";
 import UpdateTelefonoForm from "../components/UpdateTelefonoForm";
 import UpdateEmailForm from "../components/UpdateEmailForm";
 import { api } from "../utils/api";
+import { fechaInstante } from "@/app/_lib/formato";
 
 type ClientePerfil = {
   id_cliente: number;
@@ -39,14 +40,6 @@ export default function PerfilPage() {
     const t = setTimeout(() => fetchPerfil(), 0);
     return () => clearTimeout(t);
   }, [fetchPerfil]);
-
-  function formatFecha(iso: string) {
-    return new Date(iso).toLocaleDateString("es-CL", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }
 
   function formatRut(rut: string) {
     const body = rut.slice(0, -1);
@@ -145,7 +138,7 @@ export default function PerfilPage() {
               Cliente desde
             </span>
             <span className="text-sm font-medium text-foreground">
-              {formatFecha(perfil.fecha_creacion)}
+              {fechaInstante(perfil.fecha_creacion, "larga")}
             </span>
           </div>
         </div>

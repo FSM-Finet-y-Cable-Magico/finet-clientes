@@ -4,27 +4,33 @@ import { useId, useState, useTransition } from "react";
 import { Wifi, CheckCircle2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { changeWifiPassword } from "@/app/portal/_lib/portal-actions";
 import { esContratoActivo } from "@/app/_lib/estado-contrato";
-
-// CU-31, su Excepcion 2 y RF-24 dicen "unicamente alfanumericos". Se decidio
-// permitir simbolos igual (pedido de Dani, confirmado por Emilio) — diverge
-// del CU escrito, ver docs/CAMBIOS-PARA-EQUIPO-DOCUMENTACION.md. Se mantienen
-// prohibidos los espacios en blanco.
-const WIFI_REGEX = /^\S+$/;
-const MIN_LEN = 8;
-const MAX_LEN = 63;
+import {
+  CLAVE_WIFI_MAX,
+  CLAVE_WIFI_MIN,
+  CLAVE_WIFI_REGEX,
+} from "@/app/_lib/clave-wifi";
+import { fechaCalendario } from "@/app/_lib/formato";
 
 export type ContratoWifi = {
   id_contrato: number;
   estado: string;
+  /** `YYYY-MM-DD`, como lo devuelve `/portal/contratos/vigentes`. */
+  fecha_inicio: string;
   plan: { nombre_comercial: string } | null;
 };
+
+/** Cómo distingue el cliente sus servicios: el plan y desde cuándo lo tiene. */
+function nombreServicio(c: ContratoWifi) {
+  const plan = c.plan?.nombre_comercial ?? "Servicio sin plan";
+  return `${plan} · desde ${fechaCalendario(c.fecha_inicio, "numerica")}`;
+}
 
 // CU-31: valida el formato y devuelve el motivo cuando no se cumple.
 function validarClave(valor: string): string {
   if (!valor) return "Ingresa la nueva contraseña"; // CU-31 Excepcion 1
-  if (valor.length < MIN_LEN) return `Mínimo ${MIN_LEN} caracteres`;
-  if (valor.length > MAX_LEN) return `Máximo ${MAX_LEN} caracteres`;
-  if (!WIFI_REGEX.test(valor)) {
+  if (valor.length < CLAVE_WIFI_MIN) return `Mínimo ${CLAVE_WIFI_MIN} caracteres`;
+  if (valor.length > CLAVE_WIFI_MAX) return `Máximo ${CLAVE_WIFI_MAX} caracteres`;
+  if (!CLAVE_WIFI_REGEX.test(valor)) {
     return "No se permiten espacios en blanco";
   }
   return "";
@@ -192,8 +198,7 @@ export default function WifiPasswordSection({ contratos }: Props) {
               <option value="">Selecciona un servicio</option>
               {activos.map((c) => (
                 <option key={c.id_contrato} value={c.id_contrato}>
-                  Abonado #{c.id_contrato}
-                  {c.plan ? ` — ${c.plan.nombre_comercial}` : ""}
+                  {nombreServicio(c)}
                 </option>
               ))}
             </select>
@@ -207,7 +212,7 @@ export default function WifiPasswordSection({ contratos }: Props) {
           >
             Nueva contraseña{" "}
             <span className="text-muted">
-              (entre {MIN_LEN} y {MAX_LEN} caracteres, sin espacios)
+              (entre {CLAVE_WIFI_MIN} y {CLAVE_WIFI_MAX} caracteres, sin espacios)
             </span>
           </label>
           <div className="relative">

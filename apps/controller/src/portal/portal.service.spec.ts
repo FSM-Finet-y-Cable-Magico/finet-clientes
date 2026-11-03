@@ -10,6 +10,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { PortalService } from './portal.service.js';
+import { CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import {
@@ -77,7 +78,7 @@ describe('PortalService', () => {
       contrato: { findMany: jest.fn(), findFirst: jest.fn() },
       cliente: { findUnique: jest.fn() },
       factura: { findMany: jest.fn() },
-      categoria_falla: { findMany: jest.fn(), findUnique: jest.fn() },
+      categoria_falla: { findMany: jest.fn(), findFirst: jest.fn() },
       ticket: {
         findMany: jest.fn(),
         create: jest.fn(),
@@ -124,9 +125,9 @@ describe('PortalService', () => {
         ...CLIENTE_MOCK,
         id_empresa: 2,
       });
-      (prisma.categoria_falla.findUnique as jest.Mock).mockResolvedValue({
+      (prisma.categoria_falla.findFirst as jest.Mock).mockResolvedValue({
         id_categoria: 3,
-        nombre: 'Conectividad',
+        nombre: 'Falla de Internet',
       });
       (prisma.ticket.create as jest.Mock).mockResolvedValue({
         id_ticket: 42,
@@ -138,18 +139,24 @@ describe('PortalService', () => {
       (mailService.sendTicketCreated as jest.Mock).mockResolvedValue(undefined);
     });
 
-    it('lista las categorias disponibles ordenadas por nombre', async () => {
+    it('lista solo las categorias del cliente (§11.9), ordenadas por nombre', async () => {
       (prisma.categoria_falla.findMany as jest.Mock).mockResolvedValue([
-        { id_categoria: 3, nombre: 'Conectividad' },
+        { id_categoria: 3, nombre: 'Falla de Internet' },
       ]);
 
       const result = await service.getCategoriasTicket();
 
-      expect(result).toEqual([{ id_categoria: 3, nombre: 'Conectividad' }]);
+      expect(result).toEqual([
+        { id_categoria: 3, nombre: 'Falla de Internet' },
+      ]);
       expect(prisma.categoria_falla.findMany).toHaveBeenCalledWith({
+        where: {
+          nombre: { in: CATEGORIAS_CLIENTE, mode: 'insensitive' },
+        },
         select: { id_categoria: true, nombre: true },
         orderBy: { nombre: 'asc' },
       });
+      expect(CATEGORIAS_CLIENTE).toHaveLength(7);
     });
 
     it('registra la solicitud, genera el codigo y notifica al cliente', async () => {
@@ -182,12 +189,12 @@ describe('PortalService', () => {
         'juan@example.com',
         'Juan Pérez',
         'FIN-2026-000042',
-        'Conectividad',
+        'Falla de Internet',
       );
     });
 
-    it('rechaza una categoria inexistente', async () => {
-      (prisma.categoria_falla.findUnique as jest.Mock).mockResolvedValue(null);
+    it('rechaza una categoria inexistente o interna de otro grupo', async () => {
+      (prisma.categoria_falla.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.crearTicket(1, {

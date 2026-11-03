@@ -165,11 +165,11 @@ src/
 ├── common/
 │   ├── filters/               # Filtros de excepciones HTTP
 │   └── utils/                 # Utilidades (RUT chileno)
-├── auth/                      # Autenticación (login, register, password recovery, logout)
+├── auth/                      # Autenticación (login, registro, password recovery, logout)
 ├── perfil/                    # Perfil del cliente (obtener, actualizar datos, cambiar contraseña)
 ├── portal/                    # Portal autenticado (panel, contratos, deuda, tickets)
 ├── landing/                   # Landing page pública (catálogo de planes)
-├── deuda-publica/             # Consulta pública de deuda (por RUT o código de abonado)
+├── deuda-publica/             # Consulta pública de deuda (por RUT)
 ├── cobertura/                 # Visor cartográfico público (capa estática)
 ├── admin/                     # Panel admin (intentos fallidos, desbloqueo de IP)
 └── generated/zod/             # Schemas Zod auto-generados desde Prisma
@@ -183,11 +183,11 @@ Documentación de endpoints organizada por feature (bodies, respuestas, errores,
 
 | Feature | Archivo | Endpoints |
 |---------|---------|-----------|
-| **Auth** | [`docs/auth.md`](./docs/auth.md) | Login, register, recuperar/restablecer password, logout |
+| **Auth** | [`docs/auth.md`](./docs/auth.md) | Login, registro (CU-04), recuperar/restablecer password, logout |
 | **Perfil** | [`docs/perfil.md`](./docs/perfil.md) | Obtener perfil, actualizar teléfono/email, cambiar contraseña |
 | **Portal** | [`docs/portal.md`](./docs/portal.md) | Panel, contratos (estado/vigentes), deuda, tickets |
 | **Landing** | [`docs/landing.md`](./docs/landing.md) | Catálogo de planes |
-| **Deuda Pública** | [`docs/deuda-publica.md`](./docs/deuda-publica.md) | Consulta de deuda por RUT o código de abonado |
+| **Deuda Pública** | [`docs/deuda-publica.md`](./docs/deuda-publica.md) | Consulta de deuda por RUT |
 | **Cobertura** | [`docs/cobertura.md`](./docs/cobertura.md) | Visor cartográfico público, capa generada desde el KML de planta externa |
 | **Admin** | (ver abajo) | Intentos fallidos, desbloquear IP |
 

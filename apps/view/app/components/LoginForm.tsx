@@ -13,6 +13,8 @@ import { securityLogger } from "../_lib/logger";
 import LoginBranding from "./LoginBranding";
 import RutInput from "./RutInput";
 import PasswordInput from "./PasswordInput";
+import { MensajeError } from "./MensajesFormulario";
+import { erroresPorCampo, validarCampo } from "../utils/errores-formulario";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -33,18 +35,8 @@ export default function LoginForm() {
   }, [isAuthenticated, isLoading, router]);
 
   function validateField(field: string, value: string) {
-    const result = loginSchema.safeParse({ rut, password, [field]: value });
-    if (!result.success) {
-      const fieldError = result.error.issues.find(
-        (i) => i.path[0] === field
-      );
-      setErrors((prev) => ({
-        ...prev,
-        [field]: fieldError?.message ?? "",
-      }));
-    } else {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
+    const error = validarCampo(loginSchema, { rut, password, [field]: value }, field);
+    setErrors((prev) => ({ ...prev, [field]: error }));
   }
 
   async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
@@ -53,12 +45,7 @@ export default function LoginForm() {
 
     const result = loginSchema.safeParse({ rut, password });
     if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      for (const issue of result.error.issues) {
-        const key = String(issue.path[0]);
-        if (!fieldErrors[key]) fieldErrors[key] = issue.message;
-      }
-      setErrors(fieldErrors);
+      setErrors(erroresPorCampo(result.error.issues));
       return;
     }
 
@@ -92,9 +79,7 @@ export default function LoginForm() {
       )}
 
       {serverError && (
-        <div className="mb-5 rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm text-error">
-          {serverError}
-        </div>
+        <MensajeError margen="mb-5">{serverError}</MensajeError>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>

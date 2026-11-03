@@ -8,9 +8,11 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { api } from "../../utils/api";
+import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
 import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
 import IrAPagarButton from "@/app/_components/portal/IrAPagarButton";
 import PagosAnteriores from "@/app/_components/portal/PagosAnteriores";
+import { FilaFactura, TablaFacturas } from "@/app/_components/deuda/TablaFacturas";
 
 type Factura = {
   id_factura: number;
@@ -27,18 +29,6 @@ type DeudaData = {
   saldo_confirmado: boolean;
   facturas_pendientes: Factura[];
 };
-
-function formatPrecio(precio: number) {
-  return `$${precio.toLocaleString("es-CL")}`;
-}
-
-function formatFecha(iso: string) {
-  return new Date(iso).toLocaleDateString("es-CL", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 function estadoBadge(estado: string): { label: string; tone: StatusTone } {
   const map: Record<string, { label: string; tone: StatusTone }> = {
@@ -159,50 +149,32 @@ export default function DeudaPage() {
                 <IrAPagarButton />
               </div>
 
-              <div className="p-6">
-                <h3 className="text-sm font-semibold text-foreground mb-3">
-                  Detalle de facturas
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-muted border-b border-border">
-                        <th className="pb-2 font-medium">Periodo</th>
-                        <th className="pb-2 font-medium">Monto</th>
-                        <th className="pb-2 font-medium">Vence</th>
-                        <th className="pb-2 font-medium">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {data.facturas_pendientes.map((f) => {
-                        const badge = estadoBadge(f.estado);
-                        return (
-                          <tr key={f.id_factura}>
-                            <td className="py-2 text-foreground">{f.periodo}</td>
-                            <td className="py-2 text-foreground">
-                              {formatPrecio(f.monto)}
-                            </td>
-                            <td className="py-2 text-muted">
-                              {formatFecha(f.fecha_limite_pago)}
-                              {f.dias_vencida != null && f.dias_vencida > 0 && (
-                                <span className="block text-xs text-error">
-                                  Hace {f.dias_vencida} día
-                                  {f.dias_vencida !== 1 ? "s" : ""}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2">
-                              <StatusBadge tone={badge.tone}>
-                                {badge.label}
-                              </StatusBadge>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <TablaFacturas>
+                {data.facturas_pendientes.map((f) => {
+                  const badge = estadoBadge(f.estado);
+                  return (
+                    <FilaFactura
+                      key={f.id_factura}
+                      periodo={f.periodo}
+                      monto={f.monto}
+                      vence={
+                        <>
+                          {fechaCalendario(f.fecha_limite_pago, "larga")}
+                          {f.dias_vencida != null && f.dias_vencida > 0 && (
+                            <span className="block text-xs text-error">
+                              Hace {f.dias_vencida} día
+                              {f.dias_vencida !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </>
+                      }
+                      estado={
+                        <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+                      }
+                    />
+                  );
+                })}
+              </TablaFacturas>
             </div>
           ) : (
             <div className="border border-border rounded-xl p-8 bg-background text-center">

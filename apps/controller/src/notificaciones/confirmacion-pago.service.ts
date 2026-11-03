@@ -27,9 +27,7 @@ export type PagoRegistrado = {
  * puede deduplicar solo, porque `log_notificacion` no tiene columna para
  * referenciar el pago.
  *
- * **Qué falta para que se dispare:** el pago. Hoy nada lo llama; se conecta al
- * construir el checkout (CU-42, CU-43), cuando se sepa dónde queda registrado
- * el pago confirmado.
+ * Lo llama el retorno de Webpay (CU-42), apenas G8 registra un pago nuevo.
  */
 @Injectable()
 export class ConfirmacionPagoService {

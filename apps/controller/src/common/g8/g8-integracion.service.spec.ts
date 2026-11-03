@@ -86,16 +86,6 @@ describe('G8IntegracionService', () => {
       expect(init?.redirect).toBe('error');
     });
 
-    it('por código de abonado pide las del contrato', async () => {
-      fetchMock.mockResolvedValue(respuesta(200, { items: [] }));
-
-      await service.facturas({ idEmpresa: 2, idContrato: 456 });
-
-      expect((fetchMock.mock.calls[0][0] as URL).href).toBe(
-        'https://g8.test/api/integrations/g2/invoices?id_empresa=2&id_contrato=456',
-      );
-    });
-
     it('sin vencimiento efectivo ni aceptaPagos, la factura igual se lee (con null)', async () => {
       fetchMock.mockResolvedValue(
         respuesta(200, { items: [{ idFactura: 7, saldoExigible: 1000 }] }),
@@ -217,6 +207,107 @@ describe('G8IntegracionService', () => {
       await expect(
         service.informarResultadoWifi(INFORME),
       ).rejects.toMatchObject({ status: 409 });
+    });
+  });
+
+  describe('registrarPago (§4)', () => {
+    /** Los valores del request de referencia de G8 (02-10-2026, §4). */
+    const PAGO = {
+      requestId: '550e8400-e29b-41d4-a716-446655440000',
+      idEmpresa: 1,
+      idFactura: 101,
+      monto: 14990,
+      fechaPago: '2026-10-02T18:15:00Z',
+      codigoAutorizacion: 'AUTH-987654',
+      codigoTransaccion: 'PORTAL-20261002-000001',
+      pasarela: 'PORTAL_G2',
+    };
+    /** La respuesta de referencia del mismo §4. */
+    const REGISTRADO = {
+      success: true,
+      data: {
+        id_pago: 9001,
+        id_factura: 101,
+        monto: 14990,
+        fecha_pago: '2026-10-02T18:15:00Z',
+        codigo_autorizacion: 'AUTH-987654',
+        codigo_transaccion: 'PORTAL-20261002-000001',
+        duplicado: false,
+        saldo: 0,
+        saldo_exigible: 0,
+        estado_factura: 'Pagada',
+      },
+    };
+
+    it('manda el body del contrato de G8 y devuelve el pago registrado', async () => {
+      fetchMock.mockResolvedValue(respuesta(200, REGISTRADO));
+
+      const registro = await service.registrarPago(PAGO);
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect((url as URL).href).toBe(
+        'https://g8.test/api/integrations/g2/payments',
+      );
+      expect(init?.method).toBe('POST');
+      expect(JSON.parse(init?.body as string)).toEqual({
+        request_id: PAGO.requestId,
+        id_empresa: 1,
+        id_factura: 101,
+        monto: 14990,
+        fecha_pago: '2026-10-02T18:15:00Z',
+        codigo_autorizacion: 'AUTH-987654',
+        codigo_transaccion: 'PORTAL-20261002-000001',
+        pasarela: 'PORTAL_G2',
+      });
+      expect((init?.headers as Record<string, string>)['X-API-KEY']).toBe(
+        API_KEY,
+      );
+      expect(registro).toEqual({ idPago: 9001, duplicado: false });
+    });
+
+    it('un reintento idéntico vuelve como duplicado', async () => {
+      fetchMock.mockResolvedValue(
+        respuesta(200, {
+          ...REGISTRADO,
+          data: { ...REGISTRADO.data, duplicado: true },
+        }),
+      );
+
+      await expect(service.registrarPago(PAGO)).resolves.toEqual({
+        idPago: 9001,
+        duplicado: true,
+      });
+    });
+
+    it('tras un corte reintenta con el mismo request_id', async () => {
+      fetchMock
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockResolvedValueOnce(respuesta(200, REGISTRADO));
+
+      await service.registrarPago(PAGO);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[1][1]?.body).toBe(
+        fetchMock.mock.calls[0][1]?.body,
+      );
+    });
+
+    it('un rechazo de G8 (sobrepago, factura cerrada…) se informa con su código', async () => {
+      fetchMock.mockResolvedValue(respuesta(422, { message: 'sobrepago' }));
+
+      await expect(service.registrarPago(PAGO)).rejects.toMatchObject({
+        status: 422,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('una respuesta 2xx que no se puede leer es un error: no se sabe si quedó registrado', async () => {
+      fetchMock.mockResolvedValue(respuesta(200, { ok: 'quizás' }));
+
+      const intento = service.registrarPago(PAGO);
+
+      await expect(intento).rejects.toBeInstanceOf(ErrorIntegracionG8);
+      await expect(intento).rejects.toMatchObject({ status: 200 });
     });
   });
 });

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { formatPrecioMensual, type PlanBackend } from "./api";
+import { formatPrecio } from "./formato";
+import type { PlanBackend } from "./api";
 import { COMPANY_BRAND } from "./company";
 import { esIndexable } from "./rutas-publicas";
 
@@ -107,7 +108,7 @@ export function resumenPlanes(planes: PlanBackend[]) {
 
   return {
     cantidad: planes.length,
-    precioDesde: `${formatPrecioMensual(Math.min(...planes.map((p) => p.precio_mensual)))}/mes`,
+    precioDesde: `${formatPrecio(Math.min(...planes.map((p) => p.precio_mensual)))}/mes`,
     mbpsDesde: velocidades.length > 0 ? Math.min(...velocidades) : null,
   };
 }
@@ -119,7 +120,7 @@ export function resumenPlanes(planes: PlanBackend[]) {
 export function metadataPlan(plan: PlanBackend | null, path: string): Metadata {
   if (!plan) return construir({ path }, { imagenPropia: true });
 
-  const precio = `${formatPrecioMensual(plan.precio_mensual)}/mes`;
+  const precio = `${formatPrecio(plan.precio_mensual)}/mes`;
   const descripcion = texto(plan.descripcion);
 
   return construir(

@@ -6,8 +6,13 @@ import {
 } from '../g8/g8-integracion.service.js';
 import { SALDO_CLIENTE_DEFINIDO } from '../pendientes.js';
 
-/** A quién se le cobra: por código de abonado, solo ese contrato. */
-export type Cuenta = { idCliente: number; idContrato: number | null };
+/** A quién se le cobra: el cliente, con todos sus contratos. */
+export type Cuenta = { idCliente: number };
+
+/** El saldo de la cuenta: la suma del `saldoExigible` que dio G8 por factura. */
+export function sumarSaldo(facturas: readonly FacturaG8[]): number {
+  return facturas.reduce((total, f) => total + f.saldoExigible, 0);
+}
 
 /**
  * El saldo que debe un cliente, tal como lo deja Grupo 8.
@@ -23,9 +28,8 @@ export type Cuenta = { idCliente: number; idContrato: number | null };
  * deuda pendiente identificada") y el aviso de corte en su Excepción 2, y nunca
  * se cobra ni se avisa un total inventado.
  *
- * Lo usan el pago (CU-42, CU-43: el total a cobrar) y el aviso de corte (CU-68:
- * el monto que se informa). Con `idContrato`, el saldo de ese contrato (pago por
- * código de abonado); sin él, el de todos los contratos del cliente.
+ * Lo usan el pago (CU-42: lo que se cobra de cada factura) y el aviso de corte (CU-68:
+ * el monto que se informa): el saldo de todos los contratos del cliente.
  */
 @Injectable()
 export class SaldoClienteService {
@@ -41,9 +45,7 @@ export class SaldoClienteService {
     saldoDefinido = SALDO_CLIENTE_DEFINIDO,
   ): Promise<number | null> {
     const facturas = await this.facturasDe(cuenta, saldoDefinido);
-    return facturas === null
-      ? null
-      : facturas.reduce((total, f) => total + f.saldoExigible, 0);
+    return facturas === null ? null : sumarSaldo(facturas);
   }
 
   /**
@@ -72,11 +74,7 @@ export class SaldoClienteService {
         return null;
       }
 
-      return await this.g8.facturas(
-        cuenta.idContrato === null
-          ? { idEmpresa, idCliente: cuenta.idCliente }
-          : { idEmpresa, idContrato: cuenta.idContrato },
-      );
+      return await this.g8.facturas({ idEmpresa, idCliente: cuenta.idCliente });
     } catch (error) {
       this.logger.warn(
         `No se pudieron obtener las facturas del cliente ${cuenta.idCliente} desde G8: ${error instanceof Error ? error.message : 'error desconocido'}`,

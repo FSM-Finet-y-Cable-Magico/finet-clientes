@@ -29,6 +29,8 @@ import {
   ESTADOS_CONTRATO_VIGENTES,
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
+import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
+import { formatPeriodo } from '../common/utils/periodo.js';
 import { MailService } from '../mail/mail.service.js';
 import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
@@ -268,7 +270,7 @@ export class PortalService {
 
       return {
         id_factura: f.id_factura,
-        periodo: this.formatPeriodo(f.periodo_mes, f.periodo_anio),
+        periodo: formatPeriodo(f.periodo_mes, f.periodo_anio),
         monto: Number(f.monto ?? 0),
         fecha_limite_pago: limite.toISOString().split('T')[0],
         estado: f.estado,
@@ -339,7 +341,7 @@ export class PortalService {
         id_pago: p.id_pago,
         fecha_pago: p.fecha_pago.toISOString(),
         periodo: p.factura
-          ? this.formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
+          ? formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
           : null,
         monto: Number(p.monto),
         pasarela: this.nombreMedio(p.pasarela),
@@ -391,8 +393,10 @@ export class PortalService {
     };
   }
 
+  /** CU-71: solo las categorías que el cliente puede elegir (§11.9). */
   async getCategoriasTicket(): Promise<CategoriaTicketDto[]> {
     return this.prisma.categoria_falla.findMany({
+      where: FILTRO_CATEGORIAS_CLIENTE,
       select: { id_categoria: true, nombre: true },
       orderBy: { nombre: 'asc' },
     });
@@ -429,8 +433,12 @@ export class PortalService {
           throw new NotFoundException('Cliente no encontrado');
         }
 
-        const categoria = await tx.categoria_falla.findUnique({
-          where: { id_categoria: dto.id_categoria },
+        // Una categoría interna de otro grupo no se acepta aunque llegue su id.
+        const categoria = await tx.categoria_falla.findFirst({
+          where: {
+            id_categoria: dto.id_categoria,
+            ...FILTRO_CATEGORIAS_CLIENTE,
+          },
           select: { id_categoria: true, nombre: true },
         });
 
@@ -501,7 +509,7 @@ export class PortalService {
     };
   }
 
-  // CU-29 / CU-30: Tickets de soporte :DDDDDDDDD AHGG AYUDA
+  // CU-29 / CU-30: tickets de soporte del cliente
   async getTickets(
     idCliente: number,
     limite?: number,
@@ -969,24 +977,5 @@ export class PortalService {
       );
       return null;
     }
-  }
-
-  // variables meses xD
-  private formatPeriodo(mes: number, anio: number): string {
-    const meses = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ];
-    return `${meses[mes - 1]} ${anio}`;
   }
 }

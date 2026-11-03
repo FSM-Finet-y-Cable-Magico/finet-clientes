@@ -41,8 +41,11 @@ export const RUTAS_PUBLICAS: RutaPublica[] = [
   // Solo sirven a quien ya llego desde el login o el correo.
   { path: "/recuperar-password", indexable: false },
   { path: "/restablecer-password", indexable: false },
-  // CU-42/43: se llega con la cuenta ya identificada (RUT, abonado o enlace).
+  { path: "/registro/confirmar", indexable: false },
+  // CU-42/43: se llega con la cuenta ya identificada (RUT o enlace).
   { path: "/pagar", indexable: false },
+  // CU-42: se llega solo desde Webpay, al terminar un pago.
+  { path: "/pagar/resultado", indexable: false },
 ];
 
 /** Las mismas que protege `proxy.ts`; robots.txt las bloquea. */
