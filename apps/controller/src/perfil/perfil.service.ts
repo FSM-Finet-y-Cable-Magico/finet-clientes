@@ -14,6 +14,16 @@ import {
   type PerfilResponseDto,
 } from './dto/perfil.dto.js';
 
+/** Lo que devuelve el perfil (CU-07) y cada cambio (CU-08 y 09). */
+const SELECT_PERFIL = {
+  id_cliente: true,
+  nombre_completo: true,
+  rut: true,
+  email: true,
+  telefono: true,
+  fecha_creacion: true,
+} as const;
+
 @Injectable()
 export class PerfilService {
   private readonly logger = new Logger(PerfilService.name);
@@ -23,30 +33,14 @@ export class PerfilService {
   async getPerfil(idCliente: number): Promise<PerfilResponseDto> {
     const cliente = await this.prisma.cliente.findUnique({
       where: { id_cliente: idCliente },
-      select: {
-        id_cliente: true,
-        nombre_completo: true,
-        rut: true,
-        email: true,
-        telefono: true,
-        fecha_creacion: true,
-      },
+      select: SELECT_PERFIL,
     });
 
     if (!cliente) {
       throw new NotFoundException('Cliente no encontrado');
     }
 
-    return {
-      id_cliente: cliente.id_cliente,
-      nombre_completo: cliente.nombre_completo,
-      rut: cliente.rut,
-      email: cliente.email,
-      telefono: cliente.telefono,
-      fecha_creacion: cliente.fecha_creacion
-        ? cliente.fecha_creacion.toISOString()
-        : null,
-    };
+    return this.mapearPerfil(cliente);
   }
 
   async actualizarTelefono(
@@ -54,35 +48,15 @@ export class PerfilService {
     dto: ActualizarTelefonoDto,
     ip: string,
   ): Promise<PerfilResponseDto> {
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { id_cliente: idCliente },
-      select: { password_portal_hash: true, telefono: true },
-    });
-
-    if (!cliente || !cliente.password_portal_hash) {
-      throw new NotFoundException('Cliente no encontrado');
-    }
-
-    const passwordValida = await bcrypt.compare(
+    const cliente = await this.verificarPasswordActual(
+      idCliente,
       dto.password_actual,
-      cliente.password_portal_hash,
     );
-
-    if (!passwordValida) {
-      throw new UnauthorizedException('La contraseña actual es incorrecta');
-    }
 
     const actualizado = await this.prisma.cliente.update({
       where: { id_cliente: idCliente },
       data: { telefono: dto.telefono },
-      select: {
-        id_cliente: true,
-        nombre_completo: true,
-        rut: true,
-        email: true,
-        telefono: true,
-        fecha_creacion: true,
-      },
+      select: SELECT_PERFIL,
     });
 
     await this.prisma.log_auditoria.create({
@@ -94,7 +68,9 @@ export class PerfilService {
           cliente.telefono !== null
             ? { telefono: cliente.telefono }
             : undefined,
-        valor_nuevo: { telefono: dto.telefono },
+        // El acuerdo v2.0 con G8 pide auditar el origen PORTAL de este cambio
+        // (§3 y §12): el teléfono lo puede escribir más de un grupo.
+        valor_nuevo: { telefono: dto.telefono, origen: 'PORTAL' },
         ip_origen: ip,
       },
     });
@@ -107,23 +83,10 @@ export class PerfilService {
     dto: ActualizarEmailDto,
     ip: string,
   ): Promise<PerfilResponseDto> {
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { id_cliente: idCliente },
-      select: { password_portal_hash: true, email: true },
-    });
-
-    if (!cliente || !cliente.password_portal_hash) {
-      throw new NotFoundException('Cliente no encontrado');
-    }
-
-    const passwordValida = await bcrypt.compare(
+    const cliente = await this.verificarPasswordActual(
+      idCliente,
       dto.password_actual,
-      cliente.password_portal_hash,
     );
-
-    if (!passwordValida) {
-      throw new UnauthorizedException('La contraseña actual es incorrecta');
-    }
 
     if (dto.email === cliente.email) {
       throw new BadRequestException(
@@ -147,14 +110,7 @@ export class PerfilService {
     const actualizado = await this.prisma.cliente.update({
       where: { id_cliente: idCliente },
       data: { email: dto.email },
-      select: {
-        id_cliente: true,
-        nombre_completo: true,
-        rut: true,
-        email: true,
-        telefono: true,
-        fecha_creacion: true,
-      },
+      select: SELECT_PERFIL,
     });
 
     await this.prisma.log_auditoria.create({
@@ -164,7 +120,8 @@ export class PerfilService {
         id_entidad_afectada: idCliente,
         valor_anterior:
           cliente.email !== null ? { email: cliente.email } : undefined,
-        valor_nuevo: { email: dto.email },
+        // Origen PORTAL por el acuerdo v2.0 con G8 (§3 y §12), igual que el teléfono.
+        valor_nuevo: { email: dto.email, origen: 'PORTAL' },
         ip_origen: ip,
       },
     });
@@ -177,23 +134,10 @@ export class PerfilService {
     dto: CambiarPasswordDto,
     ip: string,
   ): Promise<{ mensaje: string }> {
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { id_cliente: idCliente },
-      select: { password_portal_hash: true },
-    });
-
-    if (!cliente || !cliente.password_portal_hash) {
-      throw new NotFoundException('Cliente no encontrado');
-    }
-
-    const passwordValida = await bcrypt.compare(
+    const cliente = await this.verificarPasswordActual(
+      idCliente,
       dto.password_actual,
-      cliente.password_portal_hash,
     );
-
-    if (!passwordValida) {
-      throw new UnauthorizedException('La contrasena actual es incorrecta');
-    }
 
     const nuevaIgual = await bcrypt.compare(
       dto.password_nuevo,
@@ -223,6 +167,44 @@ export class PerfilService {
     });
 
     return { mensaje: 'Contrasena actualizada correctamente' };
+  }
+
+  /**
+   * CU-08, 09 y 10: cambiar un dato del perfil pide la contraseña actual
+   * (Excepción 2 de cada uno). Devuelve lo que cada cambio necesita: el hash y
+   * los valores de antes para la auditoría.
+   */
+  private async verificarPasswordActual(
+    idCliente: number,
+    passwordActual: string,
+  ): Promise<{
+    password_portal_hash: string;
+    telefono: string | null;
+    email: string | null;
+  }> {
+    const cliente = await this.prisma.cliente.findUnique({
+      where: { id_cliente: idCliente },
+      select: { password_portal_hash: true, telefono: true, email: true },
+    });
+
+    if (!cliente || !cliente.password_portal_hash) {
+      throw new NotFoundException('Cliente no encontrado');
+    }
+
+    const passwordValida = await bcrypt.compare(
+      passwordActual,
+      cliente.password_portal_hash,
+    );
+
+    if (!passwordValida) {
+      throw new UnauthorizedException('La contraseña actual es incorrecta');
+    }
+
+    return {
+      password_portal_hash: cliente.password_portal_hash,
+      telefono: cliente.telefono,
+      email: cliente.email,
+    };
   }
 
   private mapearPerfil(c: {

@@ -32,12 +32,6 @@ export default function DashboardSkeleton() {
         <div className="h-9 w-32 rounded-full bg-surface-deep" />
       </div>
 
-      {/* Ookla */}
-      <div className="rounded-2xl bg-surface p-5 shadow-sm animate-pulse flex flex-col gap-3">
-        <div className="h-3 w-28 rounded bg-surface-deep" />
-        <div className="h-24 w-full rounded bg-surface-deep" />
-      </div>
-
       {/* Tickets */}
       <div className="rounded-2xl bg-surface p-5 shadow-sm animate-pulse flex flex-col gap-3">
         <div className="h-3 w-28 rounded bg-surface-deep" />

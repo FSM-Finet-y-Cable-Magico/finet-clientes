@@ -144,7 +144,7 @@ describe('PerfilService', () => {
           entidad_afectada: 'cliente',
           id_entidad_afectada: 1,
           valor_anterior: { telefono: '+56912345678' },
-          valor_nuevo: { telefono: '+56987654321' },
+          valor_nuevo: { telefono: '+56987654321', origen: 'PORTAL' },
           ip_origen: '127.0.0.1',
         },
       });
@@ -257,7 +257,7 @@ describe('PerfilService', () => {
           entidad_afectada: 'cliente',
           id_entidad_afectada: 1,
           valor_anterior: { email: 'juan@test.cl' },
-          valor_nuevo: { email: 'nuevo@test.cl' },
+          valor_nuevo: { email: 'nuevo@test.cl', origen: 'PORTAL' },
           ip_origen: '192.168.1.1',
         },
       });
@@ -335,7 +335,7 @@ describe('PerfilService', () => {
 
       await expect(
         service.cambiarPassword(1, dto, '127.0.0.1'),
-      ).rejects.toThrow('La contrasena actual es incorrecta');
+      ).rejects.toThrow('La contraseña actual es incorrecta');
     });
 
     it('CU-10: lanza BadRequestException si nueva password igual a actual', async () => {

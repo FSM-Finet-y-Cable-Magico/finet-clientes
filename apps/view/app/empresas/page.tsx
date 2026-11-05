@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
+import { metadataSeccion } from "../_lib/seo";
 import PlanCard from "../_components/catalog/PlanCard";
-import { getLandingPlanes } from "../_lib/api";
+import { getLandingPlanes, ordenarPorPrecio } from "../_lib/api";
+import { COMPANY_PHONE_DISPLAY, WHATSAPP_URL } from "../_lib/company";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = metadataSeccion({
+  path: "/empresas",
   title: "Planes Empresa",
   description:
     "Soluciones de Internet fibra optica y conectividad para empresas y pymes en La Pintana, Puente Alto, La Florida y La Granja. Facturacion empresa y soporte comercial.",
-  openGraph: {
-    title: "Planes Empresa — Finet Fibra Optica",
-    description:
-      "Internet fibra optica corporativa para empresas en la zona sur de Santiago.",
-  },
-};
+  shareTitle: "Planes Empresa — Finet Fibra Optica",
+  shareDescription:
+    "Internet fibra optica corporativa para empresas en la zona sur de Santiago.",
+});
 
 export default async function EmpresasPage() {
   const planes = await getLandingPlanes("EMPRESARIAL");
-  const sorted = [...planes].sort((a, b) => a.precio_mensual - b.precio_mensual);
+  const sorted = ordenarPorPrecio(planes);
 
   return (
     <section className="px-4 py-12">
@@ -46,10 +47,10 @@ export default async function EmpresasPage() {
             <p className="mt-4 text-sm font-medium text-foreground">
               WhatsApp:{" "}
               <a
-                href="https://wa.me/569XXXXXXXX"
+                href={WHATSAPP_URL}
                 className="text-primary hover:underline"
               >
-                +56 9 XXXX XXXX
+                {COMPANY_PHONE_DISPLAY}
               </a>
             </p>
           </div>

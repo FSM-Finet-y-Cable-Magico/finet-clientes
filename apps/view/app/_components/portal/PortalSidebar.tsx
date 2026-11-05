@@ -3,12 +3,21 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { LayoutDashboard, FileText, CreditCard, MessageSquare, User, X, LogOut, AlertCircle } from "lucide-react";
+import {
+  LayoutDashboard,
+  Wifi,
+  CreditCard,
+  MessageSquare,
+  User,
+  X,
+  LogOut,
+  AlertCircle,
+} from "lucide-react";
 import { useAuth } from "../../_lib/auth";
 
 const navItems = [
   { href: "/portal", label: "Panel", icon: LayoutDashboard },
-  { href: "/portal/contratos", label: "Mis Contratos", icon: FileText },
+  { href: "/portal/servicios", label: "Mis Servicios", icon: Wifi },
   { href: "/portal/deuda", label: "Mi Deuda", icon: CreditCard },
   { href: "/portal/tickets", label: "Tickets", icon: MessageSquare },
   { href: "/perfil", label: "Mi Perfil", icon: User },

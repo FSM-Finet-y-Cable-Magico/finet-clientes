@@ -54,7 +54,7 @@ Requiere la contrasena actual para autorizar el cambio. El cambio queda registra
 
 ```json
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "telefono": "+56987654321"
 }
 ```
@@ -103,7 +103,7 @@ Requiere la contrasena actual para autorizar el cambio. Rechaza si el nuevo emai
 
 ```json
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "email": "nuevo@correo.cl"
 }
 ```
@@ -149,9 +149,9 @@ Requiere la contrasena actual. La nueva contrasena debe cumplir requisitos de co
 
 ```json
 {
-  "password_actual": "MiClave1",
-  "password_nuevo": "NuevaClave2!",
-  "password_confirmacion": "NuevaClave2!"
+  "password_actual": "<contraseña actual>",
+  "password_nuevo": "<contraseña nueva>",
+  "password_confirmacion": "<contraseña nueva>"
 }
 ```
 
@@ -162,7 +162,6 @@ Requiere la contrasena actual. La nueva contrasena debe cumplir requisitos de co
 | Minimo 8 caracteres | `"Mínimo 8 caracteres"` |
 | Al menos 1 mayuscula | `"Debe contener al menos una letra mayúscula"` |
 | Al menos 1 numero | `"Debe contener al menos un número"` |
-| Al menos 1 caracter especial | `"Debe contener al menos un carácter especial"` |
 | No igual a la actual | `"La nueva contrasena no puede ser igual a la actual"` |
 | Coincidir confirmacion | `"Las contraseñas no coinciden"` |
 
@@ -181,7 +180,6 @@ Requiere la contrasena actual. La nueva contrasena debe cumplir requisitos de co
 | 400 | `"Mínimo 8 caracteres"` | Muy corta |
 | 400 | `"Debe contener al menos una letra mayúscula"` | Falta mayuscula |
 | 400 | `"Debe contener al menos un número"` | Falta numero |
-| 400 | `"Debe contener al menos un carácter especial"` | Falta especial |
 | 400 | `"Las contraseñas no coinciden"` | password_nuevo ≠ password_confirmacion |
 | 400 | `"La nueva contrasena no puede ser igual a la actual"` | Misma contrasena |
 | 401 | `"La contrasena actual es incorrecta"` | Password actual incorrecta |
@@ -203,7 +201,7 @@ const res = await fetch(`${API_URL}/auth/perfil/telefono`, {
     Authorization: `Bearer ${token}`,
   },
   body: JSON.stringify({
-    password_actual: 'MiClave1',
+    password_actual: '<contraseña actual>',
     telefono: '+56987654321',
   }),
 });

@@ -1,0 +1,21 @@
+-- Aplica a la base lo que el schema ya declara desde el 06-06-2026 (commit
+-- 67ed988, "fix(auth): agrandar columna token y extraer JWT desde cookie"):
+-- `sesion_portal.token` quedo como `@db.Text` en schema.prisma pero nunca se
+-- genero la migracion, asi que toda base creada desde el repo se quedo con el
+-- VARCHAR(255) que puso la migracion `init`.
+--
+-- Sin este cambio el login responde 500 a cualquier cliente: el JWT que firma
+-- AuthService mide 265 caracteres (sub + rut + type + exp a 7d + audience +
+-- issuer + firma) y no cabe en 255, asi que el INSERT en `sesion_portal`
+-- falla con "value too long for the column's type" y se cae antes de
+-- devolver la sesion. En Postgres TEXT no reserva espacio extra: guarda lo
+-- que se le ponga.
+--
+-- Solo se toca esa columna. Las 5 columnas `telefono` (canal_whatsapp,
+-- cliente, prospecto, proveedor, tecnico_externo) tienen el mismo tipo de
+-- desajuste — el schema dice VarChar(21) y la base tiene VARCHAR(20) — y
+-- quedan pendientes a proposito: son un arreglo aparte y no se empaquetan
+-- aca, que fue el reparo de Dani al PR #6.
+
+-- AlterTable
+ALTER TABLE "sesion_portal" ALTER COLUMN "token" SET DATA TYPE TEXT;

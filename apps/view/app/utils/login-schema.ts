@@ -30,76 +30,27 @@ function validateRut(rut: string) {
   return expectedDv === dv;
 }
 
-function validateTelefonoChileno(telefono: string) {
-  const cleaned = telefono.replace(/\s/g, "");
-  if (!/^\+56\d{9}$/.test(cleaned)) return false;
-  const digits = cleaned.slice(3);
-  const first = digits[0];
-  if (first === "9") return /^9\d{8}$/.test(digits);
-  if (["2", "3", "4", "5", "6", "7", "8"].includes(first)) return true;
-  return false;
-}
+const rutField = z
+  .string({ message: "El RUT es obligatorio" })
+  .min(1, "El RUT es obligatorio")
+  .refine((val) => validateRut(val), "RUT inválido");
 
-export const loginSchema = z.object({
-  rut: z
-    .string({ message: "El RUT es obligatorio" })
-    .min(1, "El RUT es obligatorio")
-    .refine((val) => validateRut(val), "RUT inválido"),
-  password: z
-    .string({ message: "La contraseña es obligatoria" })
-    .min(8, "Mínimo 8 caracteres")
-    .regex(/^(?=.*[A-Z])(?=.*\d).+$/, "Al menos 1 mayúscula y 1 número"),
-});
-
-export const registerSchema = z
-  .object({
-    nombreCompleto: z
-      .string({ message: "El nombre es obligatorio" })
-      .min(2, "El nombre debe tener al menos 2 caracteres")
-      .max(100, "El nombre es demasiado largo")
-      .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, "Solo letras y espacios"),
-    email: z
-      .string({ message: "El email es obligatorio" })
-      .min(1, "El email es obligatorio")
-      .email("Email inválido")
-      .max(254, "El email es demasiado largo"),
-    telefono: z
-      .string()
-      .optional()
-      .refine(
-        (val) => !val || val === "" || validateTelefonoChileno(val),
-        "Teléfono chileno inválido",
-      ),
-    rut: z
-      .string({ message: "El RUT es obligatorio" })
-      .min(1, "El RUT es obligatorio")
-      .refine((val) => validateRut(val), "RUT inválido"),
-    password: z
-      .string({ message: "La contraseña es obligatoria" })
-      .min(8, "Mínimo 8 caracteres")
-      .max(128, "La contraseña es demasiado larga")
-      .regex(/^(?=.*[A-Z])(?=.*\d).+$/, "Al menos 1 mayúscula y 1 número"),
-    confirmPassword: z
-      .string({ message: "Debes confirmar la contraseña" })
-      .min(1, "Debes confirmar la contraseña"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Las contraseñas no coinciden",
-    path: ["confirmPassword"],
-  });
-
-export const recoverySchema = z.object({
-  rut: z
-    .string({ message: "El RUT es obligatorio" })
-    .min(1, "El RUT es obligatorio")
-    .refine((val) => validateRut(val), "RUT inválido"),
-});
-
+// RF-09 / CU-11: 8 caracteres como mínimo, una mayúscula y un número. El tope
+// de 72 es el del backend: bcrypt no usa lo que pasa de ahí.
 const passwordField = z
   .string({ message: "La contraseña es obligatoria" })
   .min(8, "Mínimo 8 caracteres")
-  .max(128, "La contraseña es demasiado larga")
+  .max(72, "La contraseña es demasiado larga")
   .regex(/^(?=.*[A-Z])(?=.*\d).+$/, "Al menos 1 mayúscula y 1 número");
+
+export const loginSchema = z.object({
+  rut: rutField,
+  password: passwordField,
+});
+
+export const recoverySchema = z.object({
+  rut: rutField,
+});
 
 export const resetPasswordSchema = z
   .object({
@@ -118,16 +69,8 @@ export const changePasswordSchema = z
     passwordActual: z
       .string({ message: "La contraseña actual es requerida" })
       .min(1, "La contraseña actual es requerida"),
-    passwordNuevo: z
-      .string({ message: "La nueva contraseña es obligatoria" })
-      .min(8, "Mínimo 8 caracteres")
-      .max(128, "La contraseña es demasiado larga")
-      .regex(/[A-Z]/, "Al menos 1 letra mayúscula")
-      .regex(/[0-9]/, "Al menos 1 número")
-      .regex(
-        /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/,
-        "Al menos 1 carácter especial",
-      ),
+    // RF-09 / CU-11: misma regla que registro y recuperación
+    passwordNuevo: passwordField,
     passwordConfirmacion: z
       .string({ message: "Debes confirmar la nueva contraseña" })
       .min(1, "Debes confirmar la nueva contraseña"),
@@ -136,13 +79,3 @@ export const changePasswordSchema = z
     message: "Las contraseñas no coinciden",
     path: ["passwordConfirmacion"],
   });
-
-export type LoginInput = z.infer<typeof loginSchema>;
-
-export type RegisterInput = z.infer<typeof registerSchema>;
-
-export type RecoveryInput = z.infer<typeof recoverySchema>;
-
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
-
-export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

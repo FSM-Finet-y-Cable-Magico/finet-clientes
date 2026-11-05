@@ -8,16 +8,33 @@ const cspHeader = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  "connect-src 'self' https://finet.cl http://localhost:4000",
+  // CU-34/35: el test de velocidad transfiere contra los CDN de Netflix, cuyo
+  // subdominio cambia segun la red desde la que se pide
+  // (`ipv4-cXXX-...-isp.N.oca.nflxvideo.net`), asi que necesita comodin.
+  // `api.fast.com` no va aca: solo acepta el origen https://fast.com, asi que
+  // los servidores los pide el backend y no el navegador.
+  "connect-src 'self' https://finet.cl http://localhost:4000 https://*.nflxvideo.net",
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  // CU-42: Transbank pide llevar al cliente a Webpay con un formulario POST
+  // (integracion y produccion). Ningun otro destino.
+  "form-action 'self' https://webpay3gint.transbank.cl https://webpay3g.transbank.cl",
 ].join("; ");
 
 const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
+  },
+  // CU-73: las paginas legales dejaron /legal/*. Ley 21.398 y reclamos pasaron
+  // a ser secciones de Terminos.
+  async redirects() {
+    return [
+      { source: "/legal/terminos", destination: "/terminos", permanent: true },
+      { source: "/legal/privacidad", destination: "/privacidad", permanent: true },
+      { source: "/legal/reclamos", destination: "/terminos#reclamos", permanent: true },
+      { source: "/legal/ley-21398", destination: "/terminos#termino", permanent: true },
+    ];
   },
   async headers() {
     return [

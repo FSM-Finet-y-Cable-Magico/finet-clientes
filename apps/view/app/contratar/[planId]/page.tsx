@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import FormularioContratacion from "../../_components/catalog/FormularioContratacion";
-import { getLandingPlanes, getPlanById, formatPrecioMensual } from "../../_lib/api";
+import { getLandingPlanes, getPlanById } from "../../_lib/api";
+import { formatPrecio } from "../../_lib/formato";
 import { productJsonLd, breadcrumbJsonLd } from "../../_lib/jsonld";
 import { BASE_URL } from "../../_lib/consts";
+import { metadataPlan } from "../../_lib/seo";
 
 type ContratarPlanPageProps = {
   params: Promise<{
@@ -24,23 +26,7 @@ export async function generateMetadata({
 }: ContratarPlanPageProps): Promise<Metadata> {
   const { planId } = await params;
   const plan = await getPlanById(Number(planId));
-
-  if (!plan) {
-    return { title: "Plan no encontrado" };
-  }
-
-  return {
-    title: `Contratar ${plan.nombre_comercial}`,
-    description: `Solicita la contratacion de ${plan.nombre_comercial} — ${plan.descripcion ?? "Internet fibra optica"} por $${plan.precio_mensual.toLocaleString("es-CL")}/mes. Internet fibra optica en La Pintana y Puente Alto.`,
-    openGraph: {
-      title: `Contratar ${plan.nombre_comercial} | Finet`,
-      description: `${plan.nombre_comercial} por $${plan.precio_mensual.toLocaleString("es-CL")}/mes. Fibra optica en La Pintana.`,
-    },
-    robots: {
-      index: false,
-      follow: false,
-    },
-  };
+  return metadataPlan(plan, `/contratar/${planId}`);
 }
 
 export default async function ContratarPlanPage({ params }: ContratarPlanPageProps) {
@@ -92,7 +78,7 @@ export default async function ContratarPlanPage({ params }: ContratarPlanPagePro
         <h1 className="text-2xl font-medium">Solicitud de contratacion</h1>
         <p className="text-muted">
           Plan seleccionado: <strong>{plan.nombre_comercial}</strong> &mdash;{" "}
-          {formatPrecioMensual(plan.precio_mensual)}/mes
+          {formatPrecio(plan.precio_mensual)}/mes
         </p>
         <FormularioContratacion plan={plan} />
       </div>

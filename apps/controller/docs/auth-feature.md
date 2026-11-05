@@ -9,7 +9,8 @@ Base URL: `http://localhost:4000/api`
 | Método | Ruta | Auth | Rate Limit | Descripción |
 |---|---|---|---|---|
 | `POST` | `/auth/login` | No | 5 req/min | Iniciar sesión con RUT y contraseña |
-| `POST` | `/auth/register` | No | 3 req/min | Registrar nuevo cliente + JWT |
+| `POST` | `/auth/registro` | No | 3 req/min | CU-04: pedir el enlace para crear la cuenta |
+| `POST` | `/auth/registro/confirmar` | No | 3 req/min | CU-04: crear la contraseña con el enlace + JWT |
 | `POST` | `/auth/recuperar-password` | No | 3 req/min | Solicitar token de recuperación |
 | `POST` | `/auth/restablecer-password` | No | 3 req/min | Restablecer contraseña con token |
 | `POST` | `/auth/logout` | JWT | 10 req/min | Cerrar sesión activa |
@@ -17,8 +18,6 @@ Base URL: `http://localhost:4000/api`
 | `PATCH` | `/auth/perfil/telefono` | JWT | 10 req/min | Actualizar teléfono |
 | `PATCH` | `/auth/perfil/email` | JWT | 10 req/min | Actualizar correo electrónico |
 | `PATCH` | `/auth/perfil/password` | JWT | 10 req/min | Cambiar contraseña |
-| `GET` | `/admin/intentos-fallidos` | API Key | 10 req/min | Historial de intentos fallidos |
-| `POST` | `/admin/intentos-fallidos/desbloquear-ip` | API Key | 10 req/min | Desbloquear una IP manualmente |
 
 ---
 
@@ -61,34 +60,66 @@ Content-Type: application/json
 
 ---
 
-## POST /auth/register
+## POST /auth/registro
 
-Registra un nuevo cliente y devuelve JWT automáticamente.
+CU-04, paso 1. La cuenta se crea sobre un cliente que ya existe: el cliente lo da de alta G8 (acuerdo v2.0, §3 y §4) y el portal no crea clientes. Conocer el RUT no basta: la contraseña se crea con un enlace de un solo uso que va al correo que el cliente ya tiene registrado (G8, 01-10, §6).
 
 ```
-POST /api/auth/register
+POST /api/auth/registro
 Content-Type: application/json
 
 {
-  "rut": "12.345.678-5",
-  "nombre_completo": "Juan Perez",
-  "email": "juan@ejemplo.cl",
-  "telefono": "912345678",
-  "password": "MiClave1",
-  "password_confirmation": "MiClave1"
+  "rut": "12.345.678-5"
 }
 ```
 
-**Validación de contraseña:**
-- Mínimo 8 caracteres
-- Al menos 1 mayúscula
-- Al menos 1 número
-- Máximo 72 caracteres (límite bcrypt)
+**Respuesta 200:**
+```json
+{
+  "resultado": "ENLACE_ENVIADO"
+}
+```
 
-**Campos obligatorios:** `rut`, `nombre_completo`, `email`, `password`, `password_confirmation`
-**Campo opcional:** `telefono` (puede omitirse o enviarse como `""`)
+| `resultado` | Cuándo | Qué hace |
+|---|---|---|
+| `NO_CLIENTE` | El RUT no es de un cliente, o su estado no es `'activo'` (como en el login) | Nada |
+| `YA_REGISTRADO` | El cliente ya tiene contraseña (Excepción 4 del CU-04) | Nada |
+| `SIN_CORREO` | El cliente no tiene correo registrado | Nada: la activación es manual (G8, 01-10, §6.2) |
+| `ENLACE_ENVIADO` | Cliente activo, sin contraseña y con correo | Envía al correo un enlace `/registro/confirmar#token=...` |
 
-**Respuesta 201:**
+El texto de cada caso lo pone la vista. A diferencia de `recuperar-password`, la respuesta dice si el RUT es cliente: la Excepción 4 del CU-04 pide informar que ya hay una cuenta, y la consulta pública de deuda (CU-39) ya lo dice.
+
+**Errores:**
+| Código | Mensaje | Causa |
+|---|---|---|
+| 400 | Validation failed | RUT con formato inválido o DV incorrecto |
+| 429 | ThrottlerException | Excede 3 req/min |
+| 503 | No pudimos enviar el correo. Intenta de nuevo en unos minutos | Falló el envío del enlace |
+
+**Notas:**
+- El token es un JWT con claim `type: "registro"`, expira en 30 minutos y es de un solo uso (RNF-04.1), con la misma huella que el de recuperación.
+- Un enlace de registro no sirve para restablecer la contraseña, ni al revés, y ninguno sirve como sesión.
+
+---
+
+## POST /auth/registro/confirmar
+
+CU-04, paso 2. Con el enlace del correo, el cliente crea su contraseña (CU-11), acepta la Política de Privacidad (CU-75) y queda con la sesión iniciada (poscondición del CU-04), igual que en el login.
+
+```
+POST /api/auth/registro/confirmar
+Content-Type: application/json
+
+{
+  "token": "eyJhbGciOi...",
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>",
+  "acepta_politica_privacidad": true,
+  "version_politica_privacidad": "1.1"
+}
+```
+
+**Respuesta 200** (y la cookie httpOnly `access_token`, como el login):
 ```json
 {
   "access_token": "eyJhbGciOi...",
@@ -102,11 +133,19 @@ Content-Type: application/json
 }
 ```
 
+**Efectos**, en una sola transacción:
+- Fija `password_portal_hash` en la tabla `cliente`, condicionado a que no haya cambiado desde que se pidió el enlace
+- Registra la aceptación de la política en `log_auditoria` (formulario `REGISTRO`)
+- Después abre la sesión en `sesion_portal` y cierra las anteriores
+
 **Errores:**
 | Código | Mensaje | Causa |
 |---|---|---|
-| 400 | Validation failed | Campos inválidos (RUT, email, contraseña débil) |
-| 409 | No se pudo completar el registro | RUT o email duplicado |
+| 400 | Validation failed | Contraseña débil, contraseñas que no coinciden (Excepción 3), o casilla sin marcar |
+| 400 | Token inválido o expirado | Token expiró (>30 min) o firma inválida |
+| 400 | Token inválido | El token no es de tipo `registro` (ej: de recuperación o de sesión) |
+| 400 | Este enlace ya fue usado. Si todavía no tienes contraseña, solicita uno nuevo | El enlace ya se usó, o la contraseña cambió después de pedirlo (RNF-04.1) |
+| 400 | No encontramos una cuenta de cliente activa para este enlace | El cliente dejó de estar activo después de pedir el enlace |
 | 429 | ThrottlerException | Excede 3 req/min |
 
 ---
@@ -132,7 +171,7 @@ Content-Type: application/json
 ```
 
 **Comportamiento interno:**
-- RUT registrado con email → genera token JWT `type: "reset"` (15 min), envía email con enlace (token en fragmento `#token=...`, no visible al servidor)
+- RUT registrado con email → genera token JWT `type: "reset"` (30 min), envía email con enlace (token en fragmento `#token=...`, no visible al servidor)
 - RUT registrado sin email → registra incidente en `intento_fallido`, no envía email
 - RUT no registrado → no hace nada, mismo mensaje genérico
 
@@ -143,7 +182,7 @@ Content-Type: application/json
 | 429 | ThrottlerException | Excede 3 req/min |
 
 **Notas:**
-- El token en el enlace es un JWT firmado con claim `type: "reset"`, expira en 15 minutos.
+- El token en el enlace es un JWT firmado con claim `type: "reset"`, expira en 30 minutos y es de un solo uso (RNF-04.1): lleva una huella de la contraseña vigente al pedirlo, y deja de servir cuando la contraseña cambia.
 - Si falla el envío del email, se registra en el log del servidor y se devuelve el mensaje genérico igualmente.
 
 ---
@@ -158,7 +197,7 @@ Content-Type: application/json
 
 {
   "token": "eyJhbGciOi...",
-  "password": "NuevaClave1"
+  "password": "<contraseña nueva>"
 }
 ```
 
@@ -177,8 +216,9 @@ Content-Type: application/json
 **Errores:**
 | Código | Mensaje | Causa |
 |---|---|---|
-| 400 | Token inválido o expirado | Token expiró (>15 min) o firma inválida |
+| 400 | Token inválido o expirado | Token expiró (>30 min) o firma inválida |
 | 400 | Token inválido | El token no es de tipo `reset` (ej: token de sesión) |
+| 400 | Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo | El enlace ya se usó, o la contraseña cambió después de pedirlo (RNF-04.1) |
 | 429 | ThrottlerException | Excede 3 req/min |
 
 ---
@@ -244,7 +284,7 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "telefono": "+56987654321"
 }
 ```
@@ -284,7 +324,7 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
+  "password_actual": "<contraseña actual>",
   "email": "nuevo@correo.cl"
 }
 ```
@@ -323,9 +363,9 @@ Authorization: Bearer <jwt>
 Content-Type: application/json
 
 {
-  "password_actual": "MiClave1",
-  "password_nuevo": "NuevaClave2!",
-  "password_confirmacion": "NuevaClave2!"
+  "password_actual": "<contraseña actual>",
+  "password_nuevo": "<contraseña nueva>",
+  "password_confirmacion": "<contraseña nueva>"
 }
 ```
 
@@ -333,7 +373,6 @@ Content-Type: application/json
 - Mínimo 8 caracteres
 - Al menos 1 mayúscula
 - Al menos 1 número
-- Al menos 1 carácter especial
 - No puede ser igual a la actual
 - Debe coincidir con `password_confirmacion`
 
@@ -350,101 +389,13 @@ Content-Type: application/json
 | 400 | Mínimo 8 caracteres | Muy corta |
 | 400 | Debe contener al menos una letra mayúscula | Falta mayúscula |
 | 400 | Debe contener al menos un número | Falta número |
-| 400 | Debe contener al menos un carácter especial | Falta especial |
 | 400 | Las contraseñas no coinciden | password_nuevo ≠ password_confirmacion |
 | 400 | La nueva contraseña no puede ser igual a la actual | Misma contraseña |
 | 401 | La contraseña actual es incorrecta | Password actual incorrecta |
 | 401 | Sesión expirada por inactividad | Sesión inactiva |
-
----
-
-## GET /admin/intentos-fallidos
-
-Consulta el historial de intentos fallidos de login. Requiere API Key.
-
-```
-GET /api/admin/intentos-fallidos?bloqueados=true&page=1&limit=20
-X-API-Key: <ADMIN_API_KEY>
-```
-
-**Query params (todos opcionales):**
-
-| Param | Tipo | Default | Descripción |
-|---|---|---|---|
-| `rut` | string | — | Filtra por RUT exacto (sin puntos ni guión) |
-| `ip` | string | — | Filtra por dirección IP exacta |
-| `bloqueados` | `true` \| `false` | — | Solo con bloqueo activo (`bloqueado_hasta > now`) o inactivos |
-| `desde` | string (fecha) | — | Intentos desde esta fecha (`YYYY-MM-DD`) |
-| `hasta` | string (fecha) | — | Intentos hasta esta fecha (`YYYY-MM-DD`) |
-| `page` | number | 1 | Número de página |
-| `limit` | number | 20 | Resultados por página (max 100) |
-
-**Respuesta 200:**
-```json
-{
-  "data": [
-    {
-      "id_intento": "15",
-      "rut_intentado": "123456785",
-      "ip_address": "192.168.1.50",
-      "timestamp": "2026-05-30T14:00:00.000Z",
-      "bloqueado_hasta": "2026-05-30T14:15:00.000Z"
-    }
-  ],
-  "total": 45,
-  "page": 1,
-  "limit": 20
-}
-```
-
-**Errores:**
-| Código | Causa |
-|---|---|
-| 401 | Falta header `X-API-Key`, key inválida, o `ADMIN_API_KEY` no configurado |
-
----
-
-## POST /admin/intentos-fallidos/desbloquear-ip
-
-Desbloquea manualmente una IP, eliminando el `bloqueado_hasta` de todos los registros activos. La acción queda registrada en `log_auditoria`.
-
-```
-POST /api/admin/intentos-fallidos/desbloquear-ip
-X-API-Key: <ADMIN_API_KEY>
-Content-Type: application/json
-
-{
-  "ip": "192.168.1.50"
-}
-```
-
-**Respuesta 200:**
-```json
-{
-  "desbloqueado": true,
-  "registros_afectados": 5
-}
-```
-
-**IP no bloqueada — Respuesta 200:**
-```json
-{
-  "desbloqueado": false,
-  "registros_afectados": 0
-}
-```
-
-**Errores:**
-| Código | Causa |
-|---|---|
-| 400 | IP con formato inválido |
-| 401 | API Key inválida o faltante |
-
----
-
 ## Sesiones e inactividad
 
-- Cada login/register crea una sesión en `sesion_portal` con `fecha_expiracion = now + 15 min`.
+- Cada login y cada registro confirmado crea una sesión en `sesion_portal` con `fecha_expiracion = now + 15 min`.
 - En cada request autenticado, se extiende la sesión otros 15 minutos (sliding window).
 - Si pasan 15 minutos sin requests → `401 Sesión expirada por inactividad`.
 - El JWT tiene expiración de 7 días, pero la sesión en DB vence por inactividad.
@@ -461,7 +412,8 @@ Configurado via `ThrottlerGuard` global en `app.module.ts`:
 | Endpoint | Rate Limit |
 |---|---|
 | `POST /auth/login` | 5 req/min |
-| `POST /auth/register` | 3 req/min |
+| `POST /auth/registro` | 3 req/min |
+| `POST /auth/registro/confirmar` | 3 req/min |
 | `POST /auth/recuperar-password` | 3 req/min |
 | `POST /auth/restablecer-password` | 3 req/min |
 | Todos los demás | 10 req/min (default) |
@@ -474,7 +426,6 @@ Configurado via `ThrottlerGuard` global en `app.module.ts`:
 |---|---|---|
 | `DATABASE_URL` | Sí | Conexión PostgreSQL |
 | `JWT_SECRET` | Sí | Secreto para firmar JWT |
-| `ADMIN_API_KEY` | Sí | API Key para endpoints admin |
 | `SESSION_INACTIVITY_MINUTES` | No (default: 15) | Minutos de inactividad para expirar sesión |
 | `FRONTEND_URL` | Sí | URL base del frontend para enlaces de recuperación |
 | `SMTP_HOST` | No (default: localhost) | Servidor SMTP para envío de emails |
@@ -496,12 +447,17 @@ BASE_URL=http://localhost:4000/api
 # Login
 curl -X POST "$BASE_URL/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"rut":"12.345.678-5","password":"MiClave1"}'
+  -d '{"rut":"12.345.678-5","password":"<contraseña>"}'
 
-# Register
-curl -X POST "$BASE_URL/auth/register" \
+# Registro (CU-04): pedir el enlace
+curl -X POST "$BASE_URL/auth/registro" \
   -H "Content-Type: application/json" \
-  -d '{"rut":"12.345.678-5","nombre_completo":"Juan Perez","email":"juan@test.cl","password":"MiClave1","password_confirmation":"MiClave1"}'
+  -d '{"rut":"12.345.678-5"}'
+
+# Registro (CU-04): crear la contraseña con el enlace
+curl -X POST "$BASE_URL/auth/registro/confirmar" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<token>","password":"<contraseña>","password_confirmation":"<contraseña>","acepta_politica_privacidad":true,"version_politica_privacidad":"1.1"}'
 
 # Recuperar password
 curl -X POST "$BASE_URL/auth/recuperar-password" \
@@ -511,7 +467,7 @@ curl -X POST "$BASE_URL/auth/recuperar-password" \
 # Restablecer password
 curl -X POST "$BASE_URL/auth/restablecer-password" \
   -H "Content-Type: application/json" \
-  -d '{"token":"<token>","password":"NuevaClave1"}'
+  -d '{"token":"<token>","password":"<contraseña nueva>"}'
 
 # Perfil
 curl -X GET "$BASE_URL/auth/perfil" \
@@ -521,33 +477,23 @@ curl -X GET "$BASE_URL/auth/perfil" \
 curl -X PATCH "$BASE_URL/auth/perfil/telefono" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","telefono":"+56987654321"}'
+  -d '{"password_actual":"<contraseña actual>","telefono":"+56987654321"}'
 
 # Actualizar email
 curl -X PATCH "$BASE_URL/auth/perfil/email" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","email":"nuevo@correo.cl"}'
+  -d '{"password_actual":"<contraseña actual>","email":"nuevo@correo.cl"}'
 
 # Cambiar contraseña
 curl -X PATCH "$BASE_URL/auth/perfil/password" \
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
-  -d '{"password_actual":"MiClave1","password_nuevo":"NuevaClave2!","password_confirmacion":"NuevaClave2!"}'
+  -d '{"password_actual":"<contraseña actual>","password_nuevo":"<contraseña nueva>","password_confirmacion":"<contraseña nueva>"}'
 
 # Logout
 curl -X POST "$BASE_URL/auth/logout" \
   -H "Authorization: Bearer <jwt>"
-
-# Admin - Intentos fallidos
-curl -X GET "$BASE_URL/admin/intentos-fallidos?bloqueados=true" \
-  -H "X-API-Key: finet-admin-key-2026-dev"
-
-# Admin - Desbloquear IP
-curl -X POST "$BASE_URL/admin/intentos-fallidos/desbloquear-ip" \
-  -H "X-API-Key: finet-admin-key-2026-dev" \
-  -H "Content-Type: application/json" \
-  -d '{"ip":"192.168.1.50"}'
 ```
 
 ## Seguridad aplicada
@@ -562,6 +508,7 @@ curl -X POST "$BASE_URL/admin/intentos-fallidos/desbloquear-ip" \
 - Password hasheada con bcrypt (salt rounds 10)
 - Validación Zod en todos los DTOs
 - Reset token con claim `type: "reset"` para evitar reuso de token de sesión
+- Enlace de registro con claim `type: "registro"`: no sirve para restablecer ni como sesión
 - Reset token enviado en fragmento de URL (`#token=...`) para no exponerlo en logs del servidor
 - Login rechaza cuentas con estado distinto a `'activo'` (mensaje genérico idéntico)
 - Admin protegido con `X-API-Key`
@@ -573,9 +520,9 @@ curl -X POST "$BASE_URL/admin/intentos-fallidos/desbloquear-ip" \
 | Archivo | Propósito |
 |---|---|
 | `src/auth/auth.controller.ts` | Endpoints de autenticación |
-| `src/auth/auth.service.ts` | Lógica de negocio (login, register, password reset, sesiones) |
+| `src/auth/auth.service.ts` | Lógica de negocio (login, registro, password reset, sesiones) |
 | `src/auth/dto/login.dto.ts` | Validación Zod para login |
-| `src/auth/dto/register.dto.ts` | Validación Zod para register |
+| `src/auth/dto/registro.dto.ts` | Validación Zod para el registro del CU-04 (enlace y confirmación) |
 | `src/auth/dto/recuperar-password.dto.ts` | Validación Zod para recuperar password |
 | `src/auth/dto/restablecer-password.dto.ts` | Validación Zod para restablecer password |
 | `src/auth/strategies/jwt.strategy.ts` | Estrategia JWT + validación de sesión por inactividad |
@@ -586,9 +533,6 @@ curl -X POST "$BASE_URL/admin/intentos-fallidos/desbloquear-ip" \
 | `src/mail/mail.service.ts` | Servicio de envío de emails (nodemailer) |
 | `src/mail/mail.module.ts` | Módulo global de mail |
 | `src/common/utils/rut.ts` | Limpieza y validación de RUT chileno |
-| `src/admin/admin.controller.ts` | Endpoints admin |
-| `src/admin/admin.service.ts` | Lógica de admin |
-| `src/admin/guards/api-key.guard.ts` | Guard para API Key |
 | `src/app.module.ts` | Módulo raíz con ThrottlerGuard global |
 
 ## Email en desarrollo

@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 import { useAuth } from "../_lib/auth";
 import { api } from "../utils/api";
-import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
+import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
+import StatusBadge from "@/app/_components/ui/StatusBadge";
+import IrAPagarButton from "@/app/_components/portal/IrAPagarButton";
+import { estadoContratoBadge } from "@/app/_lib/estado-contrato";
 
 type Contrato = {
   id_contrato: number;
@@ -62,26 +65,6 @@ type PanelData = {
   tickets_recientes: Ticket[];
 };
 
-function formatPrecio(precio: number) {
-  return `$${precio.toLocaleString("es-CL")}`;
-}
-
-function formatFechaCorta(iso: string) {
-  return new Date(iso).toLocaleDateString("es-CL", {
-    day: "numeric",
-    month: "short",
-  });
-}
-
-function estadoBadge(estado: string): { label: string; tone: StatusTone } {
-  const map: Record<string, { label: string; tone: StatusTone }> = {
-    activo: { label: "Activo", tone: "success" },
-    suspendido: { label: "Suspendido", tone: "warning" },
-    cortado: { label: "Cortado", tone: "error" },
-    inactivo: { label: "Inactivo", tone: "neutral" },
-  };
-  return map[estado] ?? { label: estado, tone: "neutral" };
-}
 
 export default function PortalPage() {
   const { cliente: authCliente } = useAuth();
@@ -190,7 +173,7 @@ export default function PortalPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {data.contratos.map((c) => {
-                const badge = estadoBadge(c.estado);
+                const badge = estadoContratoBadge(c.estado);
                 return (
                   <div
                     key={c.id_contrato}
@@ -269,10 +252,11 @@ export default function PortalPage() {
                       {masProxima && (
                         <p className="mt-1 text-xs text-muted">
                           {masProxima.estado === "vencida"
-                            ? `Vencida: ${formatFechaCorta(masProxima.fecha_limite_pago)}`
-                            : `Vence: ${formatFechaCorta(masProxima.fecha_limite_pago)}`}
+                            ? `Vencida: ${fechaCalendario(masProxima.fecha_limite_pago, "corta")}`
+                            : `Vence: ${fechaCalendario(masProxima.fecha_limite_pago, "corta")}`}
                         </p>
                       )}
+                      <IrAPagarButton />
                     </>
                   );
                 })()

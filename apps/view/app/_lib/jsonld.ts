@@ -1,5 +1,6 @@
 import type { PlanBackend } from "./api";
 import { BASE_URL } from "./consts";
+import { COMPANY_BRAND } from "./company";
 
 type BreadcrumbItem = { name: string; url: string };
 
@@ -11,7 +12,7 @@ export function productJsonLd(plan: PlanBackend) {
     description: plan.descripcion ?? undefined,
     brand: {
       "@type": "Brand",
-      name: "Finet",
+      name: COMPANY_BRAND,
     },
     offers: {
       "@type": "Offer",

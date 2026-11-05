@@ -1,6 +1,6 @@
+import { API_URL, EVENTO_SESION_EXPIRADA } from "../_lib/consts";
 import { securityLogger } from "../_lib/logger";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 
 type ApiError = {
   message: string;
@@ -37,7 +37,7 @@ async function request<T>(
         !path.startsWith("/auth/perfil") &&
         typeof window !== "undefined"
       ) {
-        window.dispatchEvent(new CustomEvent("auth:session-expired"));
+        window.dispatchEvent(new CustomEvent(EVENTO_SESION_EXPIRADA));
       }
     } else if (res.status >= 400) {
       securityLogger.apiError(path, res.status, message);

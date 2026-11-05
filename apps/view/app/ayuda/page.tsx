@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { metadataSeccion } from "../_lib/seo";
 import { faqJsonLd } from "../_lib/jsonld";
+import { WHATSAPP_URL } from "../_lib/company";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = metadataSeccion({
+  path: "/ayuda",
   title: "Ayuda y Preguntas Frecuentes",
   description:
     "Resuelve tus dudas sobre contratacion, instalacion, cobertura, pagos y soporte de Finet. Preguntas frecuentes de Internet fibra optica en La Pintana y Puente Alto.",
-};
+});
 
 const faqs = [
   {
@@ -26,7 +29,7 @@ const faqs = [
   {
     question: "¿En que comunas tienen cobertura?",
     answer:
-      "Actualmente tenemos cobertura en La Pintana, Puente Alto, La Florida, La Granja, El Bosque y San Ramon. Estamos expandiendo nuestra red. Si no estas en estas comunas, consulta igualmente: revisamos tu direccion y te avisamos cuando lleguemos a tu zona.",
+      "Actualmente tenemos cobertura en La Pintana, Puente Alto, La Florida y La Granja. Estamos expandiendo nuestra red. Si no estas en estas comunas, consulta igualmente: revisamos tu direccion y te avisamos cuando lleguemos a tu zona.",
   },
   {
     question: "¿Que hago si tengo problemas de conexion?",
@@ -92,7 +95,9 @@ export default function AyudaPage() {
           <p className="text-sm text-muted">
             ¿No encuentras lo que buscas?{" "}
             <a
-              href="/soporte"
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
               Contacta a soporte

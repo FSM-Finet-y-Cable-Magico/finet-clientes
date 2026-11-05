@@ -1,14 +1,47 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
+import { constants, generateKeyPairSync, privateDecrypt } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
+  ConflictException,
   NotFoundException,
   InternalServerErrorException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PortalService } from './portal.service.js';
+import { CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { MailService } from '../mail/mail.service.js';
+import {
+  ErrorClaveWifiG3,
+  G3WifiService,
+} from '../common/g3/g3-wifi.service.js';
+import { G8IntegracionService } from '../common/g8/g8-integracion.service.js';
 
 const FECHA_BASE = new Date('2024-01-15T00:00:00.000Z');
+
+// Par de llaves de prueba, para verificar el cifrado de la clave WiFi de punta
+// a punta: se cifra con la publica (como hace el servicio) y se descifra con la
+// privada (como hara el CRM). 2048 bits porque generar una 4096 en cada corrida
+// de tests es lento; el codigo no depende del tamano.
+const { publicKey: LLAVE_PUBLICA_CRM, privateKey: LLAVE_PRIVADA_CRM } =
+  generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+
+function descifrarComoElCrm(cifrada: string): string {
+  return privateDecrypt(
+    {
+      key: LLAVE_PRIVADA_CRM,
+      padding: constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: 'sha256',
+    },
+    Buffer.from(cifrada, 'base64'),
+  ).toString('utf8');
+}
 const PLAN_MOCK = {
   id_plan: 1,
   nombre_comercial: 'Fibra 200',
@@ -35,29 +68,160 @@ const CLIENTE_MOCK = {
 describe('PortalService', () => {
   let service: PortalService;
   let prisma: jest.Mocked<PrismaService>;
+  let mailService: jest.Mocked<MailService>;
+  let configService: jest.Mocked<ConfigService>;
+  let g3: { enviarClaveWifi: jest.Mock };
+  let g8: { informarResultadoWifi: jest.Mock };
 
   beforeEach(async () => {
     const mockPrisma = {
-      contrato: { findMany: jest.fn() },
+      contrato: { findMany: jest.fn(), findFirst: jest.fn() },
       cliente: { findUnique: jest.fn() },
       factura: { findMany: jest.fn() },
-      ticket: { findMany: jest.fn() },
+      categoria_falla: { findMany: jest.fn(), findFirst: jest.fn() },
+      ticket: {
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      solicitud_contrasena_wifi: { create: jest.fn() },
+      pago: { findMany: jest.fn(), findFirst: jest.fn() },
       log_auditoria: { create: jest.fn() },
+      log_notificacion: { create: jest.fn() },
+      $transaction: jest.fn(),
     };
+    const mockMailService = { sendTicketCreated: jest.fn() };
+    const mockConfigService = {
+      get: jest.fn((clave: string) =>
+        clave === 'CRM_PUBLIC_KEY' ? LLAVE_PUBLICA_CRM : undefined,
+      ),
+    };
+    g3 = { enviarClaveWifi: jest.fn() };
+    g8 = { informarResultadoWifi: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortalService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: MailService, useValue: mockMailService },
+        { provide: ConfigService, useValue: mockConfigService },
+        { provide: G3WifiService, useValue: g3 },
+        { provide: G8IntegracionService, useValue: g8 },
       ],
     }).compile();
     service = module.get(PortalService);
+    configService = module.get(ConfigService);
     prisma = module.get(PrismaService);
+    mailService = module.get(MailService);
+    (prisma.$transaction as jest.Mock).mockImplementation(
+      async (callback: (tx: typeof mockPrisma) => Promise<unknown>) =>
+        callback(mockPrisma),
+    );
+  });
+
+  // CU-71: Registro de solicitud de soporte desde el portal.
+  describe('crearTicket', () => {
+    beforeEach(() => {
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+        ...CLIENTE_MOCK,
+        id_empresa: 2,
+      });
+      (prisma.categoria_falla.findFirst as jest.Mock).mockResolvedValue({
+        id_categoria: 3,
+        nombre: 'Falla de Internet',
+      });
+      (prisma.ticket.create as jest.Mock).mockResolvedValue({
+        id_ticket: 42,
+        fecha_creacion: new Date('2026-08-24T10:00:00.000Z'),
+      });
+      (prisma.ticket.update as jest.Mock).mockResolvedValue({});
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+      (prisma.log_notificacion.create as jest.Mock).mockResolvedValue({});
+      (mailService.sendTicketCreated as jest.Mock).mockResolvedValue(undefined);
+    });
+
+    it('lista solo las categorias del cliente (§11.9), ordenadas por nombre', async () => {
+      (prisma.categoria_falla.findMany as jest.Mock).mockResolvedValue([
+        { id_categoria: 3, nombre: 'Falla de Internet' },
+      ]);
+
+      const result = await service.getCategoriasTicket();
+
+      expect(result).toEqual([
+        { id_categoria: 3, nombre: 'Falla de Internet' },
+      ]);
+      expect(prisma.categoria_falla.findMany).toHaveBeenCalledWith({
+        where: {
+          nombre: { in: CATEGORIAS_CLIENTE, mode: 'insensitive' },
+        },
+        select: { id_categoria: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      });
+      expect(CATEGORIAS_CLIENTE).toHaveLength(7);
+    });
+
+    it('registra la solicitud, genera el codigo y notifica al cliente', async () => {
+      const result = await service.crearTicket(1, {
+        id_categoria: 3,
+        descripcion: 'Sin conexion desde esta manana',
+      });
+
+      expect(result).toEqual({
+        id_ticket: 42,
+        codigo_seguimiento: 'FIN-2026-000042',
+      });
+      expect(prisma.ticket.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          id_cliente: 1,
+          id_categoria: 3,
+          estado: 'abierto',
+          prioridad: 'media',
+          origen: 'portal',
+        }),
+        select: { id_ticket: true, fecha_creacion: true },
+      });
+      expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          accion: 'CREAR_TICKET_PORTAL',
+          id_entidad_afectada: 42,
+        }),
+      });
+      expect(mailService.sendTicketCreated).toHaveBeenCalledWith(
+        'juan@example.com',
+        'Juan Pérez',
+        'FIN-2026-000042',
+        'Falla de Internet',
+      );
+    });
+
+    it('rechaza una categoria inexistente o interna de otro grupo', async () => {
+      (prisma.categoria_falla.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.crearTicket(1, {
+          id_categoria: 99,
+          descripcion: 'Sin conexion',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('informa indisponibilidad cuando falla el registro', async () => {
+      (prisma.$transaction as jest.Mock).mockRejectedValue(
+        new Error('database unavailable'),
+      );
+
+      await expect(
+        service.crearTicket(1, {
+          id_categoria: 3,
+          descripcion: 'Sin conexion',
+        }),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
   });
 
   // ─── CU-23: getEstadoContratos ────────────────────────────────────────────
 
   describe('getEstadoContratos', () => {
-    it('retorna contratos con estado y fechas formateadas', async () => {
+    it('devuelve el estado canonico de la tabla 11.15 y las fechas formateadas', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
         CONTRATO_MOCK,
       ]);
@@ -67,7 +231,8 @@ describe('PortalService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].id_contrato).toBe(1);
-      expect(result[0].estado).toBe('activo');
+      // El mock trae 'activo' en minuscula; se devuelve normalizado.
+      expect(result[0].estado).toBe('ACTIVO');
       expect(result[0].fecha_inicio).toBe('2024-01-15');
       expect(result[0].fecha_suspension).toBeNull();
     });
@@ -80,60 +245,70 @@ describe('PortalService', () => {
       );
     });
 
-    it('lanza BadRequestException y registra en log_auditoria si el estado no es reconocido (CU-23 Excepción 3)', async () => {
-      const contratoInvalido = { ...CONTRATO_MOCK, estado: 'cortado' };
+    // El CRM corta el servicio por morosidad (CU-48) y escribe CORTADO. Antes
+    // eso tumbaba el panel del cliente con un 400.
+    it('acepta CORTADO y BAJA, que antes hacian caer el panel', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        contratoInvalido,
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'CORTADO' },
+        { ...CONTRATO_MOCK, id_contrato: 2, estado: 'BAJA' },
+        { ...CONTRATO_MOCK, id_contrato: 3, estado: 'REACTIVADO' },
+      ]);
+
+      const result = await service.getEstadoContratos(1);
+
+      expect(result.map((c) => c.estado)).toEqual([
+        'CORTADO',
+        'BAJA',
+        'REACTIVADO',
+      ]);
+      expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+    });
+
+    it('normaliza los alias historicos que quedaron en la base', async () => {
+      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'en_tramite' },
+        { ...CONTRATO_MOCK, id_contrato: 2, estado: 'inactivo' },
+      ]);
+
+      const result = await service.getEstadoContratos(1);
+
+      expect(result.map((c) => c.estado)).toEqual(['PENDIENTE', 'BAJA']);
+      expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+    });
+
+    // CU-23 Excepcion 3: un estado desconocido se registra, pero no rompe.
+    it('deja pasar un estado desconocido y lo registra en auditoria', async () => {
+      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
+        { ...CONTRATO_MOCK, id_contrato: 1, estado: 'activo' },
+        { ...CONTRATO_MOCK, id_contrato: 5, estado: 'HIBERNANDO' },
       ]);
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        'no es reconocido',
-      );
+      const result = await service.getEstadoContratos(1);
 
+      expect(result.map((c) => c.estado)).toEqual(['ACTIVO', 'HIBERNANDO']);
       expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
           entidad_afectada: 'contrato',
-          id_entidad_afectada: 1,
-          valor_anterior: { estado_recibido: 'cortado' },
+          id_entidad_afectada: 5,
         }),
       });
     });
 
-    it('lanza BadRequestException con IDs de contratos afectados cuando hay estados mixtos (CU-23 Excepción 3)', async () => {
-      const contratoValido1 = { ...CONTRATO_MOCK, id_contrato: 1, estado: 'activo' };
-      const contratoInvalido = { ...CONTRATO_MOCK, id_contrato: 5, estado: 'cortado' };
-      const contratoValido2 = { ...CONTRATO_MOCK, id_contrato: 9, estado: 'suspendido' };
+    it('no se cae si falla el registro de auditoria', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        contratoValido1,
-        contratoInvalido,
-        contratoValido2,
+        { ...CONTRATO_MOCK, estado: 'LO_QUE_SEA' },
       ]);
-      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
-
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.getEstadoContratos(1)).rejects.toThrow(
-        '#5 (cortado)',
+      (prisma.log_auditoria.create as jest.Mock).mockRejectedValue(
+        new Error('auditoria caida'),
       );
 
-      // Solo se registra auditoría para el contrato inválido
-      expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
-          id_entidad_afectada: 5,
-          valor_anterior: { estado_recibido: 'cortado' },
-        }),
-      });
+      const result = await service.getEstadoContratos(1);
+
+      expect(result[0].estado).toBe('LO_QUE_SEA');
     });
   });
-
-  // ─── CU-25 / CU-26: getContratosVigentes ─────────────────────────────────
 
   describe('getContratosVigentes', () => {
     it('retorna contratos activos con datos del plan (precio como number)', async () => {
@@ -336,6 +511,505 @@ describe('PortalService', () => {
       await expect(service.getPanelPrincipal(1)).rejects.toThrow(
         'No fue posible obtener la informacion de planes en este momento',
       );
+    });
+  });
+
+  // CU-52: pagos anteriores del cliente y la descarga de su comprobante.
+  describe('CU-52: pagos anteriores', () => {
+    const DEL_CLIENTE = {
+      OR: [{ id_cliente: 1 }, { factura: { contrato: { id_cliente: 1 } } }],
+    };
+
+    it('lista los pagos del cliente, por id_cliente o por la factura de su contrato', async () => {
+      (prisma.pago.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.getPagosAnteriores(1);
+
+      expect(prisma.pago.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: DEL_CLIENTE,
+          orderBy: { fecha_pago: 'desc' },
+        }),
+      );
+    });
+
+    it('cada pago trae fecha ISO, período "Mes AAAA", monto y el nombre del medio (el desconocido, tal cual)', async () => {
+      (prisma.pago.findMany as jest.Mock).mockResolvedValue([
+        {
+          id_pago: 9,
+          fecha_pago: new Date('2026-04-08T01:30:00.000Z'),
+          monto: 18990,
+          pasarela: 'webpay',
+          factura: { periodo_mes: 4, periodo_anio: 2026 },
+        },
+        {
+          id_pago: 8,
+          fecha_pago: new Date('2026-03-05T15:00:00.000Z'),
+          monto: 18990,
+          pasarela: 'CAJA',
+          factura: null,
+        },
+      ]);
+
+      const r = await service.getPagosAnteriores(1);
+
+      expect(r.pagos).toEqual([
+        {
+          id_pago: 9,
+          fecha_pago: '2026-04-08T01:30:00.000Z',
+          periodo: 'Abril 2026',
+          monto: 18990,
+          pasarela: 'Webpay',
+        },
+        {
+          id_pago: 8,
+          fecha_pago: '2026-03-05T15:00:00.000Z',
+          periodo: null,
+          monto: 18990,
+          pasarela: 'CAJA',
+        },
+      ]);
+    });
+
+    it('sin el endpoint de G8, el comprobante figura como no disponible', async () => {
+      (prisma.pago.findMany as jest.Mock).mockResolvedValue([]);
+
+      const r = await service.getPagosAnteriores(1);
+
+      expect(r).toEqual({ comprobante_disponible: false, pagos: [] });
+    });
+
+    it('el comprobante de un pago ajeno responde 404', async () => {
+      (prisma.pago.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.getComprobante(1, 99)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.pago.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id_pago: 99, ...DEL_CLIENTE } }),
+      );
+    });
+
+    it('CU-52 Excepción 2: mientras G8 no despliegue, el comprobante no está disponible', async () => {
+      (prisma.pago.findFirst as jest.Mock).mockResolvedValue({ id_pago: 9 });
+
+      await expect(service.getComprobante(1, 9)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+    });
+  });
+
+  // CU-31 + CU-32: Solicitud de cambio de contrasena de la red WiFi.
+  describe('solicitarCambioContrasenaWifi', () => {
+    const DTO = { id_contrato: 1, password: 'MiRedNueva2026' };
+
+    it('registra la solicitud como PENDIENTE cuando el contrato esta activo', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'activo',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      const resultado = await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      expect(resultado).toEqual({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE.toISOString(),
+      });
+      // Mientras G8 no defina el ticket corre el v1 (acuerdo v2.0 §6.7): sin
+      // ticket no se llama a G3 (§6.4).
+      expect(g3.enviarClaveWifi).not.toHaveBeenCalled();
+    });
+
+    // Pedido de Dani en el review: la clave nunca en texto plano.
+    it('no escribe la clave legible en ningun campo de la fila', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'activo',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
+        .mock.calls[0][0] as { data: Record<string, unknown> };
+
+      expect(data.estado).toBe('PENDIENTE');
+      expect(JSON.stringify(data)).not.toContain(DTO.password);
+    });
+
+    it('no deja la clave nueva en el log de auditoria', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'activo',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      const llamada = (prisma.log_auditoria.create as jest.Mock).mock
+        .calls[0][0] as { data: { accion: string; valor_nuevo: unknown } };
+      expect(llamada.data.accion).toBe(
+        'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+      );
+      expect(JSON.stringify(llamada.data.valor_nuevo)).not.toContain(
+        DTO.password,
+      );
+    });
+
+    // CU-33 necesita la clave en claro para escribirla en el equipo, y el hash
+    // no se puede revertir: por eso va tambien cifrada con la llave publica del
+    // CRM. Se verifica el ida y vuelta completo.
+    it('guarda la clave cifrada para que solo el CRM pueda leerla', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'ACTIVO',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
+        .mock.calls[0][0] as { data: { password_nueva_cifrada: string } };
+
+      expect(data.password_nueva_cifrada).not.toBe(DTO.password);
+      expect(descifrarComoElCrm(data.password_nueva_cifrada)).toBe(
+        DTO.password,
+      );
+    });
+
+    // Si falta la llave la solicitud se registra igual: el cliente no tiene
+    // por que quedarse sin pedir el cambio por un error de configuracion
+    // nuestro, y el null le dice al CRM que la clave hay que pedirsela.
+    it('registra la solicitud sin cifrar si falta la llave del CRM', async () => {
+      (configService.get as jest.Mock).mockReturnValue(undefined);
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'ACTIVO',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      const resultado = await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
+        .mock.calls[0][0] as {
+        data: { password_nueva_cifrada: string | null };
+      };
+
+      // La solicitud queda registrada igual y sin la clave: el CRM la
+      // reconoce por el NULL y se la pide al cliente.
+      expect(resultado.estado).toBe('PENDIENTE');
+      expect(data.password_nueva_cifrada).toBeNull();
+      expect(JSON.stringify(data)).not.toContain(DTO.password);
+    });
+
+    // Comentario de Dani en el review sobre el estandar de estados: el resto
+    // del servicio normaliza contra la Tabla 11.15 y esta validacion comparaba
+    // el string crudo. Con 'ACTIVO' (lo que escribe el CRM) daba 409.
+    it('acepta el estado canonico ACTIVO de la Tabla 11.15', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'ACTIVO',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: FECHA_BASE,
+      });
+      (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
+
+      await service.solicitarCambioContrasenaWifi(1, DTO);
+
+      expect(prisma.solicitud_contrasena_wifi.create).toHaveBeenCalled();
+    });
+
+    it('responde 404 si el contrato no es del cliente autenticado', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
+    });
+
+    // CU-32 Excepcion 2: el plan no esta activo.
+    it('impide crear la solicitud si el contrato no esta activo', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'SUSPENDIDO',
+      });
+
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(ConflictException);
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(
+        'Solo puedes solicitar el cambio de clave en un servicio activo',
+      );
+      expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
+    });
+
+    it('devuelve 503 si falla la persistencia', async () => {
+      (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+        id_contrato: 1,
+        estado: 'activo',
+      });
+      (prisma.solicitud_contrasena_wifi.create as jest.Mock).mockRejectedValue(
+        new Error('db caida'),
+      );
+
+      await expect(
+        service.solicitarCambioContrasenaWifi(1, DTO),
+      ).rejects.toThrow(ServiceUnavailableException);
+    });
+    // Flujo v2, el del acuerdo v2.0 (§6.4): corre cuando G8 defina el ticket
+    // WiFi. La creacion del ticket es justo ese hueco, asi que aca se simula.
+    describe('flujo v2: ticket y envio directo a G3', () => {
+      const UUID_V4 =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+      const RESPUESTA_G3 = {
+        idSolicitud: 2,
+        estado: 'PENDIENTE',
+        fecha: '2026-10-01T21:11:14.370Z',
+        duplicado: false,
+      };
+      let crearTicket: jest.SpiedFunction<PortalService['crearTicketWifi']>;
+      let orden: string[];
+
+      const auditoria = (n: number) =>
+        (
+          (prisma.log_auditoria.create as jest.Mock).mock.calls[n][0] as {
+            data: { accion: string; valor_nuevo: Record<string, unknown> };
+          }
+        ).data;
+
+      beforeEach(() => {
+        orden = [];
+        (prisma.contrato.findFirst as jest.Mock).mockResolvedValue({
+          id_contrato: 1,
+          estado: 'ACTIVO',
+        });
+        (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+          id_empresa: 1,
+        });
+        crearTicket = jest
+          .spyOn(service, 'crearTicketWifi')
+          .mockImplementation(() => {
+            orden.push('ticket');
+            return Promise.resolve(77);
+          });
+        (prisma.log_auditoria.create as jest.Mock).mockImplementation(() => {
+          orden.push('auditoria');
+          return Promise.resolve({});
+        });
+        g3.enviarClaveWifi.mockImplementation(() => {
+          orden.push('G3');
+          return Promise.resolve(RESPUESTA_G3);
+        });
+        g8.informarResultadoWifi.mockImplementation(() => {
+          orden.push('G8');
+          return Promise.resolve();
+        });
+      });
+
+      it('primero el ticket y los ids guardados, recien despues G3 (§6.4 y §6.6)', async () => {
+        const resultado = await service.solicitarCambioContrasenaWifi(
+          1,
+          DTO,
+          true,
+        );
+
+        expect(orden).toEqual(['ticket', 'auditoria', 'G3', 'auditoria', 'G8']);
+        expect(crearTicket).toHaveBeenCalledWith(expect.anything(), {
+          idCliente: 1,
+          idEmpresa: 1,
+          idContrato: 1,
+        });
+        const envio = g3.enviarClaveWifi.mock.calls[0][0] as {
+          requestId: string;
+          traceId: string;
+        };
+        expect(envio).toEqual({
+          clave: DTO.password,
+          idTicket: '77',
+          idContrato: 1,
+          idEmpresa: 1,
+          requestId: expect.stringMatching(UUID_V4),
+          traceId: expect.stringMatching(UUID_V4),
+        });
+        expect(auditoria(0).valor_nuevo).toMatchObject({
+          request_id: envio.requestId,
+          trace_id: envio.traceId,
+        });
+        // CU-32: "la solicitud fue creada", con los datos que devuelve G3.
+        expect(resultado).toEqual({
+          id_solicitud: 2,
+          id_contrato: 1,
+          estado: 'PENDIENTE',
+          fecha_solicitud: '2026-10-01T21:11:14.370Z',
+        });
+      });
+
+      it('la clave no se guarda en ninguna parte (§6.5 y §14.6)', async () => {
+        await service.solicitarCambioContrasenaWifi(1, DTO, true);
+
+        expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
+        for (const [llamada] of (prisma.log_auditoria.create as jest.Mock).mock
+          .calls) {
+          expect(JSON.stringify(llamada)).not.toContain(DTO.password);
+        }
+      });
+
+      it('la respuesta de G3 queda en la auditoria, sin secretos', async () => {
+        await service.solicitarCambioContrasenaWifi(1, DTO, true);
+
+        expect(auditoria(1).accion).toBe('RESPUESTA_G3_CAMBIO_CONTRASENA_WIFI');
+        expect(auditoria(1).valor_nuevo).toEqual({
+          request_id: expect.stringMatching(UUID_V4),
+          resultado: 'REGISTRADA',
+          id_solicitud_g3: 2,
+          estado_g3: 'PENDIENTE',
+          duplicado: false,
+        });
+      });
+
+      it('si G3 no la registra: 503, sin un segundo ticket y sin simular nada (§14.12)', async () => {
+        g3.enviarClaveWifi.mockRejectedValue(
+          new ErrorClaveWifiG3(
+            403,
+            'G3 respondió 403: id_empresa fuera del alcance',
+          ),
+        );
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).rejects.toThrow(ServiceUnavailableException);
+        expect(crearTicket).toHaveBeenCalledTimes(1);
+        expect(auditoria(1).valor_nuevo).toEqual({
+          request_id: expect.stringMatching(UUID_V4),
+          resultado: 'ERROR',
+          status_g3: 403,
+        });
+      });
+
+      // §6.4 paso 8, con el contrato de G8 del 02-10 (§12).
+      it('G3 la registro: a G8 se le informa REQUIERE_ATENCION_MANUAL, no APLICADO', async () => {
+        await service.solicitarCambioContrasenaWifi(1, DTO, true);
+
+        const envioG3 = g3.enviarClaveWifi.mock.calls[0][0] as {
+          requestId: string;
+          traceId: string;
+        };
+        expect(g8.informarResultadoWifi).toHaveBeenCalledWith({
+          idTicket: 77,
+          idEmpresa: 1,
+          requestId: expect.stringMatching(UUID_V4),
+          traceId: envioG3.traceId,
+          resultado: 'REQUIERE_ATENCION_MANUAL',
+          detalleSaneado: 'Solicitud registrada para atención por técnico.',
+        });
+        const informe = g8.informarResultadoWifi.mock.calls[0][0] as {
+          requestId: string;
+        };
+        // El informe es otra operacion: su propia identidad idempotente.
+        expect(informe.requestId).not.toBe(envioG3.requestId);
+        expect(JSON.stringify(informe)).not.toContain(DTO.password);
+      });
+
+      it('G3 fallo: a G8 se le informa ERROR_TECNICO y el cliente recibe el 503', async () => {
+        g3.enviarClaveWifi.mockRejectedValue(
+          new ErrorClaveWifiG3(null, 'G3 no respondió (TimeoutError)'),
+        );
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).rejects.toThrow(ServiceUnavailableException);
+        expect(g8.informarResultadoWifi).toHaveBeenCalledWith(
+          expect.objectContaining({
+            idTicket: 77,
+            resultado: 'ERROR_TECNICO',
+            detalleSaneado: 'G3 no respondió a la solicitud.',
+          }),
+        );
+      });
+
+      it('si G8 no recibe el informe, la solicitud del cliente no se cae', async () => {
+        g8.informarResultadoWifi.mockRejectedValue(
+          new Error('G8 respondió 503'),
+        );
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).resolves.toMatchObject({ id_solicitud: 2 });
+      });
+
+      it('sin ticket no se llama a G3 (§6.4 paso 3)', async () => {
+        crearTicket.mockRejectedValue(new Error('pendiente de G8'));
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).rejects.toThrow(ServiceUnavailableException);
+        expect(g3.enviarClaveWifi).not.toHaveBeenCalled();
+        expect(g8.informarResultadoWifi).not.toHaveBeenCalled();
+      });
+
+      it('sin la empresa del cliente no se envia nada (§6.2)', async () => {
+        (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+          id_empresa: null,
+        });
+
+        await expect(
+          service.solicitarCambioContrasenaWifi(1, DTO, true),
+        ).rejects.toThrow(ServiceUnavailableException);
+        expect(crearTicket).not.toHaveBeenCalled();
+        expect(g3.enviarClaveWifi).not.toHaveBeenCalled();
+      });
+
+      it('el hueco: el ticket WiFi no se crea hasta que G8 responda', async () => {
+        crearTicket.mockRestore();
+
+        await expect(
+          service.crearTicketWifi({} as never, {
+            idCliente: 1,
+            idEmpresa: 1,
+            idContrato: 1,
+          }),
+        ).rejects.toThrow('pendiente de G8');
+      });
     });
   });
 });

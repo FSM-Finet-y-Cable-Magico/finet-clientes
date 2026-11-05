@@ -22,23 +22,21 @@ Backend para el portal de clientes basado en NestJS, Prisma y PostgreSQL.
 
 ## Configuración
 
-Copia el archivo de entorno de ejemplo y ajusta los valores:
-
-```bash
-$ cp .env.example .env
-```
+Copiar `.env.example` a `.env` y completar los valores. La plantilla completa
+también está en el [README raíz](../../README.md#backend--appscontrollerenv);
+`.env` está en `.gitignore` y no se commitea.
 
 Variables principales:
 
 - `DATABASE_URL` — conexión a PostgreSQL
 - `JWT_SECRET` — secreto para firmar JWT
-- `ADMIN_API_KEY` — clave para endpoints admin
 - `SESSION_INACTIVITY_MINUTES` — minutos de inactividad para expirar sesión (default: 15)
 - `CORS_ORIGIN` — lista separada por comas de orígenes CORS permitidos
-- `FRONTEND_URL` — URL base del frontend para enlaces de recuperación
+- `FRONTEND_URL` — URL base del frontend para recuperación de contraseña
 - `PORT` — puerto del servidor (default: 4000)
 - `NODE_ENV` — `development` o `production`
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — configuración de correo
+- `FAST_API_URL`, `FAST_TOKEN` — API de fast.com para el test de velocidad (CU-34/35). El navegador no puede consultarla directamente porque solo acepta el origen `https://fast.com`, así que el backend pide los servidores de medición y se los entrega al cliente vía `GET /diagnostico/servidores`
 
 ## Servicios locales con Docker
 
@@ -51,6 +49,59 @@ $ docker compose up -d
 - PostgreSQL: `localhost:5555`
 - Mailpit SMTP: `localhost:1025`
 - Mailpit Web UI: `http://localhost:8025` (todos los emails capturados)
+
+### Probar el correo de recuperación de contraseña
+
+No hace falta ninguna cuenta SMTP real: `SMTP_HOST=localhost` / `SMTP_PORT=1025`
+(los defaults de `.env.example`) apuntan directo a Mailpit, que captura
+cualquier correo que el backend intente mandar sin entregarlo a nadie afuera.
+
+1. **Levantar Mailpit** (si no está corriendo):
+
+   ```bash
+   $ docker compose up -d mailpit
+   ```
+
+2. **Confirmar que la cuenta de prueba tiene email.** `recuperarPassword` solo
+   manda el correo si `cliente.email` no es null; si el cliente no tiene
+   email, la API igual responde 200 con el mensaje genérico (por diseño,
+   RF-03 no revela si el RUT existe) pero no se envía nada — no vas a ver
+   nada en Mailpit y no es un bug.
+
+3. **Pedir la recuperación:**
+
+   ```bash
+   $ curl -X POST http://localhost:4000/api/auth/recuperar-password \
+       -H "Content-Type: application/json" \
+       -d '{"rut": "12345678-5"}'
+   ```
+
+4. **Abrir Mailpit** en <http://localhost:8025> — ahí aparece "Recuperación de
+   contraseña - Portal Clientes". El link apunta a
+   `{FRONTEND_URL}/restablecer-password#token=...`; si `apps/view` está
+   corriendo en `:3000`, se puede abrir tal cual y completar el formulario, o
+   copiar el `token` del fragmento y pegarlo directo en el body de:
+
+   ```bash
+   $ curl -X POST http://localhost:4000/api/auth/restablecer-password \
+       -H "Content-Type: application/json" \
+       -d '{"token": "<token del link>", "password": "NuevaClave1"}'
+   ```
+
+5. Al restablecer, Mailpit recibe un segundo correo, "Contraseña actualizada -
+   Portal Clientes" — confirma que el `UPDATE` a la base salió bien.
+
+**Troubleshooting:**
+
+- **429 en cualquiera de los dos POST** — ambos endpoints están limitados a 3
+  intentos por minuto por IP (ver `docs/auth.md`); espera un minuto entre
+  pruebas.
+- **El login sigue rechazando la contraseña nueva** ("RUT o contraseña
+  incorrectos") — antes de sospechar del flujo de correo, revisar
+  `cliente.estado` en la base: el login exige que sea `'activo'` (normalizado
+  a minúscula desde `auth.service.ts`; si viene de un import con otro casing
+  o valor, ese es el bloqueo, no la contraseña). El log del backend lo dice
+  explícito: `Login rejected: RUT ... estado=<valor>`.
 
 ## Base de datos
 
@@ -65,6 +116,10 @@ Regenerar Prisma Client (si se modifica el schema):
 ```bash
 $ pnpm prisma generate
 ```
+
+El visor cartográfico (CU-59 a CU-62) no necesita seed: su capa es estática y
+vive en `src/cobertura/cobertura-finet.data.ts`. Ver
+[`docs/cobertura.md`](./docs/cobertura.md).
 
 ## Scripts
 
@@ -110,11 +165,12 @@ src/
 ├── common/
 │   ├── filters/               # Filtros de excepciones HTTP
 │   └── utils/                 # Utilidades (RUT chileno)
-├── auth/                      # Autenticación (login, register, password recovery, logout)
+├── auth/                      # Autenticación (login, registro, password recovery, logout)
 ├── perfil/                    # Perfil del cliente (obtener, actualizar datos, cambiar contraseña)
 ├── portal/                    # Portal autenticado (panel, contratos, deuda, tickets)
 ├── landing/                   # Landing page pública (catálogo de planes)
-├── deuda-publica/             # Consulta pública de deuda (por RUT o código de abonado)
+├── deuda-publica/             # Consulta pública de deuda (por RUT)
+├── cobertura/                 # Visor cartográfico público (capa estática)
 ├── admin/                     # Panel admin (intentos fallidos, desbloqueo de IP)
 └── generated/zod/             # Schemas Zod auto-generados desde Prisma
 ```
@@ -127,11 +183,12 @@ Documentación de endpoints organizada por feature (bodies, respuestas, errores,
 
 | Feature | Archivo | Endpoints |
 |---------|---------|-----------|
-| **Auth** | [`docs/auth.md`](./docs/auth.md) | Login, register, recuperar/restablecer password, logout |
+| **Auth** | [`docs/auth.md`](./docs/auth.md) | Login, registro (CU-04), recuperar/restablecer password, logout |
 | **Perfil** | [`docs/perfil.md`](./docs/perfil.md) | Obtener perfil, actualizar teléfono/email, cambiar contraseña |
 | **Portal** | [`docs/portal.md`](./docs/portal.md) | Panel, contratos (estado/vigentes), deuda, tickets |
 | **Landing** | [`docs/landing.md`](./docs/landing.md) | Catálogo de planes |
-| **Deuda Pública** | [`docs/deuda-publica.md`](./docs/deuda-publica.md) | Consulta de deuda por RUT o código de abonado |
+| **Deuda Pública** | [`docs/deuda-publica.md`](./docs/deuda-publica.md) | Consulta de deuda por RUT |
+| **Cobertura** | [`docs/cobertura.md`](./docs/cobertura.md) | Visor cartográfico público, capa generada desde el KML de planta externa |
 | **Admin** | (ver abajo) | Intentos fallidos, desbloquear IP |
 
 ### Documentación técnica

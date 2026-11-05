@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { PortalController } from './portal.controller.js';
 import { PortalService } from './portal.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 
 const CLIENTE_MOCK = {
   id_cliente: 1,
@@ -27,6 +28,7 @@ const PANEL_MOCK = {
 describe('PortalController', () => {
   let controller: PortalController;
   let service: jest.Mocked<PortalService>;
+  let enlaces: { crearEnlacePago: jest.Mock };
 
   beforeEach(async () => {
     const mockService = {
@@ -41,16 +43,34 @@ describe('PortalController', () => {
       getTickets: jest
         .fn()
         .mockResolvedValue({ total: 0, tiene_tickets: false, tickets: [] }),
+      getCategoriasTicket: jest.fn().mockResolvedValue([]),
+      solicitarCambioContrasenaWifi: jest.fn().mockResolvedValue({
+        id_solicitud: 7,
+        id_contrato: 1,
+        estado: 'PENDIENTE',
+        fecha_solicitud: '2024-01-15T00:00:00.000Z',
+      }),
+      crearTicket: jest.fn().mockResolvedValue({
+        id_ticket: 42,
+        codigo_seguimiento: 'FIN-2026-000042',
+      }),
     };
     const module = await Test.createTestingModule({
       controllers: [PortalController],
-      providers: [{ provide: PortalService, useValue: mockService }],
+      providers: [
+        { provide: PortalService, useValue: mockService },
+        {
+          provide: EnlacePagoService,
+          useValue: { crearEnlacePago: jest.fn().mockReturnValue('p.a.b.c.d') },
+        },
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({ canActivate: () => true })
       .compile();
     controller = module.get(PortalController);
     service = module.get(PortalService);
+    enlaces = module.get(EnlacePagoService);
   });
 
   it('GET /portal/panel llama getPanelPrincipal con el id del cliente autenticado', async () => {
@@ -81,5 +101,53 @@ describe('PortalController', () => {
   it('GET /portal/tickets?limite=3 parsea el string a número y llama getTickets con 3', async () => {
     await controller.getTickets(CLIENTE_MOCK as any, '3');
     expect(service.getTickets).toHaveBeenCalledWith(1, 3);
+  });
+
+  it('GET /portal/tickets/categorias lista las categorias disponibles', async () => {
+    await controller.getCategoriasTicket();
+    expect(service.getCategoriasTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it('POST /portal/tickets registra la solicitud del cliente autenticado', async () => {
+    const body = { id_categoria: 3, descripcion: 'Sin conexion' };
+
+    await controller.crearTicket(CLIENTE_MOCK as any, body);
+
+    expect(service.crearTicket).toHaveBeenCalledWith(1, body);
+  });
+
+  // CU-31 + CU-32: el endpoint solo registra la solicitud; la ejecucion en el
+  // equipo del cliente es CU-33 y la hace el CRM.
+  it('POST /portal/wifi/password registra la solicitud del cliente autenticado', async () => {
+    const body = { id_contrato: 1, password: 'MiRedNueva2026' };
+
+    const respuesta = await controller.solicitarCambioContrasenaWifi(
+      CLIENTE_MOCK as any,
+      body,
+    );
+
+    expect(service.solicitarCambioContrasenaWifi).toHaveBeenCalledWith(1, body);
+    expect(respuesta).toEqual(
+      expect.objectContaining({ estado: 'PENDIENTE', id_solicitud: 7 }),
+    );
+  });
+
+  // ─── CU-42: pagar desde el portal ────────────────────────────────────────
+
+  it('GET /portal/enlace-pago devuelve el enlace firmado para el cliente autenticado', () => {
+    const r = controller.enlacePago(CLIENTE_MOCK as any);
+
+    expect(enlaces.crearEnlacePago).toHaveBeenCalledWith(1);
+    expect(r).toEqual({ enlace: '/pagar?t=p.a.b.c.d' });
+  });
+
+  it('GET /portal/enlace-pago responde 503 si no se puede firmar el enlace', () => {
+    enlaces.crearEnlacePago.mockImplementation(() => {
+      throw new Error('ENLACE_PAGO_SECRET no está configurada');
+    });
+
+    expect(() => controller.enlacePago(CLIENTE_MOCK as any)).toThrow(
+      'El pago en línea no está disponible por ahora.',
+    );
   });
 });

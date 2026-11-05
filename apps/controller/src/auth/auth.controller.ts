@@ -12,10 +12,21 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
-import { loginSchema } from './dto/login.dto.js';
-import { registerSchema } from './dto/register.dto.js';
-import { recuperarPasswordSchema } from './dto/recuperar-password.dto.js';
-import { restablecerPasswordSchema } from './dto/restablecer-password.dto.js';
+import { loginSchema, type LoginDto } from './dto/login.dto.js';
+import {
+  recuperarPasswordSchema,
+  type RecuperarPasswordDto,
+} from './dto/recuperar-password.dto.js';
+import {
+  restablecerPasswordSchema,
+  type RestablecerPasswordDto,
+} from './dto/restablecer-password.dto.js';
+import {
+  confirmacionRegistroSchema,
+  solicitudRegistroSchema,
+  type ConfirmacionRegistroDto,
+  type SolicitudRegistroDto,
+} from './dto/registro.dto.js';
 import { ZodValidationPipe } from './pipes/zod-validation.pipe.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { CurrentClient } from './decorators/current-client.decorator.js';
@@ -61,10 +72,7 @@ export class AuthController {
   @HttpCode(200)
   async login(
     @Body(new ZodValidationPipe(loginSchema))
-    body: {
-      rut: string;
-      password: string;
-    },
+    body: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -73,75 +81,79 @@ export class AuthController {
       body.password,
       req.ip ?? '0.0.0.0',
     );
-    res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    this.ponerCookieSesion(res, result.access_token);
     return result;
   }
 
   /**
-   * RF-10: Registrar una cuenta nueva en el portal
+   * CU-04 / RF-10, paso 1: un cliente que ya existe pide crear su cuenta.
    *
-   * Crea un cliente nuevo con los datos enviados. Si el registro es exitoso,
-   * inicia sesión automáticamente (devuelve token JWT + cookie httpOnly).
+   * El cliente lo crea G8; el portal solo le da acceso (acuerdo v2.0, §3 y §4).
+   * Si es cliente activo, no tiene contraseña y tiene correo, se le manda un
+   * enlace de un solo uso a ese correo (G8, 01-10, §6).
    *
-   * POST /auth/register
+   * POST /auth/registro
    *
-   * @body {
-   *   rut: string,              // formato 123456785 (sin puntos ni guion)
-   *   nombre_completo: string,  // 2-120 caracteres
-   *   email: string,            // formato válido, 120 char máx
-   *   telefono?: string,        // opcional, 20 char máx
-   *   password: string,         // 8-72 char, 1 mayúscula, 1 número
-   *   password_confirmation: string
-   * }
+   * @body { rut: string }  // formato 123456785 (sin puntos ni guion)
    *
-   * Se asigna automáticamente id_empresa=1 y estado='activo'.
+   * Respuesta 200: { resultado: 'ENLACE_ENVIADO' | 'YA_REGISTRADO' |
+   * 'SIN_CORREO' | 'NO_CLIENTE' }. La vista muestra un mensaje por cada uno.
    *
    * Rate limit: 3 intentos por minuto por IP.
    *
    * Errores:
-   *   400 - Validación Zod (campos requeridos, email inválido, contraseña débil,
-   *         las contraseñas no coinciden)
-   *   409 - El RUT ya está registrado
-   *   409 - El email ya está registrado
+   *   400 - RUT mal formateado o dígito verificador inválido
+   *   429 - Rate limit excedido (>3 req/min)
+   *   503 - No se pudo enviar el correo
+   */
+  @Post('registro')
+  @Throttle({ default: { limit: 3, ttl: 60 } })
+  @HttpCode(200)
+  solicitarRegistro(
+    @Body(new ZodValidationPipe(solicitudRegistroSchema))
+    body: SolicitudRegistroDto,
+  ) {
+    return this.authService.solicitarRegistro(body.rut);
+  }
+
+  /**
+   * CU-04 / RF-10, paso 2: con el enlace del correo, el cliente crea su
+   * contraseña y queda con la sesión iniciada (devuelve el token y pone la
+   * cookie httpOnly, como el login).
+   *
+   * POST /auth/registro/confirmar
+   *
+   * @body {
+   *   token: string,
+   *   password: string,               // 8-72 char, 1 mayúscula, 1 número
+   *   password_confirmation: string,
+   *   acepta_politica_privacidad: true,
+   *   version_politica_privacidad: string
+   * }
+   *
+   * Rate limit: 3 intentos por minuto por IP.
+   *
+   * Errores:
+   *   400 - Validación (contraseña débil, no coinciden, sin la casilla)
+   *   400 - Token inválido o expirado, o enlace ya usado
    *   429 - Rate limit excedido (>3 req/min)
    */
-  @Post('register')
+  @Post('registro/confirmar')
   @Throttle({ default: { limit: 3, ttl: 60 } })
-  @HttpCode(201)
-  async register(
-    @Body(new ZodValidationPipe(registerSchema))
-    body: {
-      rut: string;
-      nombre_completo: string;
-      email: string;
-      telefono?: string;
-      password: string;
-      password_confirmation: string;
-    },
+  @HttpCode(200)
+  async confirmarRegistro(
+    @Body(new ZodValidationPipe(confirmacionRegistroSchema))
+    body: ConfirmacionRegistroDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.register(
-      body.rut,
-      body.nombre_completo,
+    const result = await this.authService.confirmarRegistro(
+      body.token,
       body.password,
+      body.version_politica_privacidad,
       req.ip ?? '0.0.0.0',
-      body.email,
-      body.telefono,
     );
-    res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    this.ponerCookieSesion(res, result.access_token);
     return result;
   }
 
@@ -149,7 +161,7 @@ export class AuthController {
    * RF-03: Solicitar recuperación de contraseña
    *
    * Si el RUT existe y tiene email registrado, envía un enlace de recuperación
-   * al correo del cliente. El enlace expira en 15 minutos.
+   * al correo del cliente. El enlace expira en 30 minutos (RNF-04.1).
    *
    * POST /auth/recuperar-password
    *
@@ -169,7 +181,7 @@ export class AuthController {
   @HttpCode(200)
   async recuperarPassword(
     @Body(new ZodValidationPipe(recuperarPasswordSchema))
-    body: { rut: string },
+    body: RecuperarPasswordDto,
     @Req() req: Request,
   ) {
     return this.authService.recuperarPassword(body.rut, req.ip);
@@ -179,7 +191,7 @@ export class AuthController {
    * RF-09: Restablecer contraseña con token
    *
    * El token se recibe por email (el link apunta a /restablecer-password?token=...).
-   * Valida que el token sea de tipo 'reset' y no esté expirado (15 min).
+   * Valida que el token sea de tipo 'reset' y no esté expirado (30 min).
    * Al cambiar la contraseña, invalida todas las sesiones activas del cliente.
    *
    * POST /auth/restablecer-password
@@ -202,10 +214,7 @@ export class AuthController {
   @HttpCode(200)
   async restablecerPassword(
     @Body(new ZodValidationPipe(restablecerPasswordSchema))
-    body: {
-      token: string;
-      password: string;
-    },
+    body: RestablecerPasswordDto,
   ) {
     return this.authService.restablecerPassword(body.token, body.password);
   }
@@ -259,5 +268,16 @@ export class AuthController {
 
     res.clearCookie('access_token', { path: '/' });
     return { message: 'Sesión cerrada exitosamente' };
+  }
+
+  /** La cookie de la sesión del portal: la usan el login y el registro. */
+  private ponerCookieSesion(res: Response, token: string) {
+    res.cookie('access_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
   }
 }

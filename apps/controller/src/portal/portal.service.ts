@@ -1,33 +1,67 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import { constants, publicEncrypt, randomUUID } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
+  ErrorClaveWifiG3,
+  G3WifiService,
+  type RespuestaClaveWifiG3,
+} from '../common/g3/g3-wifi.service.js';
+import {
+  G8IntegracionService,
+  type ResultadoWifiG8,
+} from '../common/g8/g8-integracion.service.js';
+import {
+  COMPROBANTE_G8_DEFINIDO,
+  TICKET_WIFI_DEFINIDO,
+} from '../common/pendientes.js';
+import {
+  ESTADOS_CONTRATO_VIGENTES,
+  normalizarEstadoContrato,
+} from '../common/constants/contrato.js';
+import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
+import { formatPeriodo } from '../common/utils/periodo.js';
+import { MailService } from '../mail/mail.service.js';
+import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
+import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
+import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
+import {
+  CategoriaTicketDto,
   ContratoEstadoDto,
   ContratoResumenDto,
+  CrearTicketResponseDto,
   FacturaPendienteDto,
+  PagosAnterioresDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
+  SolicitudContrasenaWifiResponseDto,
   TicketsResponseDto,
 } from './dto/portal-response.dto.js';
+
+const NO_SE_PUDO_REGISTRAR_WIFI =
+  'No fue posible registrar tu solicitud. Intenta nuevamente mas tarde.';
 
 @Injectable()
 export class PortalService {
   private readonly logger = new Logger(PortalService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
-
-  // Estados válidos según RF-20 y CU-23
-  private readonly ESTADOS_CONTRATO_VALIDOS: string[] = [
-    'activo',
-    'suspendido',
-    'en_tramite',
-  ];
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService,
+    private readonly g3Wifi: G3WifiService,
+    private readonly g8: G8IntegracionService,
+  ) {}
 
   //  CU-23: Consultar estado operativo del contrato
   // Retorna el estado de TODOS los contratos del cliente (puede tener varios) y se ve si esta activo, fechas e identificador ;3.
@@ -48,58 +82,61 @@ export class PortalService {
       );
     }
 
-    // CU-23 Excepción 3: validar que todos los estados sean reconocidos
-    const estadosNoReconocidos: { id_contrato: number; estado: string }[] = [];
+    // CU-23 Excepción 3: estado no reconocido.
+    //
+    // Antes esto lanzaba un 400 y dejaba al cliente sin panel. No puede ser: la
+    // base es compartida con los otros equipos y cualquiera puede escribir un
+    // estado que todavía no conocemos. Un valor inesperado se registra para que
+    // alguien lo revise, pero se devuelve tal cual y el portal sigue en pie.
+    const noReconocidos: { id_contrato: number; estado: string }[] = [];
 
-    for (const c of contratos) {
-      if (!this.ESTADOS_CONTRATO_VALIDOS.includes(c.estado)) {
-        estadosNoReconocidos.push({
-          id_contrato: c.id_contrato,
-          estado: c.estado,
-        });
+    const estados = contratos.map((c) => {
+      const canonico = normalizarEstadoContrato(c.estado);
 
-        // Registrar en log de auditoría para revisión administrativa
-        try {
-          await this.prisma.log_auditoria.create({
-            data: {
-              accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
-              entidad_afectada: 'contrato',
-              id_entidad_afectada: c.id_contrato,
-              valor_anterior: { estado_recibido: c.estado },
-              valor_nuevo: {
-                estados_permitidos: this.ESTADOS_CONTRATO_VALIDOS,
-              },
-            },
-          });
-        } catch (auditError) {
-          this.logger.error(
-            `No se pudo registrar auditoría para estado no reconocido del contrato ${c.id_contrato}`,
-            auditError,
-          );
-        }
+      if (!canonico) {
+        noReconocidos.push({ id_contrato: c.id_contrato, estado: c.estado });
       }
-    }
 
-    if (estadosNoReconocidos.length > 0) {
-      const ids = estadosNoReconocidos
+      return {
+        id_contrato: c.id_contrato,
+        // El canónico de la tabla 11.15 cuando se reconoce; si no, el valor
+        // crudo, para que el cliente vea algo y no un hueco.
+        estado: canonico ?? c.estado,
+        fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
+        fecha_suspension: c.fecha_suspension
+          ? c.fecha_suspension.toISOString().split('T')[0]
+          : null,
+      };
+    });
+
+    if (noReconocidos.length > 0) {
+      const detalle = noReconocidos
         .map((e) => `#${e.id_contrato} (${e.estado})`)
         .join(', ');
       this.logger.warn(
-        `Estados de contrato no reconocidos para cliente ${idCliente}: ${ids}`,
+        `Estados de contrato fuera de la tabla 11.15 para el cliente ${idCliente}: ${detalle}`,
       );
-      throw new BadRequestException(
-        `El estado operativo de algunos contratos no es reconocido por el sistema. Contacte al administrador. Contratos afectados: ${ids}`,
-      );
+
+      // La auditoría no puede tumbar la consulta: si falla, se registra y sigue.
+      try {
+        await this.prisma.log_auditoria.create({
+          data: {
+            accion: 'ESTADO_CONTRATO_NO_RECONOCIDO',
+            entidad_afectada: 'contrato',
+            id_entidad_afectada: noReconocidos[0].id_contrato,
+            valor_anterior: { estados_recibidos: noReconocidos },
+            valor_nuevo: { estados_canonicos: ESTADOS_CONTRATO_VIGENTES },
+          },
+        });
+      } catch (auditError) {
+        this.logger.error(
+          'No se pudo registrar la auditoría de estados no reconocidos',
+          auditError,
+        );
+      }
     }
 
-    return contratos.map((c) => ({
-      id_contrato: c.id_contrato,
-      estado: c.estado,
-      fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
-      fecha_suspension: c.fecha_suspension
-        ? c.fecha_suspension.toISOString().split('T')[0]
-        : null,
-    }));
+    return estados;
   }
 
   // ─── CU-24: Panel principal del Portal Cliente ─────────────────────────────
@@ -151,7 +188,14 @@ export class PortalService {
       .findMany({
         where: {
           id_cliente: idCliente,
-          estado: { in: ['activo', 'suspendido'] },
+          // Se listan todos los estados en los que el servicio sigue siendo del
+          // cliente, incluidos SUSPENDIDO y CORTADO: si el CRM corta por
+          // morosidad, el cliente tiene que verlo en su portal. Queda fuera
+          // solo BAJA. Se comparan ambas capitalizaciones porque en la base
+          // conviven valores viejos en minúscula con los de la tabla 11.15.
+          estado: {
+            in: ESTADOS_CONTRATO_VIGENTES.flatMap((e) => [e, e.toLowerCase()]),
+          },
         },
         include: {
           plan: {
@@ -175,7 +219,7 @@ export class PortalService {
 
     return contratos.map((c) => ({
       id_contrato: c.id_contrato,
-      estado: c.estado,
+      estado: normalizarEstadoContrato(c.estado) ?? c.estado,
       fecha_inicio: c.fecha_inicio.toISOString().split('T')[0],
       dia_vencimiento: c.dia_vencimiento,
       plan: c.plan
@@ -226,7 +270,7 @@ export class PortalService {
 
       return {
         id_factura: f.id_factura,
-        periodo: this.formatPeriodo(f.periodo_mes, f.periodo_anio),
+        periodo: formatPeriodo(f.periodo_mes, f.periodo_anio),
         monto: Number(f.monto ?? 0),
         fecha_limite_pago: limite.toISOString().split('T')[0],
         estado: f.estado,
@@ -272,13 +316,209 @@ export class PortalService {
     };
   }
 
-  // CU-29 / CU-30: Tickets de soporte :DDDDDDDDD AHGG AYUDA
+  //  CU-52: los pagos anteriores del cliente, para descargar su comprobante.
+  //
+  //  Se lee `pago` directo, como permite el §5 del acuerdo v2.0. Un pago es del
+  //  cliente si lo dice su `id_cliente` o si su factura es de un contrato suyo:
+  //  `id_cliente` puede venir vacío. No se lee `comprobante_estado`, que todavía
+  //  no existe: está en la migración pendiente de G8.
+  async getPagosAnteriores(idCliente: number): Promise<PagosAnterioresDto> {
+    const pagos = await this.prisma.pago.findMany({
+      where: this.pagosDelCliente(idCliente),
+      select: {
+        id_pago: true,
+        fecha_pago: true,
+        monto: true,
+        pasarela: true,
+        factura: { select: { periodo_mes: true, periodo_anio: true } },
+      },
+      orderBy: { fecha_pago: 'desc' },
+    });
+
+    return {
+      comprobante_disponible: COMPROBANTE_G8_DEFINIDO,
+      pagos: pagos.map((p) => ({
+        id_pago: p.id_pago,
+        fecha_pago: p.fecha_pago.toISOString(),
+        periodo: p.factura
+          ? formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
+          : null,
+        monto: Number(p.monto),
+        pasarela: this.nombreMedio(p.pasarela),
+      })),
+    };
+  }
+
+  //  CU-52: el comprobante de un pago del cliente.
+  //
+  //  El comprobante es la boleta (reunión con G8): la emite G8, y la descarga va
+  //  por su `GET …/payments/{id_pago}/tax-document` (respuesta del 02-10, §10).
+  //  Mientras G8 no lo implemente y Finet no confirme la descarga
+  //  (`COMPROBANTE_G8_DEFINIDO`), la llamada no se escribe y el cliente cae en la
+  //  Excepción 2 del CU-52: el comprobante no está disponible.
+  async getComprobante(idCliente: number, idPago: number): Promise<never> {
+    // Si el pago es de otro cliente se responde 404, igual que si no existiera:
+    // no se confirma su existencia.
+    const pago = await this.prisma.pago.findFirst({
+      where: { id_pago: idPago, ...this.pagosDelCliente(idCliente) },
+      select: { id_pago: true },
+    });
+    if (!pago) {
+      throw new NotFoundException('No encontramos ese pago');
+    }
+
+    throw new ServiceUnavailableException(
+      'El comprobante de este pago no está disponible en este momento. Intenta más tarde.',
+    );
+  }
+
+  /**
+   * El nombre del medio, el mismo que muestra `/pagar` (`webpay` → Webpay). El
+   * §11.15 no define un enum de medio de pago, así que un valor que no
+   * conocemos se muestra tal como está guardado.
+   */
+  private nombreMedio(pasarela: string): string {
+    const medio = MEDIOS_PAGO.find(
+      (m) => m.id === pasarela.trim().toLowerCase(),
+    );
+    return medio?.nombre ?? pasarela;
+  }
+
+  private pagosDelCliente(idCliente: number): Prisma.pagoWhereInput {
+    return {
+      OR: [
+        { id_cliente: idCliente },
+        { factura: { contrato: { id_cliente: idCliente } } },
+      ],
+    };
+  }
+
+  /** CU-71: solo las categorías que el cliente puede elegir (§11.9). */
+  async getCategoriasTicket(): Promise<CategoriaTicketDto[]> {
+    return this.prisma.categoria_falla.findMany({
+      where: FILTRO_CATEGORIAS_CLIENTE,
+      select: { id_categoria: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
+  async crearTicket(
+    idCliente: number,
+    dto: CrearTicketDto,
+  ): Promise<CrearTicketResponseDto> {
+    let ticketCreado: {
+      id_ticket: number;
+      codigo_seguimiento: string;
+      cliente: {
+        id_cliente: number;
+        nombre_completo: string;
+        email: string | null;
+      };
+      categoria: string;
+    };
+
+    try {
+      ticketCreado = await this.prisma.$transaction(async (tx) => {
+        const cliente = await tx.cliente.findUnique({
+          where: { id_cliente: idCliente },
+          select: {
+            id_cliente: true,
+            id_empresa: true,
+            nombre_completo: true,
+            email: true,
+          },
+        });
+
+        if (!cliente) {
+          throw new NotFoundException('Cliente no encontrado');
+        }
+
+        // Una categoría interna de otro grupo no se acepta aunque llegue su id.
+        const categoria = await tx.categoria_falla.findFirst({
+          where: {
+            id_categoria: dto.id_categoria,
+            ...FILTRO_CATEGORIAS_CLIENTE,
+          },
+          select: { id_categoria: true, nombre: true },
+        });
+
+        if (!categoria) {
+          throw new BadRequestException(
+            'La categoria seleccionada no esta disponible',
+          );
+        }
+
+        const ticket = await tx.ticket.create({
+          data: {
+            id_cliente: cliente.id_cliente,
+            id_empresa: cliente.id_empresa,
+            id_categoria: categoria.id_categoria,
+            prioridad: 'media',
+            estado: 'abierto',
+            descripcion: dto.descripcion,
+            origen: 'portal',
+          },
+          select: { id_ticket: true, fecha_creacion: true },
+        });
+
+        const anio =
+          ticket.fecha_creacion?.getFullYear() ?? new Date().getFullYear();
+        const codigoSeguimiento = `FIN-${anio}-${String(ticket.id_ticket).padStart(6, '0')}`;
+
+        await tx.ticket.update({
+          where: { id_ticket: ticket.id_ticket },
+          data: { codigo_seguimiento: codigoSeguimiento },
+        });
+
+        await tx.log_auditoria.create({
+          data: {
+            accion: 'CREAR_TICKET_PORTAL',
+            entidad_afectada: 'ticket',
+            id_entidad_afectada: ticket.id_ticket,
+            valor_nuevo: {
+              codigo_seguimiento: codigoSeguimiento,
+              id_categoria: categoria.id_categoria,
+              estado: 'abierto',
+              origen: 'portal',
+            },
+          },
+        });
+
+        return {
+          id_ticket: ticket.id_ticket,
+          codigo_seguimiento: codigoSeguimiento,
+          cliente,
+          categoria: categoria.nombre,
+        };
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `No se pudo crear el ticket para el cliente ${idCliente}`,
+        error,
+      );
+      throw new ServiceUnavailableException(
+        'No fue posible registrar tu solicitud. Intenta nuevamente mas tarde.',
+      );
+    }
+
+    await this.notificarTicketCreado(ticketCreado);
+    return {
+      id_ticket: ticketCreado.id_ticket,
+      codigo_seguimiento: ticketCreado.codigo_seguimiento,
+    };
+  }
+
+  // CU-29 / CU-30: tickets de soporte del cliente
   async getTickets(
     idCliente: number,
     limite?: number,
   ): Promise<TicketsResponseDto> {
     const tickets = await this.prisma.ticket.findMany({
-      where: { id_cliente: idCliente },
+      // Los resueltos no le sirven al cliente en su panel de soporte activo:
+      // se excluyen aca para no traerlos de la base ni tener que filtrarlos
+      // despues en memoria.
+      where: { id_cliente: idCliente, estado: { not: 'resuelto' } },
       include: {
         categoria_falla: { select: { nombre: true } },
       },
@@ -305,22 +545,437 @@ export class PortalService {
     };
   }
 
-  // variables meses xD
-  private formatPeriodo(mes: number, anio: number): string {
-    const meses = [
-      'Enero',
-      'Febrero',
-      'Marzo',
-      'Abril',
-      'Mayo',
-      'Junio',
-      'Julio',
-      'Agosto',
-      'Septiembre',
-      'Octubre',
-      'Noviembre',
-      'Diciembre',
-    ];
-    return `${meses[mes - 1]} ${anio}`;
+  private async notificarTicketCreado(ticket: {
+    id_ticket: number;
+    codigo_seguimiento: string;
+    categoria: string;
+    cliente: {
+      id_cliente: number;
+      nombre_completo: string;
+      email: string | null;
+    };
+  }): Promise<void> {
+    let estadoEnvio = 'omitido';
+
+    if (ticket.cliente.email) {
+      try {
+        await this.mailService.sendTicketCreated(
+          ticket.cliente.email,
+          ticket.cliente.nombre_completo,
+          ticket.codigo_seguimiento,
+          ticket.categoria,
+        );
+        estadoEnvio = 'enviado';
+      } catch (error) {
+        estadoEnvio = 'fallido';
+        this.logger.error(
+          `No se pudo notificar la creacion del ticket ${ticket.id_ticket}`,
+          error,
+        );
+      }
+    }
+
+    try {
+      await this.prisma.log_notificacion.create({
+        data: {
+          id_cliente: ticket.cliente.id_cliente,
+          canal: 'email',
+          fecha_envio: new Date(),
+          estado_envio: estadoEnvio,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo registrar la notificacion del ticket ${ticket.id_ticket}`,
+        error,
+      );
+    }
+  }
+
+  //  CU-31 + CU-32: Solicitud de cambio de contrasena de la red WiFi
+  //
+  //  El portal NO cambia la clave: deja registrada la solicitud, y ejecutarla es
+  //  el CU-33, de Grupo 3. El formato ya viene validado por Zod en el
+  //  controller (CU-31 / RF-24).
+  //
+  //  Hay dos flujos y cual corre lo decide `TICKET_WIFI_DEFINIDO`
+  //  (common/pendientes.ts):
+  //  - v1, el de hoy: la solicitud queda en `solicitud_contrasena_wifi`, con la
+  //    clave cifrada con la llave del CRM. El acuerdo v2.0 permite conservarlo
+  //    mientras tanto (§6.7).
+  //  - v2, el del acuerdo v2.0 (§6.4): ticket del CRM y la clave cifrada con la
+  //    llave de G3, enviada directo a G3. Espera a que G8 defina el ticket.
+  async solicitarCambioContrasenaWifi(
+    idCliente: number,
+    dto: SolicitarCambioContrasenaWifiDto,
+    ticketWifiDefinido = TICKET_WIFI_DEFINIDO,
+  ): Promise<SolicitudContrasenaWifiResponseDto> {
+    // El contrato tiene que ser del cliente autenticado. Si es de otro, se
+    // responde 404 igual que si no existiera: no se confirma su existencia.
+    const contrato = await this.prisma.contrato.findFirst({
+      where: { id_contrato: dto.id_contrato, id_cliente: idCliente },
+      select: { id_contrato: true, estado: true },
+    });
+
+    if (!contrato) {
+      throw new NotFoundException('No encontramos el servicio seleccionado');
+    }
+
+    // CU-32 Excepcion 2: el plan no esta activo -> se impide crear la solicitud
+    // y se informa la restriccion.
+    //
+    // El estado se normaliza a la Tabla 11.15 antes de comparar, igual que el
+    // resto del servicio: la base compartida la escriben cuatro equipos y el CRM
+    // guarda 'ACTIVO' en mayusculas, asi que comparar el string crudo contra
+    // 'activo' le respondia 409 a un cliente con el servicio andando.
+    //
+    // REACTIVADO queda fuera a proposito: la tabla 11.15 lo lista como estado
+    // distinto de ACTIVO y CU-32 pide "activo". Si tras CU-50 el CRM lo deja
+    // fijo en vez de volver a ACTIVO, hay que sumarlo aca.
+    if (normalizarEstadoContrato(contrato.estado) !== 'ACTIVO') {
+      throw new ConflictException(
+        'Solo puedes solicitar el cambio de clave en un servicio activo',
+      );
+    }
+
+    return ticketWifiDefinido
+      ? this.enviarCambioWifiAG3(idCliente, contrato.id_contrato, dto.password)
+      : this.registrarCambioWifiV1(
+          idCliente,
+          contrato.id_contrato,
+          dto.password,
+        );
+  }
+
+  //  CU-32, flujo v1: la solicitud queda en `solicitud_contrasena_wifi`.
+  //
+  //  La clave NO se guarda en texto plano: va en `password_nueva_cifrada`,
+  //  cifrada con la llave publica del CRM. Solo Grupo 8 tiene la privada, asi
+  //  que en nuestra base no hay nada legible, y ellos la descifran para
+  //  escribirla en el equipo (el router la necesita en claro: la usa para
+  //  derivar la PSK de WPA2). La borran al marcar la solicitud APLICADA, y ahi
+  //  la fila deja de tener cualquier secreto.
+  //
+  //  Se descarto guardar tambien un hash bcrypt: solo habria servido para
+  //  "verificar" algo que ningun CU pide, y un hash de una clave WiFi corta se
+  //  saca por diccionario, asi que era un secreto extra guardado para siempre
+  //  a cambio de nada.
+  private async registrarCambioWifiV1(
+    idCliente: number,
+    idContrato: number,
+    clave: string,
+  ): Promise<SolicitudContrasenaWifiResponseDto> {
+    try {
+      // Se cifra recien aca, despues de validar el contrato: no tiene sentido
+      // gastar el cifrado en un request que va a terminar en 404 o 409.
+      const passwordNuevaCifrada = this.cifrarClaveParaCrm(clave);
+
+      const solicitud = await this.prisma.$transaction(async (tx) => {
+        const creada = await tx.solicitud_contrasena_wifi.create({
+          data: {
+            id_contrato: idContrato,
+            id_cliente: idCliente,
+            password_nueva_cifrada: passwordNuevaCifrada,
+            // MAYUSCULAS por la convencion del §11.15 del Documento 0: todo
+            // catalogo cerrado se guarda asi (ACTIVO, ABIERTO, MEDIA...).
+            estado: 'PENDIENTE',
+          },
+          select: {
+            id_solicitud: true,
+            id_contrato: true,
+            estado: true,
+            fecha_solicitud: true,
+          },
+        });
+
+        // La clave nueva no se registra en la auditoria, ni hasheada: el log lo
+        // lee mucha mas gente que la solicitud misma y no lo necesita.
+        await tx.log_auditoria.create({
+          data: {
+            accion: 'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+            entidad_afectada: 'solicitud_contrasena_wifi',
+            id_entidad_afectada: creada.id_solicitud,
+            valor_nuevo: {
+              id_contrato: creada.id_contrato,
+              estado: creada.estado,
+              origen: 'portal',
+            },
+          },
+        });
+
+        return creada;
+      });
+
+      return {
+        id_solicitud: solicitud.id_solicitud,
+        id_contrato: solicitud.id_contrato,
+        estado: solicitud.estado,
+        fecha_solicitud: solicitud.fecha_solicitud?.toISOString() ?? null,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(
+        `No se pudo registrar la solicitud de cambio de contrasena WiFi del cliente ${idCliente}`,
+        error,
+      );
+      throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
+    }
+  }
+
+  //  CU-32, flujo v2: el del acuerdo v2.0 (§6.4). G2 crea el ticket (paso 3),
+  //  cifra la clave con la llave de G3 y se la manda directo (pasos 4 y 5), y G3
+  //  responde en la misma llamada (paso 7). La clave no se guarda en ninguna
+  //  parte, y G8 no recibe ni la clave ni el ciphertext (§6.5).
+  //
+  //  El estado del ticket es de G8 (§3 y §6.3): aca se crea abierto y no se
+  //  vuelve a tocar. Lo que si se hace es informarle a G8 el resultado (paso 8),
+  //  con el contrato de su respuesta del 02-10 (§12), y G8 mueve el ticket.
+  private async enviarCambioWifiAG3(
+    idCliente: number,
+    idContrato: number,
+    clave: string,
+  ): Promise<SolicitudContrasenaWifiResponseDto> {
+    // §6.2: la empresa es la del cliente autenticado. G3 la valida contra el
+    // alcance de nuestra clave de API.
+    const cliente = await this.prisma.cliente.findUnique({
+      where: { id_cliente: idCliente },
+      select: { id_empresa: true },
+    });
+    const idEmpresa = cliente?.id_empresa;
+    if (!idEmpresa) {
+      this.logger.error(
+        `El cliente ${idCliente} no tiene empresa: su cambio de clave WiFi no se puede enviar a G3`,
+      );
+      throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
+    }
+
+    // §6.6 y §10: request_id y trace_id quedan guardados antes del primer
+    // envio, en la misma transaccion que el ticket.
+    const requestId = randomUUID();
+    const traceId = randomUUID();
+    let idTicket: number;
+    try {
+      idTicket = await this.prisma.$transaction(async (tx) => {
+        const id = await this.crearTicketWifi(tx, {
+          idCliente,
+          idEmpresa,
+          idContrato,
+        });
+        await tx.log_auditoria.create({
+          data: {
+            accion: 'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+            entidad_afectada: 'ticket',
+            id_entidad_afectada: id,
+            valor_nuevo: {
+              id_contrato: idContrato,
+              request_id: requestId,
+              trace_id: traceId,
+              destino: 'G3',
+              origen: 'portal',
+            },
+          },
+        });
+        return id;
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo crear el ticket del cambio de clave WiFi del cliente ${idCliente}`,
+        error,
+      );
+      throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
+    }
+
+    let respuesta: RespuestaClaveWifiG3;
+    try {
+      respuesta = await this.g3Wifi.enviarClaveWifi({
+        clave,
+        idTicket: String(idTicket),
+        idContrato,
+        idEmpresa,
+        requestId,
+        traceId,
+      });
+    } catch (error) {
+      // El ticket queda abierto y no se crea otro (§14.12). Tampoco se le dice
+      // al cliente que quedo registrada: no se simula nada.
+      this.logger.error(
+        `G3 no registro el cambio de clave WiFi del ticket ${idTicket} (request_id ${requestId}): ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+      const statusG3 = error instanceof ErrorClaveWifiG3 ? error.status : null;
+      await this.auditarRespuestaG3(idTicket, {
+        request_id: requestId,
+        resultado: 'ERROR',
+        status_g3: statusG3,
+      });
+      await this.informarResultadoWifiG8(
+        idTicket,
+        idEmpresa,
+        traceId,
+        'ERROR_TECNICO',
+        statusG3 === null
+          ? 'G3 no respondió a la solicitud.'
+          : `G3 rechazó la solicitud (HTTP ${statusG3}).`,
+      );
+      throw new ServiceUnavailableException(NO_SE_PUDO_REGISTRAR_WIFI);
+    }
+
+    await this.auditarRespuestaG3(idTicket, {
+      request_id: requestId,
+      resultado: 'REGISTRADA',
+      id_solicitud_g3: respuesta.idSolicitud,
+      estado_g3: respuesta.estado,
+      duplicado: respuesta.duplicado,
+    });
+    // G3 la deja registrada para que un tecnico la aplique: todavia no esta
+    // aplicada, asi que no se informa APLICADO (respuesta de G8 del 02-10, §12).
+    await this.informarResultadoWifiG8(
+      idTicket,
+      idEmpresa,
+      traceId,
+      'REQUIERE_ATENCION_MANUAL',
+      'Solicitud registrada para atención por técnico.',
+    );
+
+    return {
+      id_solicitud: respuesta.idSolicitud,
+      id_contrato: idContrato,
+      estado: respuesta.estado,
+      fecha_solicitud: respuesta.fecha,
+    };
+  }
+
+  /**
+   * §6.4 paso 3: el ticket del cambio de clave WiFi, abierto, con origen PORTAL
+   * y asociado al cliente y al servicio (§6.2 y §7).
+   *
+   * Es el hueco `TICKET_WIFI_DEFINIDO`. G8 lo definio el 01-10: categoria
+   * `CAMBIO_CREDENCIALES_WIFI` y el servicio en `ticket.id_servicio` (FK a
+   * `servicio_contratado`), que nuestro esquema todavia no tiene. Mientras G8 no
+   * lo despliegue no se llega aca: el CU-32 sigue con el v1. Despues se escribe
+   * como `crearTicket`, que crea los tickets genericos del portal, y devuelve el
+   * `id_ticket`.
+   */
+  crearTicketWifi(
+    tx: Prisma.TransactionClient,
+    datos: { idCliente: number; idEmpresa: number; idContrato: number },
+  ): Promise<number> {
+    return Promise.reject(
+      new Error(
+        `Ticket WiFi del cliente ${datos.idCliente} pendiente de G8: categoria y servicio (acuerdo v2.0, §6.1 y §6.2)`,
+      ),
+    );
+  }
+
+  /**
+   * §6.4 paso 8: el resultado a G8, para que mueva el ticket (Escalado en los dos
+   * casos de hoy). Lleva su propio `request_id`, la identidad idempotente del
+   * informe, y el `trace_id` de la operacion. No lanza: si G8 no lo recibe, la
+   * solicitud del cliente no se cae, y queda en el log para reintentarlo a mano.
+   */
+  private async informarResultadoWifiG8(
+    idTicket: number,
+    idEmpresa: number,
+    traceId: string,
+    resultado: ResultadoWifiG8,
+    detalleSaneado: string,
+  ): Promise<void> {
+    const requestId = randomUUID();
+    try {
+      await this.g8.informarResultadoWifi({
+        idTicket,
+        idEmpresa,
+        requestId,
+        traceId,
+        resultado,
+        detalleSaneado,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo informar a G8 el resultado ${resultado} del ticket ${idTicket} (request_id ${requestId}): ${error instanceof Error ? error.message : 'error desconocido'}`,
+      );
+    }
+  }
+
+  /**
+   * La respuesta de G3, saneada: nunca la clave ni el ciphertext (§12). Si no se
+   * puede escribir no se le cae la solicitud al cliente, que G3 ya registro.
+   */
+  private async auditarRespuestaG3(
+    idTicket: number,
+    valor: Prisma.InputJsonObject,
+  ): Promise<void> {
+    try {
+      await this.prisma.log_auditoria.create({
+        data: {
+          accion: 'RESPUESTA_G3_CAMBIO_CONTRASENA_WIFI',
+          entidad_afectada: 'ticket',
+          id_entidad_afectada: idTicket,
+          valor_nuevo: valor,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo auditar la respuesta de G3 del ticket ${idTicket}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Cifra la clave WiFi con la llave publica RSA del CRM para que solo Grupo 8
+   * pueda leerla (CU-33 la necesita en claro para escribirla en el equipo).
+   *
+   * Se usa RSA y no un cifrado simetrico como AES para no tener que compartir
+   * una llave entre los dos grupos: la publica puede andar en el repo sin
+   * riesgo, la privada no sale del entorno de ellos.
+   *
+   * La llave se configura en `CRM_PUBLIC_KEY`, en base64 (comodo para una
+   * variable de entorno, que no admite saltos de linea) o como PEM tal cual.
+   *
+   * Devuelve `null` si no hay llave o si el cifrado falla, y lo deja en el log
+   * de errores. No lanza a proposito: CU-32 tiene que poder registrar la
+   * solicitud del cliente igual, y el `null` es un contrato explicito con el
+   * CRM — significa "no viene cifrada, pidanle la clave al cliente".
+   */
+  private cifrarClaveParaCrm(clave: string): string | null {
+    const configurada = this.configService
+      .get<string>('CRM_PUBLIC_KEY')
+      ?.trim();
+
+    if (!configurada) {
+      this.logger.error(
+        'CRM_PUBLIC_KEY no esta configurada: la solicitud queda sin la clave cifrada y el CRM tendra que pedirsela al cliente',
+      );
+      return null;
+    }
+
+    try {
+      const pem = configurada.includes('-----BEGIN')
+        ? configurada
+        : Buffer.from(configurada, 'base64').toString('utf8');
+
+      if (!pem.includes('-----BEGIN')) {
+        throw new Error('CRM_PUBLIC_KEY no es un PEM ni un PEM en base64');
+      }
+
+      const cifrada = publicEncrypt(
+        {
+          key: pem,
+          padding: constants.RSA_PKCS1_OAEP_PADDING,
+          oaepHash: 'sha256',
+        },
+        Buffer.from(clave, 'utf8'),
+      );
+
+      return cifrada.toString('base64');
+    } catch (error) {
+      // Llave mal formada, o clave mas larga de lo que aguanta: una RSA-4096
+      // con OAEP-SHA256 admite 446 bytes, una RSA-2048 solo 190.
+      this.logger.error(
+        'No se pudo cifrar la clave WiFi con la llave publica del CRM',
+        error,
+      );
+      return null;
+    }
   }
 }

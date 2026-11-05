@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import AuthSwitch from "../components/AuthSwitch";
 import LoginForm from "../components/LoginForm";
-import RegisterForm from "../components/RegisterForm";
+import RegistroForm from "../components/RegistroForm";
 
 function AuthContent() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -11,7 +11,11 @@ function AuthContent() {
   return (
     <>
       <AuthSwitch active={mode} onChange={setMode} />
-      {mode === "login" ? <LoginForm /> : <RegisterForm />}
+      {mode === "login" ? (
+        <LoginForm />
+      ) : (
+        <RegistroForm onIniciarSesion={() => setMode("login")} />
+      )}
     </>
   );
 }

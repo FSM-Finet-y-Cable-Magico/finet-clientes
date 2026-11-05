@@ -1,4 +1,11 @@
-export type FooterLink = { label: string; href: string; icon?: string };
+import { WHATSAPP_URL } from '../../../_lib/company';
+
+export type FooterLink = {
+  label: string;
+  href: string;
+  icon?: string;
+  variant?: 'button';
+};
 export type FooterColumn = { title: string; links: FooterLink[] };
 
 export const footerColumns: FooterColumn[] = [
@@ -14,34 +21,21 @@ export const footerColumns: FooterColumn[] = [
   {
     title: 'Te ayudamos',
     links: [
-      { label: 'WhatsApp', href: 'https://wa.me/56945002319', icon: 'whatsapp' },
-      { label: 'Soporte técnico', href: '/soporte' },
-      { label: 'Reportar falla', href: '/reportar' },
-      { label: 'FAQs', href: '/faqs' },
-    ],
-  },
-  {
-    title: 'Hogar',
-    links: [
-      { label: 'Internet hogar', href: '/hogar/internet' },
-      { label: 'TV digital', href: '/hogar/tv' },
-      { label: 'Internet + TV', href: '/hogar/duo' },
-      { label: 'Canales', href: '/tv/canales' },
+      { label: 'WhatsApp', href: WHATSAPP_URL, icon: 'whatsapp' },
+      { label: 'Preguntas Frecuentes', href: '/ayuda' },
     ],
   },
   {
     title: 'Empresas',
-    links: [
-      { label: 'Internet empresas', href: '/empresas/internet' },
-      { label: 'Cotizador', href: '/empresas/cotizador' },
-    ],
+    links: [{ label: 'Empresas', href: '/empresas', variant: 'button' }],
   },
 ];
 
 export const legalLinks: FooterLink[] = [
-  { label: 'Términos', href: '/legal/terminos' },
-  { label: 'Privacidad', href: '/legal/privacidad' },
-  { label: 'Ley 21.398', href: '/legal/ley-21398' },
-  { label: 'Reglamento de reclamos', href: '/legal/reclamos' },
-  { label: 'Subtel', href: 'https://www.subtel.gob.cl/' },
+  // CU-73: Ley 21.398 y el reglamento de reclamos son secciones de Términos,
+  // no páginas propias.
+  { label: 'Términos', href: '/terminos' },
+  { label: 'Privacidad', href: '/privacidad' },
+  { label: 'Reclamos', href: '/terminos#reclamos' },
+  { label: 'Subtel', href: 'https://tramites.subtel.gob.cl' },
 ];

@@ -269,6 +269,58 @@ Authorization: Bearer <token>
 
 ---
 
+## 6. Cambio de clave WiFi (CU-31 / CU-32)
+
+El cliente pide cambiar la clave de su red WiFi. El portal **no** la cambia: deja registrada la solicitud, y aplicarla es el CU-33, de Grupo 3.
+
+```
+POST /api/portal/wifi/password
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "id_contrato": 1, "password": "<clave nueva>" }
+```
+
+**Validación (CU-31):** de 8 a 63 caracteres, sin espacios en blanco. Se permiten símbolos: es una decisión del equipo que difiere del RF-24 escrito.
+
+**Respuesta 201:**
+
+```json
+{
+  "id_solicitud": 7,
+  "id_contrato": 1,
+  "estado": "PENDIENTE",
+  "fecha_solicitud": "2026-10-01T21:11:14.370Z"
+}
+```
+
+La vista solo muestra "Solicitud registrada" (poscondición del CU-32). Nunca dice que la clave ya cambió.
+
+**Errores:**
+
+| HTTP | Causa |
+|------|-------|
+| 400 | La clave no cumple el formato (CU-32 Excepción 3) |
+| 401 | Sesión expirada (CU-32 Excepción 1) |
+| 404 | El servicio no es del cliente o no existe |
+| 409 | El servicio no está activo (CU-32 Excepción 2) |
+| 503 | No se pudo registrar la solicitud |
+
+**Dos flujos.** Cuál corre lo decide `TICKET_WIFI_DEFINIDO` en `src/common/pendientes.ts`:
+
+- **v1 (hoy):** la solicitud queda en `solicitud_contrasena_wifi`, con la clave cifrada con la llave pública del CRM (`CRM_PUBLIC_KEY`). El acuerdo v2.0 con G8 permite conservarlo mientras tanto (§6.7).
+- **v2 (acuerdo v2.0, §6.4):** se activa cuando G8 defina el ticket WiFi, es decir, la categoría y dónde va el servicio. El flujo es:
+  1. el portal crea el ticket;
+  2. guarda `request_id` y `trace_id` en `log_auditoria`;
+  3. cifra la clave con la llave pública de G3;
+  4. la manda directo a G3 (`src/common/g3/`). Si hay un corte, reintenta con el mismo body.
+
+  La clave no se guarda en ninguna parte, y G8 no recibe ni la clave ni el ciphertext (§6.5). En el v2, `id_solicitud`, `estado` y `fecha_solicitud` son los que devuelve G3.
+
+  Necesita `G3_API_URL`, `G3_API_KEY` y `G3_WIFI_PUBLIC_KEY` (ver `.env.example`). Si falta alguna, responde 503 y no simula nada.
+
+---
+
 ## Flujo de ejemplo: Cargar panel completo
 
 ```javascript

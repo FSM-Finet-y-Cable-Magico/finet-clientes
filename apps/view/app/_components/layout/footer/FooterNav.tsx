@@ -17,7 +17,7 @@ const iconMap: Record<string, React.ReactNode> = {
 export default function FooterNav() {
   return (
     <nav aria-label="Navegación del pie de página">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
         {footerColumns.map((col) => (
           <div key={col.title}>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-foreground">
@@ -26,6 +26,7 @@ export default function FooterNav() {
             <ul className="space-y-2">
               {col.links.map((link) => {
                 const isWhatsApp = link.icon === 'whatsapp';
+                const isButton = link.variant === 'button';
                 const isExternal = link.href.startsWith('http');
 
                 return (
@@ -39,6 +40,13 @@ export default function FooterNav() {
                       >
                         {link.label}
                       </a>
+                    ) : isButton ? (
+                      <Link
+                        href={link.href}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-white hover:opacity-90 transition-opacity"
+                      >
+                        {link.label}
+                      </Link>
                     ) : (
                       <Link
                         href={link.href}

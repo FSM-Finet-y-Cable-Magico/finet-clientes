@@ -10,6 +10,7 @@ type Props = {
   type?: ButtonHTMLAttributes<HTMLButtonElement>["type"];
   disabled?: boolean;
   className?: string;
+  onClick?: ButtonHTMLAttributes<HTMLButtonElement>["onClick"];
 };
 
 const variantClasses: Record<Variant, string> = {
@@ -28,6 +29,7 @@ export default function PrimaryButton({
   type,
   disabled,
   className = "",
+  onClick,
 }: Props) {
   const sharedClasses = `inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${variantClasses[variant]} ${disabled ? "opacity-50 pointer-events-none" : ""} ${className}`;
 
@@ -40,7 +42,12 @@ export default function PrimaryButton({
   }
 
   return (
-    <button type={type} disabled={disabled} className={sharedClasses}>
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      className={sharedClasses}
+    >
       {children}
     </button>
   );

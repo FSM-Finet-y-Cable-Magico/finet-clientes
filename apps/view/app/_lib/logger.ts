@@ -1,3 +1,5 @@
+import { seguimientoPermitido } from "./cookies-consentimiento";
+
 type SecurityEvent =
   | "auth:login_failed"
   | "auth:session_expired"
@@ -30,13 +32,20 @@ function log(entry: LogEntry) {
   };
 
   const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
-  if (SENTRY_DSN) {
+  if (!SENTRY_DSN) return;
+
+  // CU-76 / RF-57: este es el unico envio de datos a un tercero que hace el
+  // sitio, asi que es lo que el banner de cookies apaga. Sin consentimiento no
+  // sale nada. Cualquier seguimiento que se agregue despues tiene que pasar por
+  // la misma puerta.
+  void seguimientoPermitido().then((permitido) => {
+    if (!permitido) return;
     fetch("https://sentry.io/api/error", {
       method: "POST",
       body: JSON.stringify(payload),
       keepalive: true,
     }).catch(() => {});
-  }
+  });
 }
 
 export const securityLogger = {

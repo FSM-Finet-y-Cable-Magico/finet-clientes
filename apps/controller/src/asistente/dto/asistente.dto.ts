@@ -1,0 +1,117 @@
+import { z } from 'zod';
+import { validateRut } from '../../common/utils/rut.js';
+
+/**
+ * Largo maximo de un mensaje del visitante. Cada mensaje se cobra en tokens
+ * del motor, asi que se corta aca y no recien en finet-chatbot (que acepta
+ * hasta 4096 porque tambien recibe mensajes de Chatwoot).
+ */
+export const MAX_LARGO_MENSAJE = 1000;
+
+// CU-65: un turno del visitante en el widget del asistente virtual
+export const MensajeAsistenteDto = z.object({
+  /**
+   * Sesion anonima que genera el widget en el navegador. Es la conversacion:
+   * el chatbot guarda el historial bajo este id, por eso tiene que ser
+   * inadivinable (UUID) y no un correlativo.
+   */
+  id_sesion: z.uuid('Sesion invalida'),
+  mensaje: z
+    .string()
+    .trim()
+    .min(1, 'El mensaje es requerido')
+    .max(
+      MAX_LARGO_MENSAJE,
+      `El mensaje no puede superar ${MAX_LARGO_MENSAJE} caracteres`,
+    ),
+});
+export type MensajeAsistenteDto = z.infer<typeof MensajeAsistenteDto>;
+
+/**
+ * `derivado`: el asistente derivo al cliente a una persona (WhatsApp) y ya no
+ * responde en esta sesion. La respuesta que deriva trae el texto; las
+ * siguientes llegan con `respuesta: null`.
+ */
+export interface RespuestaAsistenteDto {
+  respuesta: string | null;
+  derivado: boolean;
+}
+
+// CU-63: RUT que finet-chatbot pide verificar al inicio de una conversacion
+export const IdentificarClienteDto = z.object({
+  rut: z
+    .string()
+    .min(1, 'El RUT es requerido')
+    .max(12)
+    .refine((val) => validateRut(val), { message: 'RUT invalido' }),
+});
+export type IdentificarClienteDto = z.infer<typeof IdentificarClienteDto>;
+
+export const CrearSolicitudSoporteDto = z
+  .object({
+    id_sesion: z.string().trim().min(1).max(100, 'Sesion invalida'),
+    rut: z.string().min(1, 'El RUT es requerido').max(12),
+    access_token: z.string().trim().min(1, 'Sesion de portal requerida'),
+    id_categoria: z.number().int().positive('Categoria invalida'),
+    descripcion: z
+      .string()
+      .trim()
+      .min(1, 'Describe el problema')
+      .max(5000, 'La descripcion no puede superar los 5000 caracteres'),
+  })
+  .strict();
+export type CrearSolicitudSoporteDto = z.infer<typeof CrearSolicitudSoporteDto>;
+
+/**
+ * Turnos que finet-chatbot guarda por conversacion (20) con margen. El RUT ya
+ * llega reemplazado por `[RUT]`: el chatbot no lo deja en el historial.
+ */
+export const MAX_TURNOS_ESCALAMIENTO = 50;
+
+// CU-77: conversacion que el asistente no pudo resolver y derivo a una persona
+export const EscalarConversacionDto = z
+  .object({
+    id_sesion: z.string().trim().min(1).max(100, 'Sesion invalida'),
+    rut: z
+      .string()
+      .min(1, 'El RUT es requerido')
+      .max(12)
+      .refine((val) => validateRut(val), { message: 'RUT invalido' }),
+    /** Canal de finet-chatbot por donde llego la conversacion. */
+    plataforma: z.enum(['web', 'chatwoot', 'api']),
+    /** Resumen de la consulta que escribe el asistente al derivar. Opcional. */
+    motivo: z.string().trim().min(1).max(1000).optional(),
+    historial: z
+      .array(
+        z
+          .object({
+            rol: z.enum(['user', 'assistant']),
+            contenido: z.string().min(1).max(5000),
+          })
+          .strict(),
+      )
+      .min(1, 'El historial es requerido')
+      .max(MAX_TURNOS_ESCALAMIENTO),
+  })
+  .strict();
+export type EscalarConversacionDto = z.infer<typeof EscalarConversacionDto>;
+
+/**
+ * Lo que el asistente sabe del cliente una vez verificado. Solo nombre y
+ * planes: esto viaja al proveedor del motor LLM, asi que no se manda RUT,
+ * correo, telefono, direccion ni deuda (la deuda es CU-64).
+ */
+export interface ClienteIdentificadoDto {
+  encontrado: boolean;
+  cliente: {
+    nombre_completo: string;
+    planes: PlanClienteAsistenteDto[];
+  } | null;
+}
+
+export interface PlanClienteAsistenteDto {
+  nombre_comercial: string;
+  tipo_plan: string;
+  velocidad_mbps: number | null;
+  estado_contrato: string;
+}

@@ -123,21 +123,20 @@ export class PerfilController {
    *
    * @body {
    *   password_actual: string,        // contraseña actual del cliente
-   *   password_nuevo: string,         // 8+ char, 1 mayúscula, 1 número, 1 especial
+   *   password_nuevo: string,         // 8+ char, 1 mayúscula, 1 número
    *   password_confirmacion: string   // debe coincidir con password_nuevo
    * }
    *
-   * Reglas de la nueva contraseña (CU-11):
+   * Reglas de la nueva contraseña (CU-11 / RF-09):
    *   - Mínimo 8 caracteres
    *   - Al menos 1 letra mayúscula
    *   - Al menos 1 número
-   *   - Al menos 1 carácter especial
    *   - No puede ser igual a la actual
    *   - Debe coincidir con password_confirmacion
    *
    * Errores:
    *   400 - Validación Zod (password_actual vacío, contraseña muy corta, falta
-   *         mayúscula/número/especial, confirmación no coincide)
+   *         mayúscula/número, confirmación no coincide)
    *   400 - La nueva contraseña es igual a la actual
    *   401 - Sesión expirada por inactividad / Token JWT inválido
    *   401 - La contraseña actual es incorrecta

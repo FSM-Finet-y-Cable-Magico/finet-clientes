@@ -11,9 +11,10 @@ describe('AuthController', () => {
   let mockAuthService: {
     login: jest.Mock;
     logout: jest.Mock;
-    register: jest.Mock;
     recuperarPassword: jest.Mock;
     restablecerPassword: jest.Mock;
+    solicitarRegistro: jest.Mock;
+    confirmarRegistro: jest.Mock;
   };
 
   const mockCliente = {
@@ -29,9 +30,10 @@ describe('AuthController', () => {
     mockAuthService = {
       login: jest.fn(),
       logout: jest.fn(),
-      register: jest.fn(),
       recuperarPassword: jest.fn(),
       restablecerPassword: jest.fn(),
+      solicitarRegistro: jest.fn(),
+      confirmarRegistro: jest.fn(),
     };
 
     const module = await Test.createTestingModule({
@@ -71,41 +73,50 @@ describe('AuthController', () => {
     });
   });
 
-  describe('POST /auth/register', () => {
-    it('call register service and return access_token + cliente', async () => {
-      const result = {
-        access_token: 'register-jwt',
-        cliente: {
-          id: 2,
-          rut: '123456785',
-          nombre_completo: 'Nuevo',
-          email: null,
-          telefono: null,
-        },
-      };
-      mockAuthService.register.mockResolvedValue(result);
+  describe('POST /auth/registro (CU-04)', () => {
+    it('pasa el RUT al servicio y devuelve el resultado', async () => {
+      mockAuthService.solicitarRegistro.mockResolvedValue({
+        resultado: 'ENLACE_ENVIADO',
+      });
 
-      const response = await authController.register(
+      await expect(
+        authController.solicitarRegistro({ rut: '123456785' }),
+      ).resolves.toEqual({ resultado: 'ENLACE_ENVIADO' });
+      expect(mockAuthService.solicitarRegistro).toHaveBeenCalledWith(
+        '123456785',
+      );
+    });
+  });
+
+  describe('POST /auth/registro/confirmar (CU-04)', () => {
+    it('crea la contraseña y deja la sesión iniciada con la misma cookie del login', async () => {
+      const result = { access_token: 'jwt-sesion', cliente: mockCliente };
+      mockAuthService.confirmarRegistro.mockResolvedValue(result);
+      const cookie = jest.fn();
+
+      const response = await authController.confirmarRegistro(
         {
-          rut: '123456785',
-          nombre_completo: 'Nuevo',
-          password: 'Password1',
-          password_confirmation: 'Password1',
-          email: 'nuevo@test.cl',
-          telefono: '',
+          token: 'registro-token',
+          password: 'Clave2026',
+          password_confirmation: 'Clave2026',
+          acepta_politica_privacidad: true,
+          version_politica_privacidad: '1.1',
         },
         { ip: '127.0.0.1' } as Request,
-        { cookie: jest.fn() } as unknown as Response,
+        { cookie } as unknown as Response,
       );
 
       expect(response).toEqual(result);
-      expect(mockAuthService.register).toHaveBeenCalledWith(
-        '123456785',
-        'Nuevo',
-        'Password1',
+      expect(mockAuthService.confirmarRegistro).toHaveBeenCalledWith(
+        'registro-token',
+        'Clave2026',
+        '1.1',
         '127.0.0.1',
-        'nuevo@test.cl',
-        '',
+      );
+      expect(cookie).toHaveBeenCalledWith(
+        'access_token',
+        'jwt-sesion',
+        expect.objectContaining({ httpOnly: true, sameSite: 'lax', path: '/' }),
       );
     });
   });

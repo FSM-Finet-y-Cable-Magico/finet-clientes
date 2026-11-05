@@ -1,26 +1,24 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const SLIDES = [
   {
     id: 1,
     title: "Internet de Alta Velocidad",
-    subtitle: "Planes de Fibra Optica desde 200 Mbps hasta 900 Mbps simetricos.",
-    bgClass: "bg-[var(--color-hero-slide-1)]",
+    subtitle:
+      "Planes de Fibra Optica desde 200 Mbps hasta 900 Mbps simetricos.",
+    image: "/hero/slide-1.webp",
+    overlayClass: "bg-[var(--color-hero-slide-1)]/25",
   },
   {
     id: 2,
-    title: "Conectividad sin Interrupciones",
-    subtitle: "Cobertura total en la zona sur-oriente.",
-    bgClass: "bg-[var(--color-hero-slide-2)]",
-  },
-  {
-    id: 3,
     title: "Television Digital HD",
     subtitle: "Agrega entretenimiento a tu hogar con nuestros planes Duo.",
-    bgClass: "bg-[var(--color-hero-slide-3)]",
+    image: "/hero/slide-2.webp",
+    overlayClass: "bg-[var(--color-hero-slide-2)]/20",
   },
 ];
 
@@ -35,9 +33,10 @@ export const Hero = () => {
     setCurrentIndex((prev) => (prev === SLIDES.length - 1 ? 0 : prev + 1));
   };
 
-  const isReduced = typeof window !== "undefined"
-    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    : false;
+  const isReduced =
+    typeof window !== "undefined"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false;
 
   return (
     <section
@@ -47,10 +46,12 @@ export const Hero = () => {
     >
       <div
         className="flex h-full w-full"
-        style={{
-          transform: `translateX(-${currentIndex * 100}%)`,
-          transition: isReduced ? "none" : "transform 400ms ease-in-out",
-        } satisfies CSSProperties}
+        style={
+          {
+            transform: `translateX(-${currentIndex * 100}%)`,
+            transition: isReduced ? "none" : "transform 400ms ease-in-out",
+          } satisfies CSSProperties
+        }
       >
         {SLIDES.map((slide, index) => {
           const isActive = index === currentIndex;
@@ -61,8 +62,29 @@ export const Hero = () => {
               aria-roledescription="diapositiva"
               aria-label={`Diapositiva ${index + 1} de ${SLIDES.length}`}
               aria-hidden={!isActive}
-              className={`relative flex-shrink-0 w-full h-full flex items-center justify-center ${slide.bgClass}`}
+              className={`relative shrink-0 w-full h-full flex items-center justify-center`}
             >
+              {slide.image && (
+                <>
+                  <Image
+                    src={slide.image}
+                    // Decorativa: el titulo y subtitulo ya dicen todo lo que
+                    // la foto aporta.
+                    alt=""
+                    fill
+                    priority={isActive}
+                    sizes="100vw"
+                    className="object-cover"
+                  />
+                  {/* Tinte de marca (mismo tono que el fondo solido de este
+                      slide) + un blur leve, para que el texto blanco resalte
+                      sobre la foto y las fotos queden consistentes entre si. */}
+                  <div
+                    className={`absolute inset-0 backdrop-blur-sm ${slide.overlayClass}`}
+                    aria-hidden
+                  />
+                </>
+              )}
               <div className="relative z-10 text-center px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
                 <h2 className="text-3xl md:text-5xl lg:text-6xl font-extrabold text-white tracking-tight mb-4 drop-shadow-md">
                   {slide.title}
@@ -99,7 +121,11 @@ export const Hero = () => {
         <ChevronRight size={32} aria-hidden />
       </button>
 
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex space-x-3 z-20" role="tablist" aria-label="Navegacion del carrusel">
+      <div
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex space-x-3 z-20"
+        role="tablist"
+        aria-label="Navegacion del carrusel"
+      >
         {SLIDES.map((_, index) => (
           <button
             key={index}

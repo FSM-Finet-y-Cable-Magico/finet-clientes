@@ -8,7 +8,7 @@ Base URL: `http://localhost:4000/api`
 
 | Tipo | Como se envia | Donde se usa |
 |------|---------------|--------------|
-| **Publico** | Sin auth | Login, register, recuperacion |
+| **Publico** | Sin auth | Login, registro, recuperacion |
 | **JWT** | `Authorization: Bearer <token>` o cookie `access_token` | Logout, portal, perfil |
 
 ---
@@ -24,7 +24,7 @@ POST /api/auth/login
 ```json
 {
   "rut": "12.345.678-5",
-  "password": "MiClave1"
+  "password": "<contraseña>"
 }
 ```
 
@@ -66,26 +66,63 @@ El backend setea una cookie `access_token` httpOnly (7 dias). Para llamadas aute
 
 ---
 
-## 2. Registrar cuenta nueva (RF-10)
+## 2. Crear la cuenta (CU-04 / RF-10)
+
+La cuenta se crea sobre un cliente que G8 ya dio de alta: el portal no crea clientes (acuerdo v2.0, §3 y §4). Son dos pasos, como la recuperacion de contrasena: conocer el RUT no basta, la contrasena se crea con un enlace de un solo uso que va al correo ya registrado (G8, 01-10, §6).
+
+### 2.1 Pedir el enlace
 
 ```
-POST /api/auth/register
+POST /api/auth/registro
 ```
 
 **Body:**
 
 ```json
 {
-  "rut": "12.345.678-5",
-  "nombre_completo": "Juan Perez",
-  "email": "juan@ejemplo.cl",
-  "telefono": "912345678",
-  "password": "Clave123",
-  "password_confirmation": "Clave123"
+  "rut": "12.345.678-5"
 }
 ```
 
-`telefono` es opcional (puede omitirse o enviarse como `""`).
+**Respuesta 200:** `{ "resultado": "..." }`, y la vista pone el texto:
+
+| `resultado` | Cuando |
+|-------------|--------|
+| `ENLACE_ENVIADO` | Cliente activo, sin contrasena y con correo: se le envia el enlace `/registro/confirmar#token=...` (30 minutos, un solo uso) |
+| `YA_REGISTRADO` | Ya tiene contrasena (Excepcion 4 del CU-04) |
+| `SIN_CORREO` | No tiene correo registrado: la activacion es manual (G8, 01-10, §6.2) |
+| `NO_CLIENTE` | El RUT no es de un cliente, o su estado no es `'activo'` |
+
+**Rate limit:** 3 intentos por minuto por IP.
+
+**Errores:**
+
+| HTTP | Mensaje | Causa |
+|------|---------|-------|
+| 400 | `"Formato inválido. Ej: 123456785"` | RUT mal escrito |
+| 400 | `"RUT inválido — dígito verificador incorrecto"` | DV no coincide |
+| 429 | Rate limit | +3 req/min |
+| 503 | `"No pudimos enviar el correo. Intenta de nuevo en unos minutos"` | Fallo el envio del enlace |
+
+### 2.2 Crear la contrasena con el enlace
+
+```
+POST /api/auth/registro/confirmar
+```
+
+**Body:**
+
+```json
+{
+  "token": "eyJhbGciOi...",
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>",
+  "acepta_politica_privacidad": true,
+  "version_politica_privacidad": "1.1"
+}
+```
+
+**CU-75:** `acepta_politica_privacidad` tiene que venir en `true` (si no, 400 con `"Debes aceptar la Política de Privacidad para continuar"`) y `version_politica_privacidad` es la versión publicada en `/privacidad`. La contraseña y la aceptación se registran en la misma transacción: una fila en `log_auditoria` con `accion = 'ACEPTAR_POLITICA_PRIVACIDAD'`, la IP de origen **anonimizada** (`common/utils/ip.ts`: se guarda la red, `203.0.113.0/24`), `fecha_hora` y el RUT en `valor_nuevo`. La `ip_origen` de `sesion_portal` y la `ip_address` de `intento_fallido` **no** se anonimizan: el bloqueo por IP compara el valor exacto. Ver [la bitácora del 2026-09-28](../../../docs/2026-09-28-ip-consentimiento-y-legales.md).
 
 **Reglas de contrasena:**
 - Minimo 8 caracteres
@@ -93,9 +130,9 @@ POST /api/auth/register
 - Al menos 1 numero
 - Maximo 72 caracteres
 
-El cliente se crea con `id_empresa=1` y `estado='activo'`. Si el registro es exitoso, inicia sesion automaticamente (devuelve token JWT + cookie).
+Si todo sale bien, inicia sesion automaticamente (devuelve token JWT + cookie), como pide la poscondicion del CU-04.
 
-**Respuesta 201:**
+**Respuesta 200:**
 
 ```json
 {
@@ -116,13 +153,14 @@ El cliente se crea con `id_empresa=1` y `estado='activo'`. Si el registro es exi
 
 | HTTP | Mensaje | Causa |
 |------|---------|-------|
-| 400 | `"Email es requerido"` | Campo vacio |
-| 400 | `"Email inválido"` | Formato incorrecto |
 | 400 | `"Contraseña debe tener al menos 8 caracteres"` | Muy corta |
 | 400 | `"Contraseña debe contener al menos una mayúscula"` | Falta mayuscula |
 | 400 | `"Contraseña debe contener al menos un número"` | Falta numero |
-| 400 | `"Las contraseñas no coinciden"` | password ≠ password_confirmation |
-| 409 | `"No se pudo completar el registro"` | RUT o email duplicado |
+| 400 | `"Las contraseñas no coinciden"` | password ≠ password_confirmation (Excepcion 3) |
+| 400 | `"Token inválido o expirado"` | Pasaron mas de 30 minutos o la firma no es valida |
+| 400 | `"Token inválido"` | El enlace no es de registro (por ejemplo, uno de recuperacion) |
+| 400 | `"Este enlace ya fue usado. Si todavía no tienes contraseña, solicita uno nuevo"` | Enlace de un solo uso (RNF-04.1) |
+| 400 | `"No encontramos una cuenta de cliente activa para este enlace"` | Dejo de ser cliente activo despues de pedir el enlace |
 | 429 | Rate limit | +3 req/min |
 
 ---
@@ -141,9 +179,12 @@ POST /api/auth/recuperar-password
 }
 ```
 
-Si el RUT existe y tiene email registrado, se envia un enlace de recuperacion al correo. El enlace expira en **15 minutos**.
+Si el RUT existe y tiene email registrado, se envia un enlace de recuperacion al correo. El enlace expira en **30 minutos**.
 
 Por seguridad, la respuesta siempre es identica, sin revelar si el RUT existe o no.
+
+> Para probar el envio de correos en dev (Mailpit, sin SMTP real) ver
+> [`../README.md#probar-el-correo-de-recuperación-de-contraseña`](../README.md#probar-el-correo-de-recuperación-de-contraseña).
 
 **Respuesta 200 (siempre la misma):**
 
@@ -176,11 +217,11 @@ POST /api/auth/restablecer-password
 ```json
 {
   "token": "eyJhbGciOi...",
-  "password": "NuevaClave1"
+  "password": "<contraseña nueva>"
 }
 ```
 
-El token viene del enlace en el email de recuperacion. Expira en **15 minutos**. Es un JWT de tipo `'reset'`.
+El token viene del enlace en el email de recuperacion. Expira en **30 minutos** y es de **un solo uso** (RNF-04.1). Es un JWT de tipo `'reset'`; deja de servir cuando la contraseña cambia.
 
 Al cambiar la contrasena se invalidan todas las sesiones activas del cliente.
 
@@ -200,6 +241,7 @@ Al cambiar la contrasena se invalidan todas las sesiones activas del cliente.
 |------|---------|-------|
 | 400 | `"Token inválido o expirado"` | Token JWT expiro o es invalido |
 | 400 | `"Token inválido"` | Token no es de tipo 'reset' o audiencia incorrecta |
+| 400 | `"Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo"` | El enlace ya se usó, o la contraseña cambió después de pedirlo |
 | 400 | `"Contraseña debe tener al menos 8 caracteres"` | Muy corta |
 | 400 | `"Contraseña debe contener al menos una mayúscula"` | Falta mayuscula |
 | 400 | `"Contraseña debe contener al menos un número"` | Falta numero |
@@ -256,7 +298,7 @@ const API_URL = 'http://localhost:4000/api';
 const res = await fetch(`${API_URL}/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ rut: '12.345.678-5', password: 'MiClave1' }),
+  body: JSON.stringify({ rut: '12.345.678-5', password: '<contraseña>' }),
 });
 
 if (res.status === 401) {
@@ -289,7 +331,7 @@ const token = window.location.hash.replace('#token=', '');
 const res = await fetch(`${API_URL}/auth/restablecer-password`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ token, password: 'NuevaClave1' }),
+  body: JSON.stringify({ token, password: '<contraseña nueva>' }),
 });
 
 if (res.ok) {

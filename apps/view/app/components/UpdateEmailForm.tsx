@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
 import { api } from "../utils/api";
 import type { ApiError } from "../utils/api";
 import PasswordInput from "./PasswordInput";
+import { MensajeError, MensajeExito } from "./MensajesFormulario";
 
 export default function UpdateEmailForm({
   currentEmail,
@@ -84,16 +84,11 @@ export default function UpdateEmailForm({
       </p>
 
       {done && (
-        <div className="mb-6 rounded-lg border border-success/20 bg-success-container px-4 py-3 text-sm text-on-success-container flex items-start gap-2">
-          <CheckCircle2 size={16} className="mt-0.5 shrink-0" aria-hidden />
-          Correo electrónico actualizado correctamente.
-        </div>
+        <MensajeExito>Correo electrónico actualizado correctamente.</MensajeExito>
       )}
 
       {serverError && (
-        <div className="mb-6 rounded-lg border border-error/20 bg-error-container px-4 py-3 text-sm text-error">
-          {serverError}
-        </div>
+        <MensajeError margen="mb-6">{serverError}</MensajeError>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
