@@ -17,9 +17,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return metadataSeccion({
     path: "/planes",
     title: "Planes de Internet Fibra Optica",
-    description: `Descubre ${resumen?.cantidad === 1 ? "nuestro" : "nuestros"} ${planes} en La Pintana, Puente Alto y La Florida. Contrata hoy.`,
+    description: `Descubre ${resumen?.cantidad === 1 ? "nuestro" : "nuestros"} ${planes} en La Pintana, Puente Alto, La Florida y La Granja. Contrata hoy.`,
     shareDescription:
-      "Planes con fibra optica simetrica en La Pintana y Puente Alto.",
+      "Planes con fibra optica simetrica en La Pintana, Puente Alto, La Florida y La Granja.",
   });
 }
 
