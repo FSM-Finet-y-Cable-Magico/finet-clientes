@@ -1,11 +1,20 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { cleanRut } from '../common/utils/rut.js';
+import { MailService } from '../mail/mail.service.js';
+import { variantesRut } from '../common/utils/rut.js';
+import {
+  CATEGORIA_ESCALAMIENTO,
+  ROL_OPERADOR,
+  TICKET_ASISTENTE,
+} from '../common/constants/ticket.js';
+import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
 import type { ClienteIdentificadoDto } from './dto/asistente.dto.js';
 import type {
   CrearSolicitudSoporteDto,
@@ -22,12 +31,6 @@ export interface SolicitudSoporteCreadaDto {
   id_ticket: number;
   codigo_seguimiento: string;
 }
-
-/**
- * CU-77: categoria de los tickets que abre el asistente al derivar. El ticket
- * exige una; el operador la cambia desde el CRM si corresponde otra.
- */
-export const CATEGORIA_ESCALAMIENTO = 'Asistente virtual';
 
 /** Descripcion del ticket cuando el asistente no mando un motivo. */
 const DESCRIPCION_ESCALAMIENTO =
@@ -48,23 +51,20 @@ function codigoSeguimiento(idTicket: number, creado: Date | null): string {
  */
 @Injectable()
 export class AsistenteClientesService {
+  private readonly logger = new Logger(AsistenteClientesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) {}
 
   async identificar(rut: string): Promise<ClienteIdentificadoDto> {
-    const limpio = cleanRut(rut);
-
-    // Como en deuda-publica (CU-39) se busca el RUT limpio. Se prueba la K en
-    // ambas cajas: el chatbot la manda en mayuscula y no hay garantia de como
-    // quedo guardada.
-    const variantes = [
-      ...new Set([limpio, limpio.toUpperCase(), limpio.toLowerCase()]),
-    ];
-
+    // Con y sin guion, y la K en ambas cajas: la base es compartida y no hay
+    // garantia de como quedo guardado (ver variantesRut).
     const cliente = await this.prisma.cliente.findFirst({
-      where: { rut: { in: variantes } },
+      where: { rut: { in: variantesRut(rut) } },
       select: {
         nombre_completo: true,
         contrato: {
@@ -106,54 +106,83 @@ export class AsistenteClientesService {
     };
   }
 
+  /**
+   * CU-66: categorias entre las que elige el cliente al reportar una falla.
+   * La categoria es la que dirige el ticket al equipo que corresponde en el
+   * CRM. Son las mismas siete del portal (CU-71, §11.9): las internas de otros
+   * grupos y la del CU-77, que pone el sistema al derivar, no se ofrecen.
+   * 503 si la base no responde: para el chatbot es la excepcion 1 del CU.
+   */
   async obtenerCategorias(): Promise<CategoriaSoporteDto[]> {
-    return this.prisma.categoria_falla.findMany({
-      select: { id_categoria: true, nombre: true },
-      orderBy: { nombre: 'asc' },
-    });
+    try {
+      return await this.prisma.categoria_falla.findMany({
+        where: FILTRO_CATEGORIAS_CLIENTE,
+        select: { id_categoria: true, nombre: true },
+        orderBy: { nombre: 'asc' },
+      });
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'No fue posible obtener las categorias de soporte',
+        { cause: error },
+      );
+    }
   }
 
-  async crearSolicitud(
-    dto: CrearSolicitudSoporteDto,
-  ): Promise<SolicitudSoporteCreadaDto> {
-    let clienteAutenticado: number;
+  /**
+   * CU-66: el cliente dueño de la sesion del portal que reenvia el chatbot.
+   * 401 si el token no es valido o la sesion ya no existe; si la base no
+   * responde es 503, para que el chatbot no le pida volver a iniciar sesion
+   * por una falla que no es suya.
+   */
+  private async clienteDeLaSesion(accessToken: string): Promise<number> {
+    let payload: { sub?: unknown; type?: unknown };
     try {
-      const payload = await this.jwtService.verifyAsync<{
-        sub?: number;
-        type?: string;
-      }>(dto.access_token);
-      if (payload.type && payload.type !== 'access') {
-        throw new UnauthorizedException('Sesion de portal invalida');
-      }
-      if (typeof payload.sub !== 'number') {
-        throw new UnauthorizedException('Sesion de portal invalida');
-      }
-      const sesion = await this.prisma.sesion_portal.findFirst({
-        where: {
-          token: dto.access_token,
-          fecha_expiracion: { gt: new Date() },
-        },
-        select: { id_cliente: true },
-      });
-      if (!sesion || sesion.id_cliente !== payload.sub) {
-        throw new UnauthorizedException('Sesion de portal expirada');
-      }
-      clienteAutenticado = payload.sub;
-    } catch (error) {
-      if (error instanceof UnauthorizedException) throw error;
+      payload = await this.jwtService.verifyAsync(accessToken);
+    } catch {
+      throw new UnauthorizedException('Sesion de portal invalida');
+    }
+    if (
+      (payload.type !== undefined && payload.type !== 'access') ||
+      typeof payload.sub !== 'number'
+    ) {
       throw new UnauthorizedException('Sesion de portal invalida');
     }
 
-    const limpio = cleanRut(dto.rut);
+    let sesion: { id_cliente: number | null } | null;
+    try {
+      sesion = await this.prisma.sesion_portal.findFirst({
+        where: { token: accessToken, fecha_expiracion: { gt: new Date() } },
+        select: { id_cliente: true },
+      });
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'No fue posible registrar el reporte de soporte',
+        { cause: error },
+      );
+    }
+    if (!sesion || sesion.id_cliente !== payload.sub) {
+      throw new UnauthorizedException('Sesion de portal expirada');
+    }
+    return payload.sub;
+  }
+
+  /**
+   * CU-66: registra la solicitud de soporte que el cliente reporto en el
+   * asistente y devuelve el identificador que se le informa.
+   *
+   * Exige la sesion del portal ademas del RUT: el RUT identifica pero no
+   * autentica, y la solicitud es del propio cliente. 401 si la sesion no es
+   * valida o es de otro cliente; 503 si no se pudo registrar (excepcion 1).
+   */
+  async crearSolicitud(
+    dto: CrearSolicitudSoporteDto,
+  ): Promise<SolicitudSoporteCreadaDto> {
+    const clienteAutenticado = await this.clienteDeLaSesion(dto.access_token);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
         const cliente = await tx.cliente.findFirst({
-          where: {
-            rut: {
-              in: [limpio, limpio.toUpperCase(), limpio.toLowerCase()],
-            },
-          },
+          where: { rut: { in: variantesRut(dto.rut) } },
           select: { id_cliente: true, id_empresa: true },
         });
         if (!cliente) {
@@ -165,8 +194,12 @@ export class AsistenteClientesService {
           );
         }
 
-        const categoria = await tx.categoria_falla.findUnique({
-          where: { id_categoria: dto.id_categoria },
+        // Una categoria interna no se acepta aunque llegue su id.
+        const categoria = await tx.categoria_falla.findFirst({
+          where: {
+            id_categoria: dto.id_categoria,
+            ...FILTRO_CATEGORIAS_CLIENTE,
+          },
           select: { id_categoria: true },
         });
         if (!categoria) {
@@ -189,10 +222,8 @@ export class AsistenteClientesService {
             id_empresa: cliente.id_empresa,
             id_categoria: categoria.id_categoria,
             id_conversacion_bot: conversacion.id_conversacion,
-            prioridad: 'media',
-            estado: 'abierto',
+            ...TICKET_ASISTENTE,
             descripcion: dto.descripcion,
-            origen: 'asistente',
           },
           select: { id_ticket: true, fecha_creacion: true },
         });
@@ -216,7 +247,7 @@ export class AsistenteClientesService {
               codigo_seguimiento: codigo,
               id_categoria: categoria.id_categoria,
               id_sesion: dto.id_sesion,
-              origen: 'asistente',
+              origen: TICKET_ASISTENTE.origen,
             },
           },
         });
@@ -245,8 +276,9 @@ export class AsistenteClientesService {
    * persona. Deja la conversacion con su historial y un ticket abierto
    * vinculado al cliente del RUT, para que lo tome el equipo desde el CRM.
    *
-   * No asigna operador ni notifica: eso lo resuelve el CRM con los tickets
-   * abiertos (`id_usuario_asignado` queda vacio).
+   * No asigna operador: eso lo resuelve el CRM (G8) con los tickets abiertos
+   * (`id_usuario_asignado` queda vacio). Si el ticket no se puede crear
+   * (excepcion 1), avisa por correo a Soporte.
    *
    * No pide sesion del portal, a diferencia de CU-66: el ticket no lo pide el
    * cliente, lo abre el sistema al derivar, y tiene que funcionar tambien por
@@ -255,22 +287,10 @@ export class AsistenteClientesService {
   async escalar(
     dto: EscalarConversacionDto,
   ): Promise<SolicitudSoporteCreadaDto> {
-    const limpio = cleanRut(dto.rut);
-
     try {
       return await this.prisma.$transaction(async (tx) => {
         const cliente = await tx.cliente.findFirst({
-          where: {
-            rut: {
-              in: [
-                ...new Set([
-                  limpio,
-                  limpio.toUpperCase(),
-                  limpio.toLowerCase(),
-                ]),
-              ],
-            },
-          },
+          where: { rut: { in: variantesRut(dto.rut) } },
           select: { id_cliente: true, id_empresa: true },
         });
         if (!cliente) {
@@ -312,10 +332,8 @@ export class AsistenteClientesService {
             id_empresa: cliente.id_empresa,
             id_categoria: categoria.id_categoria,
             id_conversacion_bot: conversacion.id_conversacion,
-            prioridad: 'media',
-            estado: 'abierto',
+            ...TICKET_ASISTENTE,
             descripcion: dto.motivo ?? DESCRIPCION_ESCALAMIENTO,
-            origen: 'asistente',
           },
           select: { id_ticket: true, fecha_creacion: true },
         });
@@ -339,7 +357,7 @@ export class AsistenteClientesService {
               id_conversacion_bot: conversacion.id_conversacion,
               id_sesion: dto.id_sesion,
               plataforma: dto.plataforma,
-              origen: 'asistente',
+              origen: TICKET_ASISTENTE.origen,
             },
           },
         });
@@ -348,10 +366,77 @@ export class AsistenteClientesService {
       });
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
-      // CU-77, excepcion 1: el chatbot le dice al cliente que lo atenderan en breve.
+      // CU-77, excepcion 1: el chatbot le dice al cliente que lo atenderan en
+      // breve, y aca se avisa a los operadores. Sin esperar el correo: el
+      // chatbot espera 5 s y el cliente tiene que enterarse igual.
+      void this.avisarEscalamientoSinTicket(dto, error);
       throw new ServiceUnavailableException(
         'No fue posible registrar el ticket de la derivacion',
         { cause: error },
+      );
+    }
+  }
+
+  /**
+   * CU-77, excepcion 1: el ticket no se pudo crear, asi que se avisa por
+   * correo a los operadores de Soporte con lo que habria llevado, para que
+   * tomen el caso a mano.
+   *
+   * Lo mas probable es que haya fallado la base, y con ella la lista de
+   * operadores: por eso existe `SOPORTE_EMAIL`, que no depende de la base.
+   * Nunca lanza: un aviso que falla queda en el log y nada mas.
+   */
+  private async avisarEscalamientoSinTicket(
+    dto: EscalarConversacionDto,
+    causa: unknown,
+  ): Promise<void> {
+    const motivo = causa instanceof Error ? causa.message : String(causa);
+    this.logger.error(`Escalamiento sin ticket (${dto.plataforma}): ${motivo}`);
+
+    let destinatarios: string[] = [];
+    try {
+      const operadores = await this.prisma.usuario.findMany({
+        where: {
+          activo: true,
+          email: { not: null },
+          usuario_rol: {
+            some: {
+              rol: {
+                nombre_rol: { equals: ROL_OPERADOR, mode: 'insensitive' },
+              },
+            },
+          },
+        },
+        select: { email: true },
+      });
+      destinatarios = operadores.flatMap((o) => (o.email ? [o.email] : []));
+    } catch (error) {
+      this.logger.warn(
+        `No se pudieron leer los operadores: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    if (!destinatarios.length) {
+      const respaldo = this.configService.get<string>('SOPORTE_EMAIL')?.trim();
+      if (respaldo) destinatarios = [respaldo];
+    }
+    if (!destinatarios.length) {
+      this.logger.error(
+        'Escalamiento sin ticket y sin a quien avisar: no hay operadores de Soporte ni SOPORTE_EMAIL',
+      );
+      return;
+    }
+
+    try {
+      await this.mailService.sendEscalamientoSinTicket(destinatarios, {
+        rut: dto.rut,
+        plataforma: dto.plataforma,
+        motivo: dto.motivo,
+        historial: dto.historial,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo avisar el escalamiento a Soporte: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

@@ -205,7 +205,8 @@ De los 23, ocho no los desarrolla el Grupo 2. El criterio es el mismo en todos: 
 alcance es la interfaz web y el asistente virtual del cliente**, no la administración interna
 ni la operación técnica de la red.
 
-- **CU-63 a CU-66, CU-70, CU-77 y CU-79** — los lleva Dani.
+- **CU-63 a CU-66, CU-70, CU-77 y CU-79** — los lleva Dani, igual que los CU-81 a CU-83
+  (fuera del documento fuente, ver abajo).
 - **CU-06** — lo desarrolla el CRM (G8).
 
 Los demás tienen actor Administrador o Técnico, o dependen de un contrato de otro grupo que
@@ -236,6 +237,133 @@ todavía no está publicado; cada fila lo dice.
 | 21 | CU-48 | Suspendiendo servicio por morosidad mediante SmartOLT | SmartOLT · aplazado de Inc. 2 | ⏳ Pendiente — sin integración SmartOLT en el código. **Derivado**: la detección de morosidad es de G8 y la ejecución en SmartOLT es de **G3** (acuerdo del 12-09-2026) |
 | 22 | CU-49 | Aplicando recargo de reconexión al saldo del cliente suspendido | SmartOLT · aplazado de Inc. 2 | ⏳ Pendiente |
 | 23 | CU-50 | Reactivando servicio de cliente suspendido tras pago total | SmartOLT · aplazado de Inc. 2 | ⏳ Pendiente |
+
+### Casos agregados fuera del documento fuente
+
+> ⚠️ **No están en `CU_por_Incremento`.** Los propone el equipo para documentar
+> funcionalidad que ya existe y que ningún caso del documento describe. Se numeran desde
+> el CU-81 y **no cuentan** en los 80 casos ni en los porcentajes de la tabla de arriba
+> hasta que se incorporen al documento fuente.
+
+| CU | Caso de uso | Bloque | Estado |
+|---|---|---|---|
+| CU-81 | Reiniciando la conversación con el asistente virtual | Chatbot | ✅ — `nuevaConversacion()` en `apps/view/app/_components/asistente/AsistenteWidget.tsx`. Detalle abajo |
+| CU-82 | Abriendo el asistente virtual y retomando la conversación | Chatbot | ✅ — `abrir()` y `leerConversacion()` en `apps/view/app/_components/asistente/AsistenteWidget.tsx`, montado en `app/layout.tsx`. Detalle abajo |
+| CU-83 | Limitando los mensajes al asistente virtual por IP | Chatbot | ✅ — `@Throttle` en `apps/controller/src/asistente/asistente.controller.ts` y `limitePorMinuto()` en `asistente/limite-chatbot.ts`. Detalle abajo |
+
+#### CU-81 — Reiniciando la conversación con el asistente virtual
+
+- **Actor:** visitante del sitio, sea cliente o no.
+- **Precondición:** el panel del asistente está abierto y la conversación tiene al menos
+  un mensaje. Sin mensajes el botón está deshabilitado: no hay nada que reiniciar.
+- **Disparador:** el botón "Nueva conversación" (ícono de reinicio en la cabecera del
+  panel), disponible en cualquier momento, o "Iniciar nueva conversación", que reemplaza
+  el campo de texto cuando la conversación terminó: se derivó a una persona (con ticket
+  del CU-77 o recomendando el WhatsApp) o el asistente no respondió (CU-65 y CU-66,
+  excepción 1).
+
+**Flujo principal**
+
+1. El visitante pulsa "Nueva conversación".
+2. El widget borra los mensajes en pantalla, el aviso de error si lo había y la
+   conversación guardada en el navegador (`localStorage`).
+3. El widget descarta el identificador de sesión, muestra solo la bienvenida y deja el
+   foco en el campo de texto.
+4. Al enviar el siguiente mensaje, el widget genera un identificador nuevo (UUID). Para
+   finet-chatbot es otra conversación: vuelve a pedir el RUT (CU-63) y no hereda la
+   identificación, el historial ni la derivación de la anterior.
+
+**Excepciones**
+
+1. **Hay una respuesta en camino:** el botón está deshabilitado mientras se espera al
+   asistente, para no reiniciar a mitad de un turno.
+2. **El navegador no permite almacenamiento** (modo privado, cookies bloqueadas): el
+   reinicio funciona igual; solo no hay conversación guardada que borrar.
+
+**Poscondición:** el visitante conversa desde cero. El widget no avisa a finet-chatbot:
+la conversación anterior queda en su memoria, sin que nadie la vuelva a leer, hasta que
+la desplaza el tope de 1.000 conversaciones o el chatbot se reinicia. Si se había
+registrado un ticket (CU-77), no se ve afectado: sigue en el CRM.
+
+**Pruebas:** `apps/view/app/__tests__/AsistenteWidget.test.tsx` ("desactiva la entrada y
+ofrece una conversación nueva", "la conversación nueva limpia el chat y vuelve a habilitar
+la entrada").
+
+#### CU-82 — Abriendo el asistente virtual y retomando la conversación
+
+Complementa al CU-65: ese caso es cómo responde el asistente; este, cómo llega el
+visitante a él y cómo recupera lo que ya había conversado. El plazo de 48 horas es el
+mismo del CU-63.
+
+- **Actor:** visitante del sitio, sea cliente o no.
+- **Precondición:** ninguna. El botón del asistente está en todas las páginas del sitio.
+- **Disparador:** el botón flotante abajo a la derecha ("Abrir asistente virtual").
+
+**Flujo principal**
+
+1. El visitante pulsa el botón flotante.
+2. El widget busca una conversación guardada en el navegador (`localStorage`). Si su
+   última actividad fue hace menos de 48 horas, la restaura: los mensajes, el
+   identificador de sesión y si la conversación ya había terminado.
+3. El widget abre el panel con la bienvenida, los mensajes restaurados y el foco en el
+   campo de texto. Bajo el campo, un aviso dice que las respuestas las genera una IA,
+   que solo se le pedirá el RUT y nunca contraseñas, y enlaza al WhatsApp de Finet.
+4. El visitante sigue conversando con la misma sesión: finet-chatbot conserva el
+   historial y la identificación (CU-63), así que no vuelve a pedir el RUT.
+5. El visitante cierra el panel con el botón o con Escape; el foco vuelve al botón
+   flotante. La conversación queda guardada para la próxima vez que lo abra.
+
+**Excepciones**
+
+1. **La conversación guardada tiene más de 48 horas o está dañada:** el widget la
+   descarta y empieza una nueva, como hace finet-chatbot en el CU-63.
+2. **La conversación guardada había terminado** (derivada a una persona, o el asistente
+   no respondió): se restaura sin campo de texto, solo con "Iniciar nueva conversación"
+   (CU-81).
+3. **El navegador no permite almacenamiento** (modo privado, cookies bloqueadas): el
+   asistente funciona igual, pero la conversación no sobrevive a una recarga.
+
+**Poscondición:** el visitante conversa con el asistente, retomando la conversación
+anterior si tenía una reciente.
+
+**Pruebas:** `apps/view/app/__tests__/AsistenteWidget.test.tsx` ("muestra solo el botón
+flotante hasta que se abre", "restaura una conversación de hace menos de 48 horas",
+"empieza de nuevo pasadas 48 horas sin actividad", "restaura una conversación terminada
+sin entrada de texto", "se cierra con Escape y devuelve el foco al botón").
+
+#### CU-83 — Limitando los mensajes al asistente virtual por IP
+
+Es una regla del sistema más que una acción del visitante: protege el motor de lenguaje,
+que Finet paga por uso, de quien quiera gastarlo, y frena a quien pruebe RUTs al azar
+(CU-63).
+
+- **Actor:** sistema (backend de finet-clientes).
+- **Precondición:** un visitante envía mensajes al asistente desde el widget.
+
+**Flujo principal**
+
+1. Cada mensaje del widget llega a `POST /api/asistente/mensajes`.
+2. El backend cuenta los mensajes por IP de origen, en ventanas de un minuto. En
+   producción toma la IP real detrás del proxy (`trust proxy`).
+3. Hasta 10 mensajes por minuto, el mensaje sigue a finet-chatbot.
+
+**Excepciones**
+
+1. **El visitante supera los 10 mensajes por minuto:** el backend responde `429` sin
+   llamar a finet-chatbot. El widget avisa "Estás enviando mensajes muy seguido. Espera un
+   momento e inténtalo de nuevo." y devuelve el mensaje al campo de texto, para reenviarlo
+   sin que quede duplicado.
+2. **Las consultas de finet-chatbot:** salen todas de su única IP, en nombre de todos los
+   clientes del chat (por ejemplo, la consulta de deuda del CU-64). Con su clave
+   (`X-API-Key`, la misma `ASISTENTE_API_KEY`) tienen un límite propio de 600 por minuto:
+   alto, pero finito por si la clave se filtra. Si lo supera, el chatbot lo trata como
+   finet-clientes no disponible (la excepción 1 del caso en curso).
+
+**Poscondición:** ninguna IP manda más de 10 mensajes por minuto al asistente.
+
+**Pruebas:** `apps/controller/src/asistente/limite-chatbot.spec.ts` (los límites por
+clave) y `apps/view/app/__tests__/AsistenteWidget.test.tsx` ("avisa cuando se superó el
+límite de mensajes").
 
 ### Pendientes del CU-73
 

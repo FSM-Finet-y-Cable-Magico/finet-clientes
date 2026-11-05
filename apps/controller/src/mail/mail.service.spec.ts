@@ -374,3 +374,50 @@ describe('MailService — correo del CU-04 (crear la cuenta)', () => {
     expect(enviado().html).not.toContain('Ana <b>');
   });
 });
+
+describe('MailService — CU-77, excepcion 1: derivacion sin ticket', () => {
+  let sendMail: jest.Mock;
+
+  beforeEach(async () => {
+    const mail = new MailService({
+      get: (_k: string, porDefecto?: unknown) => porDefecto,
+    } as unknown as ConfigService);
+    sendMail = jest.fn().mockResolvedValue({});
+    (mail as unknown as { transporter: unknown }).transporter = { sendMail };
+
+    await mail.sendEscalamientoSinTicket(['ana@finet.cl', 'luis@finet.cl'], {
+      rut: '123456785',
+      plataforma: 'web',
+      motivo: 'Quiere <b>dar de baja</b> su plan',
+      historial: [
+        { rol: 'user', contenido: 'mi rut es [RUT] <script>' },
+        { rol: 'assistant', contenido: 'Puedo derivarte.' },
+      ],
+    });
+  });
+
+  const enviado = () =>
+    sendMail.mock.calls[0]![0] as {
+      to: string[];
+      subject: string;
+      html: string;
+    };
+
+  it('va a los operadores, con el RUT en el asunto', () => {
+    expect(enviado().to).toEqual(['ana@finet.cl', 'luis@finet.cl']);
+    expect(enviado().subject).toBe(
+      'Asistente virtual: derivacion sin ticket (RUT 12345678-5)',
+    );
+  });
+
+  it('lleva el canal, el motivo y el historial, escapados', () => {
+    const { html } = enviado();
+    expect(html).toContain('web');
+    expect(html).toContain('Quiere &lt;b&gt;dar de baja&lt;/b&gt; su plan');
+    expect(html).toContain(
+      '<strong>Cliente:</strong> mi rut es [RUT] &lt;script&gt;',
+    );
+    expect(html).toContain('<strong>Asistente:</strong> Puedo derivarte.');
+    expect(html).not.toContain('<script>');
+  });
+});

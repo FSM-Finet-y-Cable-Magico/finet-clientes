@@ -9,6 +9,15 @@ import {
   pesos,
 } from './formato.js';
 import { comprobante, plantillaCorreo } from './plantilla-correo.js';
+import { formatRut } from '../common/utils/rut.js';
+
+/** CU-77, excepcion 1: lo que habria llevado el ticket que no se creo. */
+export interface EscalamientoSinTicket {
+  rut: string;
+  plataforma: string;
+  motivo?: string;
+  historial: { rol: 'user' | 'assistant'; contenido: string }[];
+}
 
 @Injectable()
 export class MailService {
@@ -191,6 +200,29 @@ export class MailService {
     this.logger.log('Ticket created email sent');
   }
 
+  /**
+   * CU-77, excepcion 1: el asistente derivo a un cliente y el ticket no se
+   * pudo crear. Va a los operadores de Soporte, no al cliente, con lo que
+   * habria llevado el ticket para que tomen el caso a mano.
+   */
+  async sendEscalamientoSinTicket(
+    destinatarios: string[],
+    escalamiento: EscalamientoSinTicket,
+  ) {
+    const from =
+      this.configService.get<string>('MAIL_FROM') ||
+      '"Portal Clientes" <no-reply@finet.cl>';
+
+    await this.transporter.sendMail({
+      from,
+      to: destinatarios,
+      subject: `Asistente virtual: derivacion sin ticket (RUT ${formatRut(escalamiento.rut)})`,
+      html: this.escalamientoSinTicketTemplate(escalamiento),
+    });
+
+    this.logger.log('Escalation without ticket email sent');
+  }
+
   private recordatorioPagoTemplate(
     nombre: string,
     monto: number,
@@ -252,6 +284,31 @@ export class MailService {
           ['Fecha', fechaHoraCliente(fecha)],
           ['Código de autorización', codigoAutorizacion],
         ]),
+      sitio: this.sitio(),
+    });
+  }
+
+  private escalamientoSinTicketTemplate(e: EscalamientoSinTicket): string {
+    const turnos = e.historial
+      .map(
+        (turno) =>
+          `<p style="margin:12px 0 0;font-size:14px;"><strong>${turno.rol === 'user' ? 'Cliente' : 'Asistente'}:</strong> ${escaparHtml(turno.contenido)}</p>`,
+      )
+      .join('');
+    return plantillaCorreo({
+      resumen: `El asistente derivo al RUT ${formatRut(e.rut)} y no se pudo registrar el ticket.`,
+      etiqueta: { texto: 'Derivacion sin ticket', tono: 'alerta' },
+      titulo: 'Un cliente espera ser atendido',
+      cuerpo:
+        'El asistente virtual derivo esta conversacion a una persona, pero el ' +
+        'ticket no se pudo registrar por una falla del sistema. Al cliente se le ' +
+        'dijo que lo atenderan en breve: contactalo y registra el caso en el CRM.' +
+        comprobante([
+          ['RUT', formatRut(e.rut)],
+          ['Canal', e.plataforma],
+        ]) +
+        `<p style="margin:16px 0 0;font-size:14px;"><strong>Motivo:</strong> ${escaparHtml(e.motivo ?? 'El asistente no indico un motivo.')}</p>` +
+        `<p style="margin:24px 0 0;font-size:14px;color:#6D797D;">Historial de la conversacion (el RUT aparece como [RUT]):</p>${turnos}`,
       sitio: this.sitio(),
     });
   }

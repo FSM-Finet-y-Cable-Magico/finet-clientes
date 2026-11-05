@@ -10,9 +10,11 @@ Endpoints:
 - `POST /asistente/clientes/identificar` — **interno**. Solo lo llama
   finet-chatbot, con API key, para verificar RUTs (CU-63).
 - `GET /asistente/clientes/soporte/categorias` — **interno**. Devuelve las
-  categorías de falla disponibles para CU-66.
-- `POST /asistente/clientes/soporte` — **interno**. Registra un ticket de
-  soporte para el cliente identificado por RUT (CU-66).
+  categorías de falla que puede elegir el cliente en CU-66 (las mismas del
+  portal, CU-71).
+- `POST /asistente/clientes/soporte` — **interno**. Registra la solicitud de
+  soporte del cliente identificado por RUT y con sesion del portal (CU-66).
+  Ver [seccion 4](#4-reporte-de-falla-cu-66-interno).
 - `POST /asistente/clientes/escalamientos` — **interno**. Registra el ticket
   y el historial cuando el asistente deriva a un cliente identificado a una
   persona (CU-77). Ver [seccion 3](#3-ticket-al-derivar-cu-77-interno).
@@ -301,9 +303,15 @@ Solo para finet-chatbot. Lo llama cuando el asistente deriva a una persona a
 un cliente identificado, ya sea porque el cliente lo pidio o acepto, o porque
 el motor no respondio (CU-65, excepcion 1).
 
-**Este backend solo registra.** No asigna operador ni notifica a nadie: el
-ticket queda `abierto` con `id_usuario_asignado` vacio, y lo toma el equipo
-desde el CRM. Asi la logica de asignacion vive en un solo lugar.
+**Este backend no asigna operador.** El ticket queda `ABIERTO` con
+`id_usuario_asignado` vacio, y lo asigna el CRM: G8 es dueño de los tickets
+(acuerdo del 12-09-2026), asi la logica de asignacion vive en un solo lugar.
+Si el ticket no se puede crear (excepcion 1), si avisa a los operadores por
+correo; ver mas abajo.
+
+El cliente se busca con y sin guion y con la K en ambas cajas
+(`variantesRut`): la base es compartida y no todos los RUT estan guardados
+igual.
 
 **Body:**
 
@@ -337,7 +345,7 @@ desde el CRM. Asi la logica de asignacion vive en un solo lugar.
 |-------|-----|
 | `conversacion_bot` | `id_cliente`, `plataforma`, `derivada_humano: true`. |
 | `mensaje_bot` | Un registro por turno, con `rol` `cliente` o `asistente`. |
-| `ticket` | `estado: 'abierto'`, `prioridad: 'media'`, `origen: 'asistente'`, vinculado al cliente y a la conversacion, sin operador asignado. Categoria `Asistente virtual` (se crea en `categoria_falla` la primera vez; el operador la cambia si corresponde otra). |
+| `ticket` | `estado: 'ABIERTO'`, `prioridad: 'MEDIA'`, `origen: 'ASISTENTE'` (MAYUSCULAS como los catalogos del §11.15 del Documento 0 y los tickets del CRM), vinculado al cliente y a la conversacion, sin operador asignado. Categoria `Asistente virtual` (se crea en `categoria_falla` la primera vez; el operador la cambia si corresponde otra). |
 | `log_auditoria` | Accion `ESCALAR_CONVERSACION_ASISTENTE`. |
 
 **Respuesta 201:**
@@ -355,11 +363,22 @@ El asistente le da el codigo al cliente.
 | 400 | `"Validation failed"` (+ `errors`) | RUT invalido, historial vacio o con mas de 50 turnos, rol o plataforma desconocidos, campos de mas |
 | 400 | `"Cliente no encontrado"` | El RUT no esta en `cliente` |
 | 401 | `"X-API-Key header is required"` / `"Invalid API key"` | Falta la clave o es incorrecta |
-| 503 | `"No fue posible registrar el ticket de la derivacion"` | Fallo la base de datos. No queda nada guardado |
+| 503 | `"No fue posible registrar el ticket de la derivacion"` | Fallo la base de datos. No queda nada guardado, y se avisa a Soporte por correo |
 
 Ante cualquier error, o si no responde en 5 s, el asistente aplica la
 excepcion 1 del CU-77: le dice al cliente que una persona lo atendera en breve
 y le da el WhatsApp.
+
+**Aviso a los operadores (excepcion 1).** Con el 503, este backend manda un
+correo con el RUT, el canal, el motivo y el historial a los usuarios activos
+con rol `Soporte` (sin distinguir mayusculas), para que tomen el caso a mano.
+Si no puede leerlos, lo normal cuando fallo la base, o no hay ninguno, lo manda
+a `SOPORTE_EMAIL`; si tampoco esta configurado, solo queda en el log. No espera
+al correo para responder: el chatbot corta a los 5 s.
+
+No hay aviso cuando el que no responde es este backend (caido o fuera de los
+5 s): ahi el unico registro es el log de finet-chatbot. Tampoco ante un 400:
+`Cliente no encontrado` no es una falla del sistema.
 
 ### Trazabilidad del CU-77 — Creando ticket de soporte al escalar conversacion del asistente
 
@@ -369,9 +388,10 @@ y le da el WhatsApp.
 | **Precondicion:** el asistente no puede resolver | Lo decide el LLM: deriva si el cliente lo pide o acepta la derivacion que le ofrecio. | finet-chatbot `src/messages/handoff.ts` (`handoffTool`) |
 | **Descripcion:** registra el evento de escalamiento | `conversacion_bot.derivada_humano` y `log_auditoria` (`ESCALAR_CONVERSACION_ASISTENTE`). | `src/asistente/asistente-clientes.service.ts` (`escalar`) |
 | **Descripcion:** ticket vinculado al RUT con el historial | El ticket se vincula al `cliente` del RUT y a la `conversacion_bot`, cuyos turnos quedan en `mensaje_bot`. | idem |
-| **Descripcion:** asigna el ticket al operador disponible / el operador recibe el contexto | **Fuera de este backend:** el ticket queda abierto sin asignar y lo toma el equipo desde el CRM, que ve el historial por `id_conversacion_bot`. | — |
-| **Excepcion 1:** no se puede crear el ticket | Se informa al cliente que sera atendido en breve, con el WhatsApp. No queda aviso para el operador: lo que no llega a la base de datos solo queda en el log de finet-chatbot. | finet-chatbot `src/messages/handoff.ts` (`ticketFailedText`) |
-| **Poscondicion:** ticket con historial vinculado al RUT | Ver arriba. La asignacion queda pendiente para el CRM. | — |
+| **Precondicion:** existe al menos un operador disponible | **Del CRM (G8):** este backend no conoce la disponibilidad de los operadores (el esquema no la modela). | — |
+| **Descripcion:** asigna el ticket al operador disponible / el operador recibe el contexto | **Del CRM (G8):** el ticket queda `ABIERTO` sin asignar, con el mismo estado que usan los tickets del CRM, y el CRM lo asigna. El operador ve el historial por `id_conversacion_bot`. | — |
+| **Excepcion 1:** no se puede crear el ticket | Al cliente: que sera atendido en breve, con el WhatsApp. A los operadores: correo a los usuarios activos con rol `Soporte` (o a `SOPORTE_EMAIL`) con el RUT, el canal, el motivo y el historial. | finet-chatbot `src/messages/handoff.ts` (`ticketFailedText`); `escalar` → `avisarEscalamientoSinTicket`, `MailService.sendEscalamientoSinTicket` |
+| **Poscondicion:** ticket con historial vinculado al RUT, asignado al operador | Ticket y historial, ver arriba. La asignacion la hace el CRM. | — |
 | **Dependencias:** RF-54, RF-52 | El texto de esos RF no esta en el repo (ver [CASOS-DE-USO](../../../docs/CASOS-DE-USO.md#requisitos-funcionales-rf)). | — |
 
 **Decisiones que el CU no definia:**
@@ -382,11 +402,116 @@ y le da el WhatsApp.
   sistema, no el cliente, y tiene que funcionar por WhatsApp (via Chatwoot),
   donde no hay sesion. El RUT identifica pero no autentica, igual que en el
   resto del asistente.
-- **Sin asignacion ni notificacion aca**: es trabajo del CRM.
+- **La asignacion es del CRM.** G8 es dueño de los tickets, y el esquema no
+  modela la disponibilidad de los operadores. Asignar aca seria una segunda
+  logica de asignacion, que podria contradecir la del CRM.
+- **El aviso manual de la excepcion 1 es un correo a Soporte**, el rol que
+  atiende a clientes. Hay un buzon de respaldo (`SOPORTE_EMAIL`) porque si la
+  base fallo, probablemente tampoco se puede leer quienes son los operadores.
 
 ---
 
-## 4. Configuracion
+## 4. Reporte de falla (CU-66, interno)
+
+Solo para finet-chatbot, con `X-API-Key: <ASISTENTE_API_KEY>`. El cliente
+reporta una falla en el asistente y este registra una solicitud de soporte a
+su nombre.
+
+**Requiere sesion del portal**, ademas del RUT: el RUT identifica pero no
+autentica, y la solicitud es del propio cliente. `POST /asistente/mensajes`
+toma la cookie `access_token` (o `Authorization: Bearer`) del visitante y la
+reenvia a finet-chatbot, que la manda aca solo al registrar; no llega al motor
+ni al historial. Sin sesion, el asistente le pide iniciar sesion en el sitio.
+
+### `GET /api/asistente/clientes/soporte/categorias`
+
+```json
+[
+  { "id_categoria": 2, "nombre": "Falla de Internet" },
+  { "id_categoria": 3, "nombre": "Falla de TV" }
+]
+```
+
+Las de `categoria_falla` que puede elegir el cliente, por nombre: las siete de
+la Tabla 11.9 del Documento 0 (`CATEGORIAS_CLIENTE` en
+`src/common/constants/categorias-ticket.ts`, sin distinguir mayusculas), las
+mismas que `GET /portal/tickets/categorias` (CU-71). La tabla es compartida y
+tiene mas filas, que no se ofrecen: las internas de otros grupos (por ejemplo
+`CAMBIO_CREDENCIALES_WIFI` o "IPTV pirata") y `Asistente virtual`, que pone
+el sistema al derivar (CU-77). 503 si la base no responde.
+
+### `POST /api/asistente/clientes/soporte`
+
+```json
+{
+  "id_sesion": "web:3f6c8a52-7d1e-4b9a-9c2f-5e8d1a0b7c64",
+  "rut": "123456785",
+  "access_token": "<JWT del portal>",
+  "id_categoria": 2,
+  "descripcion": "No tengo internet. Desde ayer, en Los Aromos 123; reinicie el router."
+}
+```
+
+| Campo | Tipo | Requerido | Descripcion |
+|-------|------|-----------|-------------|
+| `id_sesion` | string | Si | Clave de la conversacion en finet-chatbot. Queda en la auditoria. |
+| `rut` | string | Si | RUT con que el cliente se identifico en el asistente (CU-63). |
+| `access_token` | string | Si | JWT de la sesion del portal. Tiene que ser de acceso, estar vigente en `sesion_portal` y ser del mismo cliente que el RUT. |
+| `id_categoria` | number | Si | Una de las categorias de arriba. El asistente la resuelve por nombre a partir de la que eligio el cliente. |
+| `descripcion` | string | Si | La falla y la informacion del reporte (desde cuando ocurre, que servicio o direccion afecta, que ha intentado). Hasta 5000 caracteres. |
+
+**Que se guarda, en una sola transaccion:** una `conversacion_bot` minima
+(`plataforma: 'web'`, sin turnos), el `ticket` (`ABIERTO`, `MEDIA`,
+`origen: 'ASISTENTE'`, con la categoria elegida y sin operador) con su
+`codigo_seguimiento`, y `log_auditoria` con la accion `CREAR_TICKET_ASISTENTE`.
+
+**Respuesta 201:**
+
+```json
+{ "id_ticket": 124, "codigo_seguimiento": "FIN-2026-000124" }
+```
+
+**Errores:**
+
+| HTTP | Mensaje | Causa | Que hace el asistente |
+|------|---------|-------|-----------------------|
+| 400 | `"Validation failed"` / `"Categoria no encontrada"` / `"Cliente no encontrado"` | Cuerpo invalido, categoria inexistente o que no es del cliente (interna o la de CU-77), RUT que no esta en `cliente` | Excepcion 1 |
+| 401 | `"Sesion de portal invalida"` / `"Sesion de portal expirada"` / `"La sesion no corresponde al cliente"` | Token invalido o no de acceso, sesion cerrada o vencida, o de otro cliente que el RUT | Le pide volver a iniciar sesion; la conversacion sigue |
+| 401 | `"Invalid API key"` | Falta la clave del chatbot o es incorrecta | Excepcion 1 |
+| 503 | `"No fue posible registrar el reporte de soporte"` | Fallo la base de datos (tambien al buscar la sesion). No queda nada guardado | Excepcion 1 |
+
+### Trazabilidad del CU-66 — Reportando falla y generando solicitud de soporte
+
+| Elemento del CU | Como se cumple | Donde |
+|---|---|---|
+| **Precondicion:** sesion activa con el asistente | Cliente identificado por RUT (CU-63) y, para registrar, con sesion del portal. | finet-chatbot `src/messages/messages.service.ts` (`tools`, `reportFailure`) |
+| **Descripcion:** el cliente reporta una falla | El motor usa `consultar_categorias_falla` cuando el cliente reporta una falla o problema tecnico. | finet-chatbot `src/messages/support.ts` |
+| **Descripcion:** presenta las categorias; el cliente elige e ingresa una descripcion | El asistente trae las categorias de este endpoint y el motor se las muestra y pide la descripcion. | `obtenerCategorias`; finet-chatbot `supportCategoriesContext` |
+| **Descripcion:** solicita la informacion del reporte; el cliente la entrega | El motor pide desde cuando ocurre, que servicio o direccion afecta y que ha intentado, y no registra hasta tenerlo. | finet-chatbot `supportCategoriesContext`, `createSupportTool` |
+| **Descripcion:** genera la solicitud y la dirige al departamento | Ticket `ABIERTO` con la categoria elegida, que es la que lo dirige al equipo en el CRM. No hay tabla de departamentos. | `crearSolicitud` |
+| **Descripcion:** confirma con el identificador | Texto fijo con el `codigo_seguimiento`; la conversacion sigue. | finet-chatbot `supportConfirmation` |
+| **Excepcion 1:** soporte no disponible | Si las categorias no se pueden leer o la solicitud no se registra (error, 503 o mas de 5 s), texto fijo: no fue posible registrar el reporte, un agente humano tomara su caso en breve, con el WhatsApp. La conversacion se deriva. | finet-chatbot `supportUnavailableText` |
+| **Poscondicion:** solicitud registrada con identificador | Ver arriba. | — |
+| **Dependencias:** RF-48 | El texto del RF no esta en el repo (ver [CASOS-DE-USO](../../../docs/CASOS-DE-USO.md#requisitos-funcionales-rf)). | — |
+
+**Decisiones que el CU no definia:**
+
+- **Sesion del portal obligatoria para registrar.** Por WhatsApp no hay
+  sesion, asi que ahi el asistente le pide al cliente entrar al sitio, u
+  ofrece derivarlo (CU-77, que si funciona solo con el RUT).
+- **Sesion rechazada no es la excepcion 1**: el cliente lo puede arreglar
+  volviendo a iniciar sesion, asi que la conversacion sigue.
+- **La categoria es el "departamento correspondiente".** El ticket queda sin
+  operador, igual que en CU-77; el CRM lo toma por categoria.
+- **Las mismas categorias que el portal (CU-71).** El cliente reporta lo
+  mismo por los dos caminos, asi que elige de la misma lista; una interna no
+  se acepta aunque llegue su id.
+- **Sin el historial de la conversacion** en `mensaje_bot`, a diferencia del
+  CU-77: lo que importa del reporte va en la descripcion.
+
+---
+
+## 5. Configuracion
 
 En `apps/controller/.env`:
 
@@ -394,6 +519,9 @@ En `apps/controller/.env`:
 CHATBOT_URL="http://localhost:3001"
 CHATBOT_API_KEY="<mismo valor que API_KEY en el .env de finet-chatbot>"
 ASISTENTE_API_KEY="<mismo valor que CLIENTES_API_KEY en el .env de finet-chatbot>"
+# Opcional. CU-77, excepcion 1: buzon de respaldo si no se pueden leer los
+# operadores de Soporte. Usa la configuracion SMTP_* del resto de los correos.
+SOPORTE_EMAIL="soporte@finet.cl"
 ```
 
 En el `.env` de finet-chatbot, ademas de `API_KEY` y las variables `OPENAI_*`:
