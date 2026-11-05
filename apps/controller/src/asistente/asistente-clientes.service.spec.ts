@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { AsistenteClientesService } from './asistente-clientes.service.js';
 import { CATEGORIA_ESCALAMIENTO } from '../common/constants/ticket.js';
 import type {
@@ -12,7 +13,11 @@ import type {
   EscalarConversacionDto,
 } from './dto/asistente.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { MailService } from '../mail/mail.service.js';
 import { JwtService } from '@nestjs/jwt';
+
+/** Deja correr el aviso de la excepcion 1, que no se espera. */
+const avisoEnviado = () => new Promise((listo) => setImmediate(listo));
 
 describe('AsistenteClientesService', () => {
   let service: AsistenteClientesService;
@@ -20,6 +25,9 @@ describe('AsistenteClientesService', () => {
   let categorias: jest.Mock;
   let sesionPortal: jest.Mock;
   let verifyAsync: jest.Mock;
+  let operadores: jest.Mock;
+  let correo: jest.Mock;
+  let config: Record<string, string>;
   let tx: {
     cliente: { findFirst: jest.Mock };
     categoria_falla: { findFirst: jest.Mock; create: jest.Mock };
@@ -35,6 +43,14 @@ describe('AsistenteClientesService', () => {
     verifyAsync = jest
       .fn()
       .mockResolvedValue({ sub: 7, type: 'access' } as never);
+    operadores = jest
+      .fn()
+      .mockResolvedValue([
+        { email: 'ana@finet.cl' },
+        { email: 'luis@finet.cl' },
+      ] as never);
+    correo = jest.fn().mockResolvedValue(undefined as never);
+    config = {};
     tx = {
       cliente: {
         findFirst: jest
@@ -66,11 +82,20 @@ describe('AsistenteClientesService', () => {
             cliente: { findFirst },
             categoria_falla: { findMany: categorias },
             sesion_portal: { findFirst: sesionPortal },
+            usuario: { findMany: operadores },
             $transaction: (trabajo: (t: typeof tx) => Promise<unknown>) =>
               trabajo(tx),
           },
         },
         { provide: JwtService, useValue: { verifyAsync } },
+        {
+          provide: MailService,
+          useValue: { sendEscalamientoSinTicket: correo },
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: (clave: string) => config[clave] },
+        },
       ],
     }).compile();
     service = module.get(AsistenteClientesService);
@@ -119,14 +144,18 @@ describe('AsistenteClientesService', () => {
       });
     });
 
-    it('busca el RUT limpio, con la K en ambas cajas', async () => {
+    it('busca el RUT con y sin guion, con la K en ambas cajas', async () => {
       findFirst.mockResolvedValue(null as never);
 
       await service.identificar('7.654.302-K');
 
       expect(findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { rut: { in: ['7654302K', '7654302k'] } },
+          where: {
+            rut: {
+              in: ['7654302K', '7654302-K', '7654302k', '7654302-k'],
+            },
+          },
         }),
       );
     });
@@ -199,10 +228,10 @@ describe('AsistenteClientesService', () => {
         id_empresa: 1,
         id_categoria: 2,
         id_conversacion_bot: 55,
-        prioridad: 'media',
-        estado: 'abierto',
+        prioridad: 'MEDIA',
+        estado: 'ABIERTO',
         descripcion: 'Sin internet desde ayer. Ya reinicie el router.',
-        origen: 'asistente',
+        origen: 'ASISTENTE',
       });
       expect(tx.ticket.update).toHaveBeenCalledWith({
         where: { id_ticket: 123 },
@@ -315,7 +344,7 @@ describe('AsistenteClientesService', () => {
       });
       expect(tx.cliente.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { rut: { in: ['123456785'] } },
+          where: { rut: { in: ['123456785', '12345678-5'] } },
         }),
       );
       expect(tx.ticket.update).toHaveBeenCalledWith({
@@ -358,10 +387,10 @@ describe('AsistenteClientesService', () => {
         id_empresa: 1,
         id_categoria: 9,
         id_conversacion_bot: 55,
-        prioridad: 'media',
-        estado: 'abierto',
+        prioridad: 'MEDIA',
+        estado: 'ABIERTO',
         descripcion: 'Pide la baja del servicio',
-        origen: 'asistente',
+        origen: 'ASISTENTE',
       });
     });
 
@@ -401,21 +430,108 @@ describe('AsistenteClientesService', () => {
       });
     });
 
-    it('rechaza un RUT que no esta en los registros', async () => {
+    it('rechaza un RUT que no esta en los registros, sin avisar a Soporte', async () => {
       tx.cliente.findFirst.mockResolvedValue(null as never);
 
       await expect(service.escalar(derivacion)).rejects.toBeInstanceOf(
         BadRequestException,
       );
+      await avisoEnviado();
       expect(tx.ticket.create).not.toHaveBeenCalled();
+      expect(correo).not.toHaveBeenCalled();
     });
 
-    it('responde 503 si la base de datos falla (excepcion 1)', async () => {
-      tx.ticket.create.mockRejectedValue(new Error('db caida') as never);
+    it('no avisa a Soporte cuando el ticket se crea', async () => {
+      await service.escalar(derivacion);
+      await avisoEnviado();
 
-      await expect(service.escalar(derivacion)).rejects.toBeInstanceOf(
-        ServiceUnavailableException,
-      );
+      expect(correo).not.toHaveBeenCalled();
+    });
+
+    describe('excepcion 1: el ticket no se puede crear', () => {
+      beforeEach(() => {
+        tx.ticket.create.mockRejectedValue(new Error('db caida') as never);
+      });
+
+      it('responde 503 y avisa por correo a los operadores de Soporte', async () => {
+        await expect(service.escalar(derivacion)).rejects.toBeInstanceOf(
+          ServiceUnavailableException,
+        );
+        await avisoEnviado();
+
+        expect(operadores).toHaveBeenCalledWith({
+          where: {
+            activo: true,
+            email: { not: null },
+            usuario_rol: {
+              some: {
+                rol: {
+                  nombre_rol: { equals: 'SOPORTE', mode: 'insensitive' },
+                },
+              },
+            },
+          },
+          select: { email: true },
+        });
+        expect(correo).toHaveBeenCalledWith(['ana@finet.cl', 'luis@finet.cl'], {
+          rut: '12.345.678-5',
+          plataforma: 'web',
+          motivo: 'Pide la baja del servicio',
+          historial: derivacion.historial,
+        });
+      });
+
+      it('usa SOPORTE_EMAIL si no puede leer los operadores', async () => {
+        operadores.mockRejectedValue(new Error('db caida') as never);
+        config.SOPORTE_EMAIL = 'soporte@finet.cl';
+
+        await expect(service.escalar(derivacion)).rejects.toBeInstanceOf(
+          ServiceUnavailableException,
+        );
+        await avisoEnviado();
+
+        expect(correo).toHaveBeenCalledWith(
+          ['soporte@finet.cl'],
+          expect.anything(),
+        );
+      });
+
+      it('usa SOPORTE_EMAIL si no hay operadores de Soporte', async () => {
+        operadores.mockResolvedValue([] as never);
+        config.SOPORTE_EMAIL = 'soporte@finet.cl';
+
+        await expect(service.escalar(derivacion)).rejects.toBeInstanceOf(
+          ServiceUnavailableException,
+        );
+        await avisoEnviado();
+
+        expect(correo).toHaveBeenCalledWith(
+          ['soporte@finet.cl'],
+          expect.anything(),
+        );
+      });
+
+      it('no envia nada si no hay a quien avisar', async () => {
+        operadores.mockResolvedValue([] as never);
+
+        await expect(service.escalar(derivacion)).rejects.toBeInstanceOf(
+          ServiceUnavailableException,
+        );
+        await avisoEnviado();
+
+        expect(correo).not.toHaveBeenCalled();
+      });
+
+      it('sigue respondiendo 503 aunque el correo falle', async () => {
+        correo.mockRejectedValue(new Error('smtp caido') as never);
+
+        await expect(service.escalar(derivacion)).rejects.toBeInstanceOf(
+          ServiceUnavailableException,
+        );
+        await avisoEnviado();
+
+        expect(correo).toHaveBeenCalled();
+      });
     });
   });
 });

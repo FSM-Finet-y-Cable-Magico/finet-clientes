@@ -1,12 +1,19 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { cleanRut } from '../common/utils/rut.js';
-import { CATEGORIA_ESCALAMIENTO } from '../common/constants/ticket.js';
+import { MailService } from '../mail/mail.service.js';
+import { variantesRut } from '../common/utils/rut.js';
+import {
+  CATEGORIA_ESCALAMIENTO,
+  ROL_OPERADOR,
+  TICKET_ASISTENTE,
+} from '../common/constants/ticket.js';
 import type { ClienteIdentificadoDto } from './dto/asistente.dto.js';
 import type {
   CrearSolicitudSoporteDto,
@@ -43,23 +50,20 @@ function codigoSeguimiento(idTicket: number, creado: Date | null): string {
  */
 @Injectable()
 export class AsistenteClientesService {
+  private readonly logger = new Logger(AsistenteClientesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) {}
 
   async identificar(rut: string): Promise<ClienteIdentificadoDto> {
-    const limpio = cleanRut(rut);
-
-    // Como en deuda-publica (CU-39) se busca el RUT limpio. Se prueba la K en
-    // ambas cajas: el chatbot la manda en mayuscula y no hay garantia de como
-    // quedo guardada.
-    const variantes = [
-      ...new Set([limpio, limpio.toUpperCase(), limpio.toLowerCase()]),
-    ];
-
+    // Con y sin guion, y la K en ambas cajas: la base es compartida y no hay
+    // garantia de como quedo guardado (ver variantesRut).
     const cliente = await this.prisma.cliente.findFirst({
-      where: { rut: { in: variantes } },
+      where: { rut: { in: variantesRut(rut) } },
       select: {
         nombre_completo: true,
         contrato: {
@@ -172,16 +176,11 @@ export class AsistenteClientesService {
     dto: CrearSolicitudSoporteDto,
   ): Promise<SolicitudSoporteCreadaDto> {
     const clienteAutenticado = await this.clienteDeLaSesion(dto.access_token);
-    const limpio = cleanRut(dto.rut);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
         const cliente = await tx.cliente.findFirst({
-          where: {
-            rut: {
-              in: [limpio, limpio.toUpperCase(), limpio.toLowerCase()],
-            },
-          },
+          where: { rut: { in: variantesRut(dto.rut) } },
           select: { id_cliente: true, id_empresa: true },
         });
         if (!cliente) {
@@ -220,10 +219,8 @@ export class AsistenteClientesService {
             id_empresa: cliente.id_empresa,
             id_categoria: categoria.id_categoria,
             id_conversacion_bot: conversacion.id_conversacion,
-            prioridad: 'media',
-            estado: 'abierto',
+            ...TICKET_ASISTENTE,
             descripcion: dto.descripcion,
-            origen: 'asistente',
           },
           select: { id_ticket: true, fecha_creacion: true },
         });
@@ -247,7 +244,7 @@ export class AsistenteClientesService {
               codigo_seguimiento: codigo,
               id_categoria: categoria.id_categoria,
               id_sesion: dto.id_sesion,
-              origen: 'asistente',
+              origen: TICKET_ASISTENTE.origen,
             },
           },
         });
@@ -276,8 +273,9 @@ export class AsistenteClientesService {
    * persona. Deja la conversacion con su historial y un ticket abierto
    * vinculado al cliente del RUT, para que lo tome el equipo desde el CRM.
    *
-   * No asigna operador ni notifica: eso lo resuelve el CRM con los tickets
-   * abiertos (`id_usuario_asignado` queda vacio).
+   * No asigna operador: eso lo resuelve el CRM (G8) con los tickets abiertos
+   * (`id_usuario_asignado` queda vacio). Si el ticket no se puede crear
+   * (excepcion 1), avisa por correo a Soporte.
    *
    * No pide sesion del portal, a diferencia de CU-66: el ticket no lo pide el
    * cliente, lo abre el sistema al derivar, y tiene que funcionar tambien por
@@ -286,22 +284,10 @@ export class AsistenteClientesService {
   async escalar(
     dto: EscalarConversacionDto,
   ): Promise<SolicitudSoporteCreadaDto> {
-    const limpio = cleanRut(dto.rut);
-
     try {
       return await this.prisma.$transaction(async (tx) => {
         const cliente = await tx.cliente.findFirst({
-          where: {
-            rut: {
-              in: [
-                ...new Set([
-                  limpio,
-                  limpio.toUpperCase(),
-                  limpio.toLowerCase(),
-                ]),
-              ],
-            },
-          },
+          where: { rut: { in: variantesRut(dto.rut) } },
           select: { id_cliente: true, id_empresa: true },
         });
         if (!cliente) {
@@ -343,10 +329,8 @@ export class AsistenteClientesService {
             id_empresa: cliente.id_empresa,
             id_categoria: categoria.id_categoria,
             id_conversacion_bot: conversacion.id_conversacion,
-            prioridad: 'media',
-            estado: 'abierto',
+            ...TICKET_ASISTENTE,
             descripcion: dto.motivo ?? DESCRIPCION_ESCALAMIENTO,
-            origen: 'asistente',
           },
           select: { id_ticket: true, fecha_creacion: true },
         });
@@ -370,7 +354,7 @@ export class AsistenteClientesService {
               id_conversacion_bot: conversacion.id_conversacion,
               id_sesion: dto.id_sesion,
               plataforma: dto.plataforma,
-              origen: 'asistente',
+              origen: TICKET_ASISTENTE.origen,
             },
           },
         });
@@ -379,10 +363,77 @@ export class AsistenteClientesService {
       });
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
-      // CU-77, excepcion 1: el chatbot le dice al cliente que lo atenderan en breve.
+      // CU-77, excepcion 1: el chatbot le dice al cliente que lo atenderan en
+      // breve, y aca se avisa a los operadores. Sin esperar el correo: el
+      // chatbot espera 5 s y el cliente tiene que enterarse igual.
+      void this.avisarEscalamientoSinTicket(dto, error);
       throw new ServiceUnavailableException(
         'No fue posible registrar el ticket de la derivacion',
         { cause: error },
+      );
+    }
+  }
+
+  /**
+   * CU-77, excepcion 1: el ticket no se pudo crear, asi que se avisa por
+   * correo a los operadores de Soporte con lo que habria llevado, para que
+   * tomen el caso a mano.
+   *
+   * Lo mas probable es que haya fallado la base, y con ella la lista de
+   * operadores: por eso existe `SOPORTE_EMAIL`, que no depende de la base.
+   * Nunca lanza: un aviso que falla queda en el log y nada mas.
+   */
+  private async avisarEscalamientoSinTicket(
+    dto: EscalarConversacionDto,
+    causa: unknown,
+  ): Promise<void> {
+    const motivo = causa instanceof Error ? causa.message : String(causa);
+    this.logger.error(`Escalamiento sin ticket (${dto.plataforma}): ${motivo}`);
+
+    let destinatarios: string[] = [];
+    try {
+      const operadores = await this.prisma.usuario.findMany({
+        where: {
+          activo: true,
+          email: { not: null },
+          usuario_rol: {
+            some: {
+              rol: {
+                nombre_rol: { equals: ROL_OPERADOR, mode: 'insensitive' },
+              },
+            },
+          },
+        },
+        select: { email: true },
+      });
+      destinatarios = operadores.flatMap((o) => (o.email ? [o.email] : []));
+    } catch (error) {
+      this.logger.warn(
+        `No se pudieron leer los operadores: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    if (!destinatarios.length) {
+      const respaldo = this.configService.get<string>('SOPORTE_EMAIL')?.trim();
+      if (respaldo) destinatarios = [respaldo];
+    }
+    if (!destinatarios.length) {
+      this.logger.error(
+        'Escalamiento sin ticket y sin a quien avisar: no hay operadores de Soporte ni SOPORTE_EMAIL',
+      );
+      return;
+    }
+
+    try {
+      await this.mailService.sendEscalamientoSinTicket(destinatarios, {
+        rut: dto.rut,
+        plataforma: dto.plataforma,
+        motivo: dto.motivo,
+        historial: dto.historial,
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo avisar el escalamiento a Soporte: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
