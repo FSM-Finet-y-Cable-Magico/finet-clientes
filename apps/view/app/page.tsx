@@ -56,8 +56,6 @@ const comunas = [
   "Puente Alto",
   "La Florida",
   "La Granja",
-  "El Bosque",
-  "San Ramon",
 ];
 
 export default async function HomePage() {

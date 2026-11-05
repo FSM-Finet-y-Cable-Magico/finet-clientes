@@ -29,7 +29,7 @@ const faqs = [
   {
     question: "¿En que comunas tienen cobertura?",
     answer:
-      "Actualmente tenemos cobertura en La Pintana, Puente Alto, La Florida, La Granja, El Bosque y San Ramon. Estamos expandiendo nuestra red. Si no estas en estas comunas, consulta igualmente: revisamos tu direccion y te avisamos cuando lleguemos a tu zona.",
+      "Actualmente tenemos cobertura en La Pintana, Puente Alto, La Florida y La Granja. Estamos expandiendo nuestra red. Si no estas en estas comunas, consulta igualmente: revisamos tu direccion y te avisamos cuando lleguemos a tu zona.",
   },
   {
     question: "¿Que hago si tengo problemas de conexion?",
