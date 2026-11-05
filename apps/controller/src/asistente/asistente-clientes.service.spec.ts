@@ -8,6 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AsistenteClientesService } from './asistente-clientes.service.js';
 import { CATEGORIA_ESCALAMIENTO } from '../common/constants/ticket.js';
+import { CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
 import type {
   CrearSolicitudSoporteDto,
   EscalarConversacionDto,
@@ -176,16 +177,16 @@ describe('AsistenteClientesService', () => {
   });
 
   describe('CU-66: obtenerCategorias', () => {
-    it('lista las categorias por nombre, sin la del asistente', async () => {
+    it('lista por nombre solo las categorias del cliente (CU-71, §11.9)', async () => {
       categorias.mockResolvedValue([
-        { id_categoria: 2, nombre: 'Sin conexion' },
+        { id_categoria: 2, nombre: 'Falla de Internet' },
       ] as never);
 
       await expect(service.obtenerCategorias()).resolves.toEqual([
-        { id_categoria: 2, nombre: 'Sin conexion' },
+        { id_categoria: 2, nombre: 'Falla de Internet' },
       ]);
       expect(categorias).toHaveBeenCalledWith({
-        where: { nombre: { not: CATEGORIA_ESCALAMIENTO } },
+        where: { nombre: { in: CATEGORIAS_CLIENTE, mode: 'insensitive' } },
         select: { id_categoria: true, nombre: true },
         orderBy: { nombre: 'asc' },
       });
@@ -256,11 +257,14 @@ describe('AsistenteClientesService', () => {
       );
     });
 
-    it('no acepta la categoria del asistente (CU-77)', async () => {
+    it('solo acepta categorias del cliente, ni internas ni la del CU-77', async () => {
       await service.crearSolicitud(solicitud);
 
       expect(tx.categoria_falla.findFirst).toHaveBeenCalledWith({
-        where: { id_categoria: 2, nombre: { not: CATEGORIA_ESCALAMIENTO } },
+        where: {
+          id_categoria: 2,
+          nombre: { in: CATEGORIAS_CLIENTE, mode: 'insensitive' },
+        },
         select: { id_categoria: true },
       });
     });

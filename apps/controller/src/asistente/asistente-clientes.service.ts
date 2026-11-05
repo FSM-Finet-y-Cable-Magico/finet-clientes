@@ -14,6 +14,7 @@ import {
   ROL_OPERADOR,
   TICKET_ASISTENTE,
 } from '../common/constants/ticket.js';
+import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
 import type { ClienteIdentificadoDto } from './dto/asistente.dto.js';
 import type {
   CrearSolicitudSoporteDto,
@@ -108,13 +109,14 @@ export class AsistenteClientesService {
   /**
    * CU-66: categorias entre las que elige el cliente al reportar una falla.
    * La categoria es la que dirige el ticket al equipo que corresponde en el
-   * CRM. Sin la de CU-77: esa la pone el sistema al derivar, no el cliente.
+   * CRM. Son las mismas siete del portal (CU-71, §11.9): las internas de otros
+   * grupos y la del CU-77, que pone el sistema al derivar, no se ofrecen.
    * 503 si la base no responde: para el chatbot es la excepcion 1 del CU.
    */
   async obtenerCategorias(): Promise<CategoriaSoporteDto[]> {
     try {
       return await this.prisma.categoria_falla.findMany({
-        where: { nombre: { not: CATEGORIA_ESCALAMIENTO } },
+        where: FILTRO_CATEGORIAS_CLIENTE,
         select: { id_categoria: true, nombre: true },
         orderBy: { nombre: 'asc' },
       });
@@ -192,10 +194,11 @@ export class AsistenteClientesService {
           );
         }
 
+        // Una categoria interna no se acepta aunque llegue su id.
         const categoria = await tx.categoria_falla.findFirst({
           where: {
             id_categoria: dto.id_categoria,
-            nombre: { not: CATEGORIA_ESCALAMIENTO },
+            ...FILTRO_CATEGORIAS_CLIENTE,
           },
           select: { id_categoria: true },
         });

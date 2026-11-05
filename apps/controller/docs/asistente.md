@@ -10,7 +10,8 @@ Endpoints:
 - `POST /asistente/clientes/identificar` — **interno**. Solo lo llama
   finet-chatbot, con API key, para verificar RUTs (CU-63).
 - `GET /asistente/clientes/soporte/categorias` — **interno**. Devuelve las
-  categorías de falla disponibles para CU-66.
+  categorías de falla que puede elegir el cliente en CU-66 (las mismas del
+  portal, CU-71).
 - `POST /asistente/clientes/soporte` — **interno**. Registra la solicitud de
   soporte del cliente identificado por RUT y con sesion del portal (CU-66).
   Ver [seccion 4](#4-reporte-de-falla-cu-66-interno).
@@ -426,14 +427,18 @@ ni al historial. Sin sesion, el asistente le pide iniciar sesion en el sitio.
 
 ```json
 [
-  { "id_categoria": 3, "nombre": "Lentitud" },
-  { "id_categoria": 2, "nombre": "Sin conexion" }
+  { "id_categoria": 2, "nombre": "Falla de Internet" },
+  { "id_categoria": 3, "nombre": "Falla de TV" }
 ]
 ```
 
-Las de `categoria_falla`, por nombre, **sin** `Asistente virtual`: esa la pone
-el sistema al derivar (CU-77), no el cliente. Por lo mismo tampoco aparece en
-`GET /portal/tickets/categorias`. 503 si la base no responde.
+Las de `categoria_falla` que puede elegir el cliente, por nombre: las siete de
+la Tabla 11.9 del Documento 0 (`CATEGORIAS_CLIENTE` en
+`src/common/constants/categorias-ticket.ts`, sin distinguir mayusculas), las
+mismas que `GET /portal/tickets/categorias` (CU-71). La tabla es compartida y
+tiene mas filas, que no se ofrecen: las internas de otros grupos (por ejemplo
+`CAMBIO_CREDENCIALES_WIFI` o "IPTV pirata") y `Asistente virtual`, que pone
+el sistema al derivar (CU-77). 503 si la base no responde.
 
 ### `POST /api/asistente/clientes/soporte`
 
@@ -470,7 +475,7 @@ el sistema al derivar (CU-77), no el cliente. Por lo mismo tampoco aparece en
 
 | HTTP | Mensaje | Causa | Que hace el asistente |
 |------|---------|-------|-----------------------|
-| 400 | `"Validation failed"` / `"Categoria no encontrada"` / `"Cliente no encontrado"` | Cuerpo invalido, categoria inexistente o la de CU-77, RUT que no esta en `cliente` | Excepcion 1 |
+| 400 | `"Validation failed"` / `"Categoria no encontrada"` / `"Cliente no encontrado"` | Cuerpo invalido, categoria inexistente o que no es del cliente (interna o la de CU-77), RUT que no esta en `cliente` | Excepcion 1 |
 | 401 | `"Sesion de portal invalida"` / `"Sesion de portal expirada"` / `"La sesion no corresponde al cliente"` | Token invalido o no de acceso, sesion cerrada o vencida, o de otro cliente que el RUT | Le pide volver a iniciar sesion; la conversacion sigue |
 | 401 | `"Invalid API key"` | Falta la clave del chatbot o es incorrecta | Excepcion 1 |
 | 503 | `"No fue posible registrar el reporte de soporte"` | Fallo la base de datos (tambien al buscar la sesion). No queda nada guardado | Excepcion 1 |
@@ -498,6 +503,9 @@ el sistema al derivar (CU-77), no el cliente. Por lo mismo tampoco aparece en
   volviendo a iniciar sesion, asi que la conversacion sigue.
 - **La categoria es el "departamento correspondiente".** El ticket queda sin
   operador, igual que en CU-77; el CRM lo toma por categoria.
+- **Las mismas categorias que el portal (CU-71).** El cliente reporta lo
+  mismo por los dos caminos, asi que elige de la misma lista; una interna no
+  se acepta aunque llegue su id.
 - **Sin el historial de la conversacion** en `mensaje_bot`, a diferencia del
   CU-77: lo que importa del reporte va en la descripcion.
 
