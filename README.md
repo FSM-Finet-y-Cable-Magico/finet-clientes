@@ -143,7 +143,7 @@ NEXT_PUBLIC_SENTRY_DSN=
 | Variable | Requerida | Descripción |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | Sí | URL del backend para componentes cliente y casi todo el fetching server-side |
-| `API_URL` | Sí | Misma URL, pero la lee **solo** `app/portal/_lib/portal-api.ts`. Ver el quirk documentado en [`apps/view/docs/conventions.md`](apps/view/docs/conventions.md) |
+| `API_URL` | Sí | Misma URL, para las acciones que corren en el servidor de Next (clave WiFi y consentimiento de cookies). La lee **solo** `app/_lib/api-servidor.ts`, y sin ella esas acciones fallan. Ver [`apps/view/docs/conventions.md`](apps/view/docs/conventions.md) |
 | `JWT_SECRET` | Sí | Debe coincidir con el backend — `proxy.ts` verifica la firma localmente, sin llamar a la API |
 | `NEXT_PUBLIC_SITE_URL` | No | URL pública del sitio (SEO: JSON-LD, sitemap) |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Si está seteada, `securityLogger` reporta eventos de seguridad en producción |

@@ -132,7 +132,7 @@ describe('PortalController', () => {
     );
   });
 
-  // ─── CU-42 / CU-43: pagar desde el portal ────────────────────────────────
+  // ─── CU-42: pagar desde el portal ────────────────────────────────────────
 
   it('GET /portal/enlace-pago devuelve el enlace firmado para el cliente autenticado', () => {
     const r = controller.enlacePago(CLIENTE_MOCK as any);

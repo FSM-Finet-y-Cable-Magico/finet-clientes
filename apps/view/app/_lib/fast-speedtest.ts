@@ -14,7 +14,7 @@
  * responden con `*`.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+import { API_URL } from "./consts";
 const DURACION_BAJADA_MS = 10_000;
 const DURACION_SUBIDA_MS = 8_000;
 const MUESTRAS_LATENCIA = 5;

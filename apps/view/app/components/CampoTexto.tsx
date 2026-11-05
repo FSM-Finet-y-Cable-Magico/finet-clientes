@@ -1,38 +1,44 @@
 "use client";
 
-function formatTelefono(value: string) {
-  const cleaned = value.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
-  if (!cleaned) return "";
-  return cleaned.startsWith("+") ? cleaned : "+" + cleaned;
-}
+import type { InputHTMLAttributes } from "react";
 
-export default function TelefonoInput({
+/**
+ * Un campo de texto con su etiqueta y su error, con el estilo de los
+ * formularios de acceso. Lo usa `RutInput`, que agrega el formato mientras se
+ * escribe.
+ */
+export default function CampoTexto({
+  id,
+  label,
   value,
   error,
   onChange,
   onBlur,
+  ...input
 }: {
+  id: string;
+  label: string;
   value: string;
   error?: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
-}) {
+} & Pick<
+  InputHTMLAttributes<HTMLInputElement>,
+  "type" | "inputMode" | "placeholder" | "maxLength"
+>) {
   return (
     <div>
       <label
-        htmlFor="telefono"
+        htmlFor={id}
         className="mb-1.5 block text-sm font-medium text-foreground"
       >
-        Teléfono
+        {label}
       </label>
       <input
-        id="telefono"
-        type="tel"
-        inputMode="numeric"
-        placeholder="+56912345678"
-        maxLength={12}
+        id={id}
+        {...input}
         value={value}
-        onChange={(e) => onChange(formatTelefono(e.target.value))}
+        onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         data-error={!!error}
         className={`w-full rounded-lg border px-4 py-2.5 text-sm outline-none transition-colors duration-200

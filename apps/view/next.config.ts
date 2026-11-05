@@ -17,7 +17,9 @@ const cspHeader = [
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  // CU-42: Transbank pide llevar al cliente a Webpay con un formulario POST
+  // (integracion y produccion). Ningun otro destino.
+  "form-action 'self' https://webpay3gint.transbank.cl https://webpay3g.transbank.cl",
 ].join("; ");
 
 const nextConfig: NextConfig = {

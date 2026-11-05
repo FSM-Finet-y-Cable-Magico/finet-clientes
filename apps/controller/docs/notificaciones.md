@@ -69,7 +69,7 @@ eso. Corriéndolo dos veces seguidas, la segunda no debe despachar nada.
 
 ## CU-68 / RF-50 — Aviso de corte inminente por morosidad
 
-**Construido, pendiente de la pasarela y del saldo de G8.** Hoy no despacha nada: ver "Lo que falta".
+**Construido, pendiente de G8** (el saldo y el registro de pagos). Hoy no despacha nada: ver "Lo que falta".
 
 Tarea programada en `aviso-corte.service.ts`, disparada por `@Cron` a las **09:30 de Chile**:
 media hora después del CU-67, para no pisarse en el SMTP.
@@ -98,7 +98,9 @@ corte** y el **enlace directo para pagar** (RF-50).
 
 ### Qué hace
 
-1. **Revisa la precondición:** sin pasarela activa lo deja en el log y termina.
+1. **Revisa la precondición:** sin pasarela activa lo deja en el log y termina. La pasarela cuenta
+   como activa cuando Webpay está construido y G8 registra los pagos: sin eso, el enlace del aviso
+   no deja pagar.
 2. **Toma su propio candado de transacción**, distinto del CU-67.
 3. **Comprueba `FRONTEND_URL` y `ENLACE_PAGO_SECRET`** antes de despachar. Sin ellos los
    enlaces saldrían rotos, y cada cliente quedaría como `fallido` por un error de configuración.
@@ -122,7 +124,7 @@ En `src/common/pendientes.ts`; al arrancar, el backend deja en el log qué falta
 
 | Dato | Quién | Mientras falte |
 |---|---|---|
-| `PASARELA_ACTIVA` — pasarela operativa | Nosotros (CU-42, CU-43) | No despacha: es precondición del CU |
+| `REGISTRO_PAGO_DEFINIDO` — el registro de pagos de G8 (Webpay ya está, CU-42) | Grupo 8 | No despacha: es precondición del CU (sin él no se puede pagar) |
 | `SALDO_CLIENTE_DEFINIDO` — dónde está el saldo | Grupo 8 | No despacha: el aviso informa cuánto debe |
 
 ### Excepciones del CU
@@ -156,8 +158,8 @@ corriéndolo dos veces, la segunda no manda nada.
 
 ## CU-69 / RF-51 — Confirmación de pago registrado
 
-**Construido, pendiente del pago.** Hoy nada lo llama: se conecta al construir el checkout
-(CU-42, CU-43).
+**Construido y conectado al pago (CU-42), pendiente del registro de G8.** Lo llama el retorno de
+Webpay apenas G8 registra un pago nuevo.
 
 `confirmacion-pago.service.ts`. **No es tarea programada**: la dispara el registro del pago,
 apenas la pasarela devuelve un estado exitoso (RNF-51.1: "inmediatamente").
@@ -186,5 +188,4 @@ el pago, así que no puede deduplicar solo. El registro rechaza un código de tr
 
 | Dato | Quién | Mientras falte |
 |---|---|---|
-| `PASARELA_ACTIVA` — pasarela de pagos operativa | Nosotros (CU-42, CU-43) | No hay pagos que confirmar |
 | `REGISTRO_PAGO_DEFINIDO` — dónde queda registrado el pago confirmado | Grupo 8 | No hay pago registrado: la precondición del CU no se cumple |

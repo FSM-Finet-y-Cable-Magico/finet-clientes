@@ -3,6 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ServiciosPage from '@/app/portal/servicios/page';
 
+// Las fechas de calendario (@db.Date) llegan como medianoche UTC. Con la hora de
+// Chile, si no se formatean en UTC, se ven un día antes: se fija para que el test
+// lo detecte en cualquier máquina.
+process.env.TZ = 'America/Santiago';
+
 describe('ServiciosPage (CU-25/CU-26)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -54,6 +59,7 @@ describe('ServiciosPage (CU-25/CU-26)', () => {
     expect(screen.getByText('600 Mbps')).toBeInTheDocument();
     expect(screen.getByText('Activo')).toBeInTheDocument();
     expect(screen.getByText(/vence el día 10 de cada mes/i)).toBeInTheDocument();
+    expect(screen.getByText('Inicio: 15 de enero de 2025')).toBeInTheDocument();
   });
 
   it('muestra múltiples contratos y contempla contrato sin plan asociado (CU-26)', async () => {

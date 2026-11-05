@@ -6,7 +6,7 @@ import { CreditCard } from "lucide-react";
 import { api } from "@/app/utils/api";
 
 /**
- * CU-42 / CU-43 desde el portal: pide el enlace firmado de este cliente y lo
+ * CU-42 desde el portal: pide el enlace firmado de este cliente y lo
  * lleva a /pagar. Así el RUT no queda en la URL.
  */
 export default function IrAPagarButton() {

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { PlanBackend } from "../../_lib/api";
+import {
+  idPlanDestacado,
+  ordenarPorPrecio,
+  type PlanBackend,
+} from "../../_lib/api";
 import PlanCard from "./PlanCard";
 import SegmentFilter from "./SegmentFilter";
 
@@ -23,11 +27,8 @@ export default function PlanesClient({ planes }: PlanesClientProps) {
     (p) => p.nombre_comercial && p.precio_mensual != null
   );
 
-  const sorted = [...valid].sort(
-    (a, b) => a.precio_mensual - b.precio_mensual
-  );
-  const featuredId =
-    sorted.length >= 2 ? sorted[Math.floor(sorted.length / 2)].id_plan : null;
+  const sorted = ordenarPorPrecio(valid);
+  const featuredId = idPlanDestacado(sorted);
 
   if (planes.length === 0) {
     return (

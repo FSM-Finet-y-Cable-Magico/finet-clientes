@@ -50,25 +50,63 @@ El backend también setea una cookie `access_token` httpOnly (7 días). Para lla
 
 ---
 
-### 1.2 Registrar cuenta nueva (RF-10)
+### 1.2 Crear la cuenta (CU-04 / RF-10)
+
+La cuenta se crea sobre un cliente que G8 ya dio de alta: el portal no crea clientes (acuerdo v2.0, §3 y §4). Son dos pasos, como la recuperación de contraseña (G8, 01-10, §6).
+
+**Paso 1: pedir el enlace**
 
 ```
-POST /api/auth/register
+POST /api/auth/registro
 ```
 
 **Body:**
 ```json
 {
-  "rut": "12.345.678-5",
-  "nombre_completo": "Juan Pérez",
-  "email": "juan@ejemplo.cl",
-  "telefono": "912345678",
-  "password": "<contraseña>",
-  "password_confirmation": "<contraseña>"
+  "rut": "12.345.678-5"
 }
 ```
 
-`telefono` es opcional (puede omitirse o enviarse como `""`).
+**Respuesta 200:**
+```json
+{
+  "resultado": "ENLACE_ENVIADO"
+}
+```
+
+| `resultado` | Qué mostrar |
+|-------------|-------------|
+| `ENLACE_ENVIADO` | Que revise su correo: le llegó un enlace de 30 minutos |
+| `YA_REGISTRADO` | Que ya tiene cuenta (Excepción 4): iniciar sesión o recuperar la contraseña |
+| `SIN_CORREO` | Que no hay correo registrado: escribir por WhatsApp |
+| `NO_CLIENTE` | Que el RUT no es de un cliente activo: ver los planes |
+
+**Errores:**
+| HTTP | Mensaje | Causa |
+|------|---------|-------|
+| 400 | `"Formato inválido. Ej: 123456785"` | RUT mal escrito (el backend lo recibe sin puntos ni guion) |
+| 400 | `"RUT inválido — dígito verificador incorrecto"` | DV no coincide |
+| 429 | Rate limit | +3 req/min |
+| 503 | `"No pudimos enviar el correo. Intenta de nuevo en unos minutos"` | Falló el envío del enlace |
+
+**Paso 2: crear la contraseña con el enlace**
+
+El correo lleva a `/registro/confirmar#token=...`.
+
+```
+POST /api/auth/registro/confirmar
+```
+
+**Body:**
+```json
+{
+  "token": "eyJhbGciOi...",
+  "password": "<contraseña>",
+  "password_confirmation": "<contraseña>",
+  "acepta_politica_privacidad": true,
+  "version_politica_privacidad": "1.1"
+}
+```
 
 **Reglas de contraseña:**
 - Mínimo 8 caracteres
@@ -76,7 +114,7 @@ POST /api/auth/register
 - Al menos 1 número
 - Máximo 72 caracteres
 
-**Respuesta 201:**
+**Respuesta 200** (con la cookie `access_token`, como el login):
 ```json
 {
   "access_token": "eyJhbGciOi...",
@@ -93,13 +131,13 @@ POST /api/auth/register
 **Errores:**
 | HTTP | Mensaje | Causa |
 |------|---------|-------|
-| 400 | `"Email es requerido"` | Campo vacío |
-| 400 | `"Email inválido"` | Formato incorrecto |
 | 400 | `"Contraseña debe tener al menos 8 caracteres"` | Muy corta |
 | 400 | `"Contraseña debe contener al menos una mayúscula"` | Falta mayúscula |
 | 400 | `"Contraseña debe contener al menos un número"` | Falta número |
 | 400 | `"Las contraseñas no coinciden"` | password ≠ password_confirmation |
-| 409 | `"No se pudo completar el registro"` | RUT o email duplicado |
+| 400 | `"Debes aceptar la Política de Privacidad para continuar"` | Casilla sin marcar (CU-75) |
+| 400 | `"Token inválido o expirado"` | Pasaron más de 30 minutos |
+| 400 | `"Este enlace ya fue usado. Si todavía no tienes contraseña, solicita uno nuevo"` | Enlace de un solo uso (RNF-04.1) |
 | 429 | Rate limit | +3 req/min |
 
 ---
@@ -142,7 +180,7 @@ POST /api/auth/restablecer-password
 }
 ```
 
-El token viene del enlace en el email de recuperación. Expira en **15 minutos**.
+El token viene del enlace en el email de recuperación. Expira en **30 minutos** y es de **un solo uso** (RNF-04.1).
 
 **Respuesta 200:**
 ```json
@@ -158,6 +196,7 @@ Efectos: actualiza la contraseña, invalida todas las sesiones activas del clien
 |------|---------|
 | 400 | `"Token inválido o expirado"` |
 | 400 | `"Token inválido"` (no es de tipo reset) |
+| 400 | `"Este enlace ya fue usado. Si necesitas cambiar tu contraseña, solicita uno nuevo"` (el enlace ya se usó) |
 
 ---
 
@@ -588,8 +627,7 @@ Formatos de RUT aceptados: `12.345.678-9` o `12345678-9`.
   "encontrado": true,
   "cliente": {
     "nombre_completo": "Juan Pérez",
-    "rut": "12345678-9",
-    "codigo_abonado": 100
+    "rut": "12345678-9"
   },
   "tiene_deuda": true,
   "saldo_total": 39980,
@@ -620,18 +658,11 @@ Formatos de RUT aceptados: `12.345.678-9` o `12345678-9`.
 
 ---
 
-### 4.2 Consultar por código de abonado (CU-40)
-
-```
-GET /api/deuda-publica/abonado?codigo_abonado=100
-```
-
-**Respuesta 200:** Misma estructura que consulta por RUT.
 ## 6. Mecanismos de autenticación
 
 | Tipo | Cómo se envía | Dónde se usa |
 |------|---------------|--------------|
-| **Público** | Sin auth | Login, register, recuperación, deuda pública, landing |
+| **Público** | Sin auth | Login, registro, recuperación, deuda pública, landing |
 | **JWT** | Header `Authorization: Bearer <token>` o cookie `access_token` | Portal, perfil, logout |
 
 ---
@@ -653,7 +684,7 @@ Todas las respuestas de error siguen este formato:
 |------|---------------|
 | 400 | Validación fallida (Zod). Revisar `message` para el campo específico. |
 | 401 | No autenticado, token expirado, sesión inactiva, IP/RUT bloqueado, o cuenta no activa. Redirigir a login. |
-| 409 | Conflicto (registro duplicado). |
+| 409 | Conflicto con el estado actual: el RUT ya es cliente al contratar, no hay deuda al pagar, o el servicio no está activo al pedir el cambio de clave WiFi. |
 | 429 | Rate limit excedido. Esperar y reintentar. |
 | 500 | `"Error interno del servidor"` — error inesperado. Contactar soporte. |
 

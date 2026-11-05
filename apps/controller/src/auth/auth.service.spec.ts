@@ -28,15 +28,12 @@ describe('AuthService', () => {
     estado: 'activo',
   };
 
-  // El cliente se busca por RUT (en sus dos formas, variantesRut) y, en el
-  // registro, también por correo: las dos son findFirst. Cada test fija qué
-  // responde cada búsqueda.
+  // El cliente se busca por RUT, en sus dos formas (variantesRut). Cada test
+  // fija qué responde esa búsqueda.
   let porRut: jest.Mock;
-  let porEmail: jest.Mock;
 
   beforeEach(async () => {
     porRut = jest.fn();
-    porEmail = jest.fn();
     const module = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -47,13 +44,11 @@ describe('AuthService', () => {
             log_auditoria: { create: jest.fn() },
             cliente: {
               findFirst: jest.fn(
-                (args: { where: { rut?: unknown } }): unknown =>
-                  args.where.rut !== undefined
-                    ? (porRut(args) as unknown)
-                    : (porEmail(args) as unknown),
+                (args: unknown): unknown => porRut(args) as unknown,
               ),
-              create: jest.fn(),
               update: jest.fn(),
+              findUnique: jest.fn(),
+              updateMany: jest.fn(),
             },
             sesion_portal: {
               create: jest.fn(),
@@ -80,6 +75,7 @@ describe('AuthService', () => {
           useValue: {
             sendPasswordReset: jest.fn().mockResolvedValue(undefined),
             sendPasswordChanged: jest.fn().mockResolvedValue(undefined),
+            sendRegistroCuenta: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],
@@ -151,278 +147,6 @@ describe('AuthService', () => {
     });
   });
 
-  describe('register', () => {
-    it('create cliente and return token', async () => {
-      const mockCreated = {
-        id_cliente: 2,
-        rut: '876543210',
-        nombre_completo: 'Nuevo Cliente',
-        email: 'nuevo@test.cl',
-        telefono: '998877665',
-        password_portal_hash: 'hashed',
-        estado: 'activo',
-        id_empresa: 1,
-      };
-
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
-      porRut.mockResolvedValue(null);
-      porEmail.mockResolvedValue(null);
-      (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCreated);
-      (jwtService.signAsync as jest.Mock).mockResolvedValue('register-jwt');
-
-      const result = await authService.register(
-        '123456785',
-        'Nuevo Cliente',
-        'Password1',
-        '127.0.0.1',
-        'nuevo@test.cl',
-        '998877665',
-        '1.1',
-      );
-
-      expect(prisma.cliente.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          rut: '123456785',
-          nombre_completo: 'Nuevo Cliente',
-          email: 'nuevo@test.cl',
-          telefono: '998877665',
-          password_portal_hash: 'hashed-password',
-          id_empresa: 1,
-          estado: 'activo',
-        }),
-      });
-
-      expect(result).toHaveProperty('access_token', 'register-jwt');
-      expect(result.cliente).toMatchObject({
-        id: 2,
-        rut: '876543210',
-        nombre_completo: 'Nuevo Cliente',
-        email: 'nuevo@test.cl',
-        telefono: '998877665',
-      });
-    });
-
-    // CU-75: el cliente y su aceptación quedan en la misma transacción.
-    it('registra la aceptación de la Política de Privacidad sin la contraseña', async () => {
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      porRut.mockResolvedValue(null);
-      porEmail.mockResolvedValue(null);
-      (prisma.cliente.create as jest.Mock).mockResolvedValue({
-        ...mockCliente,
-        id_cliente: 6,
-      });
-      (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt');
-
-      await authService.register(
-        '123456785',
-        'Nuevo Cliente',
-        'Password1',
-        '203.0.113.7',
-        'nuevo@test.cl',
-        '998877665',
-        '1.1',
-      );
-
-      expect(prisma.$transaction).toHaveBeenCalled();
-      expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
-        data: {
-          accion: 'ACEPTAR_POLITICA_PRIVACIDAD',
-          entidad_afectada: 'cliente',
-          id_entidad_afectada: 6,
-          ip_origen: '203.0.113.0/24',
-          valor_nuevo: {
-            formulario: 'REGISTRO',
-            version_politica: '1.1',
-            datos: {
-              rut: '123456785',
-              nombre_completo: 'Nuevo Cliente',
-              email: 'nuevo@test.cl',
-              telefono: '998877665',
-            },
-          },
-        },
-      });
-    });
-
-    it('mantiene la IP completa en la sesión: solo se anonimiza el consentimiento', async () => {
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      porRut.mockResolvedValue(null);
-      porEmail.mockResolvedValue(null);
-      (prisma.cliente.create as jest.Mock).mockResolvedValue({
-        ...mockCliente,
-        id_cliente: 7,
-      });
-      (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt');
-
-      await authService.register(
-        '123456785',
-        'Nuevo Cliente',
-        'Password1',
-        '203.0.113.7',
-        'nuevo@test.cl',
-        undefined,
-        '1.1',
-      );
-
-      expect(prisma.sesion_portal.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ ip_origen: '203.0.113.7' }),
-      });
-    });
-
-    it('no crea la sesión si no se puede registrar la aceptación', async () => {
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      porRut.mockResolvedValue(null);
-      porEmail.mockResolvedValue(null);
-      (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCliente);
-      (prisma.log_auditoria.create as jest.Mock).mockRejectedValue(
-        new Error('insert failed'),
-      );
-
-      await expect(
-        authService.register(
-          '123456785',
-          'Nuevo Cliente',
-          'Password1',
-          '0.0.0.0',
-          'nuevo@test.cl',
-          undefined,
-          '1.1',
-        ),
-      ).rejects.toThrow('insert failed');
-      expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
-    });
-
-    it('no duplica a un cliente cuyo RUT está guardado con guion (G3, 29-09)', async () => {
-      porRut.mockResolvedValue({ ...mockCliente, rut: '12345678-5' });
-      porEmail.mockResolvedValue(null);
-
-      await expect(
-        authService.register(
-          '12.345.678-5',
-          'Juan',
-          'Password1',
-          '127.0.0.1',
-          'otro@correo.cl',
-          null,
-          '1.1',
-        ),
-      ).rejects.toThrow('No se pudo completar el registro');
-      expect(prisma.cliente.create).not.toHaveBeenCalled();
-    });
-
-    it('throw ConflictException when RUT already exists', async () => {
-      porRut.mockResolvedValue(mockCliente);
-
-      await expect(
-        authService.register(
-          '123456785',
-          'Otro',
-          'Password1',
-          '0.0.0.0',
-          'otro@test.cl',
-          undefined,
-          '1.1',
-        ),
-      ).rejects.toThrow('No se pudo completar el registro');
-    });
-
-    it('throw ConflictException when email already exists', async () => {
-      porRut.mockResolvedValue(null);
-      porEmail.mockResolvedValue(mockCliente);
-
-      await expect(
-        authService.register(
-          '999999999',
-          'Duplicado',
-          'Password1',
-          '0.0.0.0',
-          'juan@test.cl',
-          undefined,
-          '1.1',
-        ),
-      ).rejects.toThrow('No se pudo completar el registro');
-    });
-
-    it('create session after register', async () => {
-      const mockCreated = {
-        id_cliente: 4,
-        rut: '222222222',
-        nombre_completo: 'Con Sesion',
-        email: 'sesion@test.cl',
-        telefono: null,
-        password_portal_hash: 'hashed',
-        estado: 'activo',
-        id_empresa: 1,
-      };
-
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      porRut.mockResolvedValue(null);
-      porEmail.mockResolvedValue(null);
-      (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCreated);
-      (jwtService.signAsync as jest.Mock).mockResolvedValue('session-jwt');
-
-      await authService.register(
-        '222222222',
-        'Con Sesion',
-        'Password1',
-        '0.0.0.0',
-        'sesion@test.cl',
-        undefined,
-        '1.1',
-      );
-
-      expect(prisma.sesion_portal.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          id_cliente: 4,
-          token: 'session-jwt',
-        }),
-      });
-    });
-
-    it('set session expiration within 15 minutes from now', async () => {
-      const mockCreated = {
-        id_cliente: 5,
-        rut: '333333333',
-        nombre_completo: 'Expiracion',
-        email: 'exp@test.cl',
-        telefono: null,
-        password_portal_hash: 'hashed',
-        estado: 'activo',
-        id_empresa: 1,
-      };
-
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
-      porRut.mockResolvedValue(null);
-      porEmail.mockResolvedValue(null);
-      (prisma.cliente.create as jest.Mock).mockResolvedValue(mockCreated);
-      (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt');
-
-      const beforeCall = Date.now();
-      await authService.register(
-        '333333333',
-        'Expiracion',
-        'Password1',
-        '0.0.0.0',
-        'exp@test.cl',
-        undefined,
-        '1.1',
-      );
-      const afterCall = Date.now();
-
-      const createCall = (prisma.sesion_portal.create as jest.Mock).mock
-        .calls[0][0];
-      const fechaExpiracion = new Date(
-        createCall.data.fecha_expiracion,
-      ).getTime();
-
-      const expectedMin = beforeCall + 14 * 60 * 1000;
-      const expectedMax = afterCall + 15 * 60 * 1000;
-
-      expect(fechaExpiracion).toBeGreaterThanOrEqual(expectedMin);
-      expect(fechaExpiracion).toBeLessThanOrEqual(expectedMax);
-    });
-  });
-
   describe('recuperarPassword', () => {
     it('return generic message when RUT exists with email', async () => {
       porRut.mockResolvedValue(mockCliente);
@@ -432,8 +156,8 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('message');
       expect(jwtService.signAsync).toHaveBeenCalledWith(
-        { sub: 1, type: 'reset' },
-        { expiresIn: '15m' },
+        { sub: 1, type: 'reset', huella: expect.any(String) },
+        { expiresIn: '30m' },
       );
     });
 
@@ -448,30 +172,99 @@ describe('AuthService', () => {
   });
 
   describe('restablecerPassword', () => {
-    it('update password and invalidate sessions on valid token', async () => {
-      (jwtService.verify as jest.Mock).mockReturnValue({
-        sub: 1,
-        type: 'reset',
+    /** Pide un enlace y devuelve el payload firmado, como lo vería restablecer. */
+    async function pedirEnlace(hashActual: string | null = 'hashedpassword') {
+      porRut.mockResolvedValue({
+        ...mockCliente,
+        password_portal_hash: hashActual,
       });
-      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
-      (prisma.cliente.update as jest.Mock).mockResolvedValue({
-        id_cliente: 1,
+      (jwtService.signAsync as jest.Mock).mockResolvedValue('reset-token');
+      await authService.recuperarPassword('123456785');
+      const [payload] = (jwtService.signAsync as jest.Mock).mock.calls.at(-1)!;
+      (jwtService.verify as jest.Mock).mockReturnValue(payload);
+    }
+
+    function hashEnBase(hash: string | null) {
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+        password_portal_hash: hash,
         email: 'juan@test.cl',
         nombre_completo: 'Juan Pérez',
       });
+    }
+
+    beforeEach(() => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    });
+
+    it('update password and invalidate sessions on valid token', async () => {
+      await pedirEnlace('hashedpassword');
+      hashEnBase('hashedpassword');
 
       const result = await authService.restablecerPassword(
         'reset-token',
         'NewPass1',
       );
 
-      expect(prisma.cliente.update).toHaveBeenCalledWith({
-        where: { id_cliente: 1 },
+      expect(prisma.cliente.updateMany).toHaveBeenCalledWith({
+        where: { id_cliente: 1, password_portal_hash: 'hashedpassword' },
         data: { password_portal_hash: 'new-hash' },
       });
+      expect(prisma.sesion_portal.updateMany).toHaveBeenCalled();
       expect(result).toEqual({
         message: 'Contraseña restablecida exitosamente',
       });
+    });
+
+    it('RNF-04.1: el enlace no sirve una segunda vez', async () => {
+      await pedirEnlace('hashedpassword');
+      // La primera vez cambió la contraseña: en la base ya está el hash nuevo.
+      hashEnBase('new-hash');
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'OtraPass2'),
+      ).rejects.toThrow('Este enlace ya fue usado');
+      expect(prisma.cliente.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('RNF-04.1: si la contraseña cambió por otro lado, el enlace tampoco sirve', async () => {
+      await pedirEnlace('hashedpassword');
+      hashEnBase('hash-cambiado-desde-el-perfil');
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'OtraPass2'),
+      ).rejects.toThrow('Este enlace ya fue usado');
+    });
+
+    it('RNF-04.1: dos envíos a la vez con el mismo enlace, solo uno cambia la contraseña', async () => {
+      await pedirEnlace('hashedpassword');
+      hashEnBase('hashedpassword');
+      (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'OtraPass2'),
+      ).rejects.toThrow('Este enlace ya fue usado');
+      expect(prisma.sesion_portal.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('sirve para un cliente que todavía no tenía contraseña', async () => {
+      await pedirEnlace(null);
+      hashEnBase(null);
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'NewPass1'),
+      ).resolves.toEqual({ message: 'Contraseña restablecida exitosamente' });
+    });
+
+    it('un token de recuperación sin huella no sirve', async () => {
+      (jwtService.verify as jest.Mock).mockReturnValue({
+        sub: 1,
+        type: 'reset',
+      });
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'NewPass1'),
+      ).rejects.toThrow('Token inválido');
     });
 
     it('throw BadRequestException on expired token', async () => {
@@ -493,6 +286,236 @@ describe('AuthService', () => {
       await expect(
         authService.restablecerPassword('session-token', 'NewPass1'),
       ).rejects.toThrow('Token inválido');
+    });
+  });
+
+  describe('CU-04: registro sobre un cliente que ya existe', () => {
+    const sinCuenta = { ...mockCliente, password_portal_hash: null };
+
+    function correo() {
+      return (
+        authService as unknown as {
+          mailService: { sendRegistroCuenta: jest.Mock };
+        }
+      ).mailService;
+    }
+
+    describe('solicitarRegistro', () => {
+      it('si el RUT no es cliente: NO_CLIENTE, sin correo', async () => {
+        porRut.mockResolvedValue(null);
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'NO_CLIENTE' });
+        expect(correo().sendRegistroCuenta).not.toHaveBeenCalled();
+      });
+
+      it('si el cliente no está activo: NO_CLIENTE, como el login, que tampoco lo deja entrar', async () => {
+        porRut.mockResolvedValue({ ...sinCuenta, estado: 'inactivo' });
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'NO_CLIENTE' });
+        expect(correo().sendRegistroCuenta).not.toHaveBeenCalled();
+      });
+
+      it('Excepción 4: si ya tiene contraseña, YA_REGISTRADO, sin correo', async () => {
+        porRut.mockResolvedValue(mockCliente);
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'YA_REGISTRADO' });
+        expect(correo().sendRegistroCuenta).not.toHaveBeenCalled();
+      });
+
+      it('G8 §6.2: sin correo registrado, SIN_CORREO; la activación es manual', async () => {
+        porRut.mockResolvedValue({ ...sinCuenta, email: null });
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'SIN_CORREO' });
+        expect(correo().sendRegistroCuenta).not.toHaveBeenCalled();
+      });
+
+      it('manda un enlace de un solo uso, de 30 minutos, al correo registrado', async () => {
+        porRut.mockResolvedValue(sinCuenta);
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).resolves.toEqual({ resultado: 'ENLACE_ENVIADO' });
+        expect(jwtService.signAsync).toHaveBeenCalledWith(
+          { sub: 1, type: 'registro', huella: expect.any(String) },
+          { expiresIn: '30m' },
+        );
+        expect(correo().sendRegistroCuenta).toHaveBeenCalledWith(
+          'juan@test.cl',
+          'Juan Pérez',
+          expect.stringContaining('/registro/confirmar#token=registro-token'),
+        );
+      });
+
+      it('si el correo no sale, lo dice en vez de decir que se envió', async () => {
+        porRut.mockResolvedValue(sinCuenta);
+        correo().sendRegistroCuenta.mockRejectedValueOnce(
+          new Error('SMTP caído'),
+        );
+
+        await expect(
+          authService.solicitarRegistro('123456785'),
+        ).rejects.toThrow('No pudimos enviar el correo');
+      });
+    });
+
+    describe('confirmarRegistro', () => {
+      async function pedirEnlace() {
+        porRut.mockResolvedValue(sinCuenta);
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
+        await authService.solicitarRegistro('123456785');
+        const [payload] = (jwtService.signAsync as jest.Mock).mock.calls.at(
+          -1,
+        )!;
+        (jwtService.verify as jest.Mock).mockReturnValue(payload);
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('jwt-sesion');
+      }
+
+      function enBase(cambios: Record<string, unknown> = {}) {
+        (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+          rut: '123456785',
+          nombre_completo: 'Juan Pérez',
+          email: 'juan@test.cl',
+          telefono: '912345678',
+          estado: 'activo',
+          password_portal_hash: null,
+          ...cambios,
+        });
+      }
+
+      beforeEach(() => {
+        (bcrypt.hash as jest.Mock).mockResolvedValue('nuevo-hash');
+        (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({
+          count: 1,
+        });
+      });
+
+      it('fija la contraseña, registra la aceptación (CU-75) y deja la sesión iniciada', async () => {
+        await pedirEnlace();
+        enBase();
+
+        const r = await authService.confirmarRegistro(
+          'registro-token',
+          'Clave2026',
+          '1.1',
+          '127.0.0.1',
+        );
+
+        expect(prisma.cliente.updateMany).toHaveBeenCalledWith({
+          where: { id_cliente: 1, password_portal_hash: null },
+          data: { password_portal_hash: 'nuevo-hash' },
+        });
+        expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            entidad_afectada: 'cliente',
+            id_entidad_afectada: 1,
+            valor_nuevo: expect.objectContaining({
+              formulario: 'REGISTRO',
+              version_politica: '1.1',
+            }),
+          }),
+        });
+        expect(jwtService.signAsync).toHaveBeenLastCalledWith({
+          sub: 1,
+          rut: '123456785',
+          type: 'access',
+        });
+        expect(prisma.sesion_portal.create).toHaveBeenCalled();
+        expect(r).toEqual({
+          access_token: 'jwt-sesion',
+          cliente: {
+            id: 1,
+            rut: '123456785',
+            nombre_completo: 'Juan Pérez',
+            email: 'juan@test.cl',
+            telefono: '912345678',
+          },
+        });
+      });
+
+      it('RNF-04.1: el enlace no sirve una segunda vez', async () => {
+        await pedirEnlace();
+        enBase({ password_portal_hash: 'nuevo-hash' });
+
+        await expect(
+          authService.confirmarRegistro(
+            'registro-token',
+            'Otra2026',
+            '1.1',
+            '127.0.0.1',
+          ),
+        ).rejects.toThrow('Este enlace ya fue usado');
+        expect(prisma.cliente.updateMany).not.toHaveBeenCalled();
+        expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
+      });
+
+      it('dos envíos a la vez con el mismo enlace: solo uno crea la contraseña', async () => {
+        await pedirEnlace();
+        enBase();
+        (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          authService.confirmarRegistro(
+            'registro-token',
+            'Clave2026',
+            '1.1',
+            '127.0.0.1',
+          ),
+        ).rejects.toThrow('Este enlace ya fue usado');
+        expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
+      });
+
+      it('si el cliente dejó de estar activo, no se le abre la sesión', async () => {
+        await pedirEnlace();
+        enBase({ estado: 'inactivo' });
+
+        await expect(
+          authService.confirmarRegistro(
+            'registro-token',
+            'Clave2026',
+            '1.1',
+            '127.0.0.1',
+          ),
+        ).rejects.toThrow('No encontramos una cuenta de cliente activa');
+        expect(prisma.log_auditoria.create).not.toHaveBeenCalled();
+        expect(prisma.sesion_portal.create).not.toHaveBeenCalled();
+      });
+
+      it('un enlace de recuperación (CU-03) no sirve para registrarse', async () => {
+        (jwtService.verify as jest.Mock).mockReturnValue({
+          sub: 1,
+          type: 'reset',
+          huella: 'x',
+        });
+
+        await expect(
+          authService.confirmarRegistro(
+            'reset-token',
+            'Clave2026',
+            '1.1',
+            '127.0.0.1',
+          ),
+        ).rejects.toThrow('Token inválido');
+      });
+
+      it('un enlace de registro no sirve para restablecer la contraseña', async () => {
+        await pedirEnlace();
+        enBase();
+
+        await expect(
+          authService.restablecerPassword('registro-token', 'Clave2026'),
+        ).rejects.toThrow('Token inválido');
+      });
     });
   });
 

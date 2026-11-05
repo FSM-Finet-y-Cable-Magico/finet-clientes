@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { API_URL, EVENTO_SESION_EXPIRADA } from "./consts";
 import { securityLogger } from "./logger";
 
 export type Cliente = {
@@ -64,9 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const API_URL =
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
-
     async function checkAuth() {
       try {
         const res = await fetchWithRetry(`${API_URL}/auth/perfil`, {
@@ -98,9 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.push("/inicio-sesion?expired=1");
     }
 
-    window.addEventListener("auth:session-expired", handleSessionExpired);
+    window.addEventListener(EVENTO_SESION_EXPIRADA, handleSessionExpired);
     return () =>
-      window.removeEventListener("auth:session-expired", handleSessionExpired);
+      window.removeEventListener(EVENTO_SESION_EXPIRADA, handleSessionExpired);
   }, [router]);
 
   const login = useCallback((clienteData: Cliente) => {
@@ -108,9 +106,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async (): Promise<boolean> => {
-    const API_URL =
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
-
     try {
       const res = await fetch(`${API_URL}/auth/logout`, {
         method: "POST",

@@ -13,9 +13,11 @@
 /**
  * Si hay una pasarela de pagos operativa. La precondición del CU-68 lo exige: el
  * aviso de corte lleva un enlace para pagar, y sin pasarela ese enlace no lleva a
- * ningún lado. Se rellena cuando se construya el pago (CU-42 y CU-43).
+ * ningún lado. Webpay Plus (CU-42) ya está construido, en el ambiente que diga
+ * `WEBPAY_AMBIENTE`: de integración mientras Finet no entregue su código de
+ * comercio. Para cobrar falta además el registro de G8 (abajo).
  */
-export const PASARELA_ACTIVA = false;
+export const PASARELA_ACTIVA = true;
 
 /**
  * El registro de un pago confirmado (RF-32: fecha, monto y código de
@@ -35,7 +37,7 @@ export const REGISTRO_PAGO_DEFINIDO = false;
  * El 02-10 mandó el formato (`saldoExigible` por factura), y la lectura ya está
  * construida (`common/saldo/saldo-cliente.service.ts`). Falta que G8 confirme su
  * deploy y el smoke (su §15). Sin él, el pago no tiene un total que cobrar (la
- * precondición del CU-42 y del CU-43 es "una deuda pendiente identificada"), y
+ * precondición del CU-42 es "una deuda pendiente identificada"), y
  * el aviso de corte (CU-68) no tiene monto.
  */
 export const SALDO_CLIENTE_DEFINIDO = false;
@@ -73,19 +75,19 @@ export const PENDIENTES: readonly Pendiente[] = [
   {
     dato: 'Pasarela de pagos operativa',
     quien: 'Grupo 2',
-    destraba: 'CU-42, CU-43, CU-68, CU-69',
+    destraba: 'CU-42, CU-68, CU-69',
     estaVacio: () => !PASARELA_ACTIVA,
   },
   {
     dato: 'Registro del pago desplegado (POST /api/integrations/g2/payments)',
     quien: 'Grupo 8',
-    destraba: 'CU-42, CU-43, CU-69',
+    destraba: 'CU-42, CU-69',
     estaVacio: () => !REGISTRO_PAGO_DEFINIDO,
   },
   {
     dato: 'Saldo del cliente desplegado (GET /api/integrations/g2/invoices)',
     quien: 'Grupo 8',
-    destraba: 'CU-42, CU-43, CU-68',
+    destraba: 'CU-42, CU-68',
     estaVacio: () => !SALDO_CLIENTE_DEFINIDO,
   },
   {

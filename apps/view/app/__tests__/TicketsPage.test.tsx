@@ -3,6 +3,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import TicketsPage from "@/app/portal/tickets/page";
 
+process.env.TZ = "America/Santiago";
+
 const sinTickets = { total: 0, tiene_tickets: false, tickets: [] };
 const categorias = [
   { id_categoria: 1, nombre: "Conectividad" },
@@ -86,6 +88,8 @@ describe("TicketsPage (CU-71)", () => {
     await waitFor(() => {
       expect(screen.getAllByText("FIN-2026-000042")).toHaveLength(2);
     });
+    // La fecha de creación es un instante: se muestra en hora de Chile.
+    expect(screen.getByText(/24 de agosto de 2026/)).toBeInTheDocument();
     expect(global.fetch).toHaveBeenNthCalledWith(
       3,
       "http://localhost:4000/api/portal/tickets",

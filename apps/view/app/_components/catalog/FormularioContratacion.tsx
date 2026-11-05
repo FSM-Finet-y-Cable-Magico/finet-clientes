@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 import PrimaryButton from "../ui/PrimaryButton";
 import CasillaPoliticaPrivacidad from "../legal/CasillaPoliticaPrivacidad";
 import type { PlanBackend } from "../../_lib/api";
+import { API_URL } from "../../_lib/consts";
 import {
   MENSAJE_POLITICA_REQUERIDA,
   POLITICA_PRIVACIDAD_VERSION,
@@ -14,8 +15,6 @@ type FormularioContratacionProps = {
 };
 
 type FormState = "idle" | "loading" | "success" | "error";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 /** El backend responde `{ message, errors?: [{ message }] }`. */
 async function mensajeDeError(res: Response): Promise<string> {

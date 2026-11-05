@@ -1,15 +1,9 @@
 "use server";
 
+import { apiUrl } from "./api-servidor";
 import { POLITICA_PRIVACIDAD_VERSION } from "./legal";
 import type { DecisionCookies } from "./cookies-consentimiento";
 import { guardarConsentimiento } from "./cookies-consentimiento.servidor";
-
-function apiUrl(path: string): string {
-  const base = process.env.API_URL;
-  if (!base)
-    throw new Error("API_URL no está configurada en las variables de entorno");
-  return `${base}${path}`;
-}
 
 /**
  * CU-76: guarda la decisión del banner.

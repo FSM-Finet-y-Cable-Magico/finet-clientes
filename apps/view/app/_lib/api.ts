@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+import { API_URL } from "./consts";
 
 export type PlanBackend = {
   id_plan: number;
@@ -10,12 +10,19 @@ export type PlanBackend = {
   descripcion: string | null;
 };
 
-function formatPrecio(precio: number): string {
-  return `$${precio.toLocaleString("es-CL")}`;
+/** Del más barato al más caro, sin reordenar el arreglo que recibe. */
+export function ordenarPorPrecio(planes: PlanBackend[]): PlanBackend[] {
+  return [...planes].sort((a, b) => a.precio_mensual - b.precio_mensual);
 }
 
-export function formatPrecioMensual(precio: number): string {
-  return formatPrecio(precio);
+/**
+ * El plan que se marca "Mas popular": el del medio de la lista ya ordenada.
+ * Con menos de dos planes no se destaca ninguno.
+ */
+export function idPlanDestacado(ordenados: PlanBackend[]): number | null {
+  return ordenados.length >= 2
+    ? ordenados[Math.floor(ordenados.length / 2)].id_plan
+    : null;
 }
 
 /**

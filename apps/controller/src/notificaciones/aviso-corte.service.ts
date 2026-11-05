@@ -7,6 +7,7 @@ import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
 import {
   PASARELA_ACTIVA,
+  REGISTRO_PAGO_DEFINIDO,
   SALDO_CLIENTE_DEFINIDO,
 } from '../common/pendientes.js';
 import { conCandado } from './candado.js';
@@ -24,8 +25,8 @@ import {
 import {
   PAUSA_ENTRE_TANDAS_MS,
   TANDA_MAXIMA,
-  ZONA_HORARIA,
 } from './recordatorio-pago.constantes.js';
+import { ZONA_HORARIA } from '../common/constants/zona-horaria.js';
 import {
   clientesConFacturasImpagas,
   diaG8,
@@ -106,7 +107,8 @@ export class AvisoCorteService {
   async ejecutar(
     ahora: Date,
     datos: DatosAvisoCorte = {
-      pasarelaActiva: PASARELA_ACTIVA,
+      // Sin el registro de G8 el enlace del aviso no deja pagar (CU-42).
+      pasarelaActiva: PASARELA_ACTIVA && REGISTRO_PAGO_DEFINIDO,
       saldoDefinido: SALDO_CLIENTE_DEFINIDO,
     },
   ): Promise<ResumenAvisoCorte> {
@@ -183,7 +185,7 @@ export class AvisoCorteService {
         }
 
         const facturas = await this.saldos.facturasDe(
-          { idCliente: c.idCliente, idContrato: null },
+          { idCliente: c.idCliente },
           datos.saldoDefinido,
         );
         if (facturas === null) {

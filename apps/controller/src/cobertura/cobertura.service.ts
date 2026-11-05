@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { COBERTURA_FINET } from './cobertura-finet.data.js';
-import type { VisorCoberturaConfigDto } from './dto/cobertura.dto.js';
+import type {
+  PuntoMapaDto,
+  VisorCoberturaConfigDto,
+} from './dto/cobertura.dto.js';
 
 const VISOR_CONFIG: VisorCoberturaConfigDto = {
   // Centroide de la red, ponderado por densidad.
@@ -37,7 +40,7 @@ export class CoberturaService {
     return VISOR_CONFIG;
   }
 
-  getPuntos(tipoCobertura?: string) {
+  getPuntos(tipoCobertura?: string): readonly PuntoMapaDto[] {
     return tipoCobertura
       ? COBERTURA_FINET.filter((p) => p.tipo_cobertura === tipoCobertura)
       : COBERTURA_FINET;

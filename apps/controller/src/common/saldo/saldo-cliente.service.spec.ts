@@ -34,45 +34,32 @@ describe('SaldoClienteService', () => {
   });
 
   it('mientras G8 no confirme su deploy, no se le pregunta y no hay saldo', async () => {
-    await expect(
-      service.saldoDe({ idCliente: 10, idContrato: null }),
-    ).resolves.toBeNull();
+    await expect(service.saldoDe({ idCliente: 10 })).resolves.toBeNull();
     expect(g8.facturas).not.toHaveBeenCalled();
     expect(prisma.cliente.findUnique).not.toHaveBeenCalled();
   });
 
   describe('con el deploy de G8 confirmado', () => {
     it('el saldo del cliente es la suma de su saldo exigible, en su empresa', async () => {
-      await expect(
-        service.saldoDe({ idCliente: 10, idContrato: null }, true),
-      ).resolves.toBe(34980);
+      await expect(service.saldoDe({ idCliente: 10 }, true)).resolves.toBe(
+        34980,
+      );
       expect(g8.facturas).toHaveBeenCalledWith({ idEmpresa: 1, idCliente: 10 });
     });
 
     it('facturasDe entrega las facturas de G8 tal cual, para el CU-67 y el CU-68', async () => {
       await expect(
-        service.facturasDe({ idCliente: 10, idContrato: null }, true),
+        service.facturasDe({ idCliente: 10 }, true),
       ).resolves.toEqual([
         { idFactura: 101, saldoExigible: 14990 },
         { idFactura: 102, saldoExigible: 19990 },
       ]);
     });
 
-    it('por código de abonado, solo el de ese contrato', async () => {
-      await service.saldoDe({ idCliente: 10, idContrato: 456 }, true);
-
-      expect(g8.facturas).toHaveBeenCalledWith({
-        idEmpresa: 1,
-        idContrato: 456,
-      });
-    });
-
     it('sin facturas con saldo, la deuda es cero', async () => {
       g8.facturas.mockResolvedValue([]);
 
-      await expect(
-        service.saldoDe({ idCliente: 10, idContrato: null }, true),
-      ).resolves.toBe(0);
+      await expect(service.saldoDe({ idCliente: 10 }, true)).resolves.toBe(0);
     });
 
     it('si G8 no responde, no se inventa un total: null', async () => {
@@ -81,7 +68,7 @@ describe('SaldoClienteService', () => {
       );
 
       await expect(
-        service.saldoDe({ idCliente: 10, idContrato: null }, true),
+        service.saldoDe({ idCliente: 10 }, true),
       ).resolves.toBeNull();
     });
 
@@ -89,7 +76,7 @@ describe('SaldoClienteService', () => {
       prisma.cliente.findUnique.mockResolvedValue({ id_empresa: null });
 
       await expect(
-        service.saldoDe({ idCliente: 10, idContrato: null }, true),
+        service.saldoDe({ idCliente: 10 }, true),
       ).resolves.toBeNull();
       expect(g8.facturas).not.toHaveBeenCalled();
     });

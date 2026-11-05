@@ -55,7 +55,7 @@ describe('ChangePasswordForm (CU-10/CU-11)', () => {
     await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/al menos 1 letra mayúscula/i)).toBeInTheDocument();
+      expect(screen.getByText("Al menos 1 mayúscula y 1 número")).toBeInTheDocument();
     });
   });
 
