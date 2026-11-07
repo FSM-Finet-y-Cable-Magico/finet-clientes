@@ -17,7 +17,7 @@ describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
     global.fetch = jest.fn();
   });
 
-  it('muestra "Estás al día" cuando no hay deuda (CU-27)', async () => {
+  it('muestra "¡Todo al día! No tienes pagos pendientes" cuando no hay deuda (CU-27)', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -32,7 +32,9 @@ describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
     render(<DeudaPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/estás al día/i)).toBeInTheDocument();
+      expect(
+        screen.getByText("¡Todo al día! No tienes pagos pendientes"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -150,7 +152,7 @@ describe('DeudaPage (CU-27/CU-28/CU-41)', () => {
     await user.click(screen.getByRole('button', { name: /reintentar/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/estás al día/i)).toBeInTheDocument();
+      expect(screen.getByText("¡Todo al día! No tienes pagos pendientes")).toBeInTheDocument();
     });
 
     expect(global.fetch).toHaveBeenCalledTimes(2);

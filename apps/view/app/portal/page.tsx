@@ -31,9 +31,9 @@ type Contrato = {
 
 type Factura = {
   id_factura: number;
-  periodo: string;
+  periodo: string | null;
   monto: number;
-  fecha_limite_pago: string;
+  fecha_limite_pago: string | null;
   estado: string;
   dias_vencida: number | null;
 };
@@ -57,11 +57,12 @@ type PanelData = {
     telefono: string;
   };
   contratos: Contrato[];
+  // null: el saldo de G8 no está disponible (Excepción 2 de los CU-27 y 28)
   resumen_deuda: {
     tiene_deuda: boolean;
     saldo_total: number;
     facturas_pendientes: Factura[];
-  };
+  } | null;
   tickets_recientes: Ticket[];
 };
 
@@ -224,14 +225,19 @@ export default function PortalPage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">
                 Mi Deuda
               </p>
-              {data.resumen_deuda.tiene_deuda ? (
+              {data.resumen_deuda === null ? (
+                <p className="text-sm text-muted">
+                  Tu estado de cuenta no está disponible temporalmente.
+                </p>
+              ) : data.resumen_deuda.tiene_deuda ? (
                 (() => {
                   const masProxima = data.resumen_deuda.facturas_pendientes
-                    .filter((f) => f.fecha_limite_pago)
-                    .sort(
-                      (a, b) =>
-                        new Date(a.fecha_limite_pago).getTime() -
-                        new Date(b.fecha_limite_pago).getTime(),
+                    .filter(
+                      (f): f is Factura & { fecha_limite_pago: string } =>
+                        f.fecha_limite_pago !== null,
+                    )
+                    .sort((a, b) =>
+                      a.fecha_limite_pago.localeCompare(b.fecha_limite_pago),
                     )[0];
 
                   return (
@@ -263,10 +269,7 @@ export default function PortalPage() {
               ) : (
                 <>
                   <p className="text-lg font-semibold text-success">
-                    Estás al día
-                  </p>
-                  <p className="mt-1 text-sm text-muted">
-                    Sin facturas pendientes
+                    ¡Todo al día! No tienes pagos pendientes
                   </p>
                 </>
               )}

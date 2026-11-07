@@ -36,7 +36,7 @@ export interface PlanResumenPublicoDto {
 // CU-41: Detalle de deuda y fecha de vencimiento
 export interface DetalleFacturaPublicaDto {
   id_factura: number;
-  periodo: string;
+  periodo: string | null; // null si la factura no está en la base
   monto: number;
   fecha_limite_pago: string;
   estado: string;

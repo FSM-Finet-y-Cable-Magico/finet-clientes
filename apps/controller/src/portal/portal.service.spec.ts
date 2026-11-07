@@ -18,6 +18,10 @@ import {
   G3WifiService,
 } from '../common/g3/g3-wifi.service.js';
 import { G8IntegracionService } from '../common/g8/g8-integracion.service.js';
+import {
+  armarDeuda,
+  SaldoClienteService,
+} from '../common/saldo/saldo-cliente.service.js';
 
 const FECHA_BASE = new Date('2024-01-15T00:00:00.000Z');
 
@@ -72,6 +76,7 @@ describe('PortalService', () => {
   let configService: jest.Mocked<ConfigService>;
   let g3: { enviarClaveWifi: jest.Mock };
   let g8: { informarResultadoWifi: jest.Mock };
+  let saldos: { deudaDe: jest.Mock };
 
   beforeEach(async () => {
     const mockPrisma = {
@@ -98,6 +103,9 @@ describe('PortalService', () => {
     };
     g3 = { enviarClaveWifi: jest.fn() };
     g8 = { informarResultadoWifi: jest.fn() };
+    saldos = {
+      deudaDe: jest.fn().mockResolvedValue(armarDeuda([], new Map())),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortalService,
@@ -106,6 +114,7 @@ describe('PortalService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: G3WifiService, useValue: g3 },
         { provide: G8IntegracionService, useValue: g8 },
+        { provide: SaldoClienteService, useValue: saldos },
       ],
     }).compile();
     service = module.get(PortalService);
@@ -349,68 +358,90 @@ describe('PortalService', () => {
   // ─── CU-27 / CU-28: getResumenDeuda ──────────────────────────────────────
 
   describe('getResumenDeuda', () => {
-    it('retorna tiene_deuda:false y saldo_total:0 cuando no hay facturas pendientes', async () => {
-      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        { id_contrato: 1 },
-      ]);
-      (prisma.factura.findMany as jest.Mock).mockResolvedValue([]);
+    const AHORA = new Date('2026-11-07T15:00:00Z');
 
-      const result = await service.getResumenDeuda(1);
-
-      expect(result.tiene_deuda).toBe(false);
-      expect(result.saldo_total).toBe(0);
-      expect(result.facturas_pendientes).toHaveLength(0);
+    it('pide la deuda del cliente a G8, no la suma de la base', async () => {
+      await service.getResumenDeuda(1);
+      expect(saldos.deudaDe).toHaveBeenCalledWith({ idCliente: 1 });
+      expect(prisma.factura.findMany).not.toHaveBeenCalled();
     });
 
-    it('retorna tiene_deuda:true con dias_vencida calculados para facturas vencidas', async () => {
-      const hace3dias = new Date(Date.now() - 86_400_000 * 3);
-      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        { id_contrato: 1 },
-      ]);
-      (prisma.factura.findMany as jest.Mock).mockResolvedValue([
-        {
-          id_factura: 10,
-          periodo_mes: 4,
-          periodo_anio: 2026,
-          monto: 23890,
-          fecha_limite_pago: hace3dias,
-          estado: 'vencida',
-        },
-      ]);
-
+    it('sin facturas con saldo en G8, la cuenta está al día (CU-27)', async () => {
       const result = await service.getResumenDeuda(1);
 
-      expect(result.tiene_deuda).toBe(true);
-      expect(result.saldo_total).toBe(23890);
-      expect(result.facturas_pendientes[0].dias_vencida).toBeGreaterThanOrEqual(
-        2,
+      expect(result).toEqual({
+        tiene_deuda: false,
+        saldo_total: 0,
+        saldo_confirmado: true,
+        facturas_pendientes: [],
+      });
+    });
+
+    it('con saldo, muestra el monto y el vencimiento de G8 (CU-28)', async () => {
+      saldos.deudaDe.mockResolvedValue(
+        armarDeuda(
+          [
+            {
+              idFactura: 10,
+              saldoExigible: 23890,
+              fechaVencimientoEfectiva: '2026-11-04',
+              aceptaPagos: true,
+            },
+          ],
+          new Map([[10, 'Octubre 2026']]),
+          AHORA,
+        ),
       );
-      expect(result.facturas_pendientes[0].periodo).toBe('Abril 2026');
+
+      const result = await service.getResumenDeuda(1);
+
+      expect(result).toEqual({
+        tiene_deuda: true,
+        saldo_total: 23890,
+        saldo_confirmado: true,
+        facturas_pendientes: [
+          {
+            id_factura: 10,
+            periodo: 'Octubre 2026',
+            monto: 23890,
+            fecha_limite_pago: '2026-11-04',
+            estado: 'vencida',
+            dias_vencida: 3,
+          },
+        ],
+      });
     });
 
-    it('retorna saldo_confirmado:false sin lanzar error si saldo_total es negativo (CU-27 Excepción 3)', async () => {
-      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
-        { id_contrato: 1 },
-      ]);
-      (prisma.factura.findMany as jest.Mock).mockResolvedValue([
-        {
-          id_factura: 11,
-          periodo_mes: 5,
-          periodo_anio: 2026,
-          monto: -5000,
-          fecha_limite_pago: new Date(),
-          estado: 'pendiente',
-        },
-      ]);
+    it('si G8 no entrega el saldo, el estado de cuenta no está disponible (Excepción 2)', async () => {
+      saldos.deudaDe.mockResolvedValue(null);
+
+      await expect(service.getResumenDeuda(1)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+    });
+
+    it('un saldo inconsistente de G8 se registra y no se muestra al día (CU-27 Excepción 3)', async () => {
+      saldos.deudaDe.mockResolvedValue(
+        armarDeuda(
+          [
+            {
+              idFactura: 11,
+              saldoExigible: -5000,
+              fechaVencimientoEfectiva: '2026-11-04',
+              aceptaPagos: true,
+            },
+          ],
+          new Map(),
+          AHORA,
+        ),
+      );
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
       const result = await service.getResumenDeuda(1);
 
       expect(result.tiene_deuda).toBe(false);
-      expect(result.saldo_total).toBe(0);
       expect(result.saldo_confirmado).toBe(false);
       expect(result.facturas_pendientes).toHaveLength(0);
-
       expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           accion: 'SALDO_INCONSISTENTE',
@@ -463,7 +494,6 @@ describe('PortalService', () => {
   describe('getPanelPrincipal', () => {
     it('agrega cliente, contratos, deuda y tickets en la estructura PanelPrincipalDto', async () => {
       (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(CLIENTE_MOCK);
-      // getContratosVigentes y getResumenDeuda llaman a contrato.findMany
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
         CONTRATO_MOCK,
       ]);
@@ -476,8 +506,22 @@ describe('PortalService', () => {
       expect(result.cliente.id_cliente).toBe(1);
       expect(result.cliente.nombre_completo).toBe('Juan Pérez');
       expect(result.contratos).toHaveLength(1);
-      expect(result.resumen_deuda.tiene_deuda).toBe(false);
+      expect(result.resumen_deuda?.tiene_deuda).toBe(false);
       expect(result.tickets_recientes).toHaveLength(0);
+    });
+
+    it('sin el saldo de G8, el panel igual se muestra y la deuda va en null', async () => {
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(CLIENTE_MOCK);
+      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([
+        CONTRATO_MOCK,
+      ]);
+      (prisma.ticket.findMany as jest.Mock).mockResolvedValue([]);
+      saldos.deudaDe.mockResolvedValue(null);
+
+      const result = await service.getPanelPrincipal(1);
+
+      expect(result.contratos).toHaveLength(1);
+      expect(result.resumen_deuda).toBeNull();
     });
 
     it('lanza NotFoundException si el cliente no existe', async () => {

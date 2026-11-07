@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { formatPeriodo } from '../common/utils/periodo.js';
+import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import {
   DetalleFacturaPublicaDto,
@@ -18,7 +18,10 @@ type PlanContratoRaw = {
 
 @Injectable()
 export class DeudaPublicaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly saldos: SaldoClienteService,
+  ) {}
 
   /**
    * CU-39: Consultar deuda pública mediante RUT.
@@ -43,118 +46,91 @@ export class DeudaPublicaService {
     }
 
     return this.construirRespuesta(
-      cliente.nombre_completo,
-      cliente.rut,
+      cliente,
       cliente.contrato.map((c) => c.id_contrato),
     );
   }
 
   /**
-   * CU-41: construye el detalle de deuda y vencimientos de la consulta del
-   * CU-39.
+   * CU-41: el detalle de deuda y vencimientos de la consulta del CU-39. El monto
+   * y el vencimiento son los de G8 (`GET …/invoices`), como en el portal y el
+   * pago; de la base salen el cliente, sus planes y el periodo de cada factura.
    */
   private async construirRespuesta(
-    nombreCompleto: string,
-    rut: string | null,
+    cliente: {
+      id_cliente: number;
+      nombre_completo: string;
+      rut: string | null;
+    },
     idContratos: number[],
   ): Promise<DeudaPublicaResponseDto> {
-    if (!idContratos.length) {
-      return {
-        encontrado: true,
-        cliente: { nombre_completo: nombreCompleto, rut },
-        tiene_deuda: false,
-        saldo_total: 0,
-        facturas: [],
-        planes: [],
-        detalle_disponible: true,
-        informacion_completa: true,
-      };
-    }
+    const base = {
+      encontrado: true,
+      cliente: { nombre_completo: cliente.nombre_completo, rut: cliente.rut },
+    };
 
-    const hoy = new Date();
-
-    let facturas: Awaited<ReturnType<typeof this.prisma.factura.findMany>>;
+    let deuda: Awaited<ReturnType<SaldoClienteService['deudaDe']>>;
     let planes: PlanResumenPublicoDto[];
     try {
-      const [facturasResult, contratosConPlan] = await Promise.all([
-        this.prisma.factura.findMany({
-          where: {
-            id_contrato: { in: idContratos },
-            estado: { in: ['pendiente', 'vencida'] },
-          },
-          orderBy: { fecha_limite_pago: 'asc' },
-        }),
-        this.prisma.contrato.findMany({
-          where: { id_contrato: { in: idContratos } },
-          select: {
-            plan: {
+      const [deudaG8, contratosConPlan] = await Promise.all([
+        this.saldos.deudaDe({ idCliente: cliente.id_cliente }),
+        idContratos.length
+          ? this.prisma.contrato.findMany({
+              where: { id_contrato: { in: idContratos } },
               select: {
-                nombre_comercial: true,
-                tipo_plan: true,
-                velocidad_mbps: true,
-                precio_mensual: true,
+                plan: {
+                  select: {
+                    nombre_comercial: true,
+                    tipo_plan: true,
+                    velocidad_mbps: true,
+                    precio_mensual: true,
+                  },
+                },
               },
-            },
-          },
-        }),
+            })
+          : Promise.resolve([]),
       ]);
-      facturas = facturasResult;
+      deuda = deudaG8;
       planes = this.construirPlanes(contratosConPlan);
     } catch {
-      // CU-41 Excepción 1: no fue posible determinar/obtener el detalle de facturación
+      deuda = null;
+      planes = [];
+    }
+
+    // CU-41 Excepción 1: no fue posible obtener el detalle de facturación.
+    // Un saldo inconsistente tampoco se muestra como "al día".
+    if (deuda === null || deuda.inconsistente) {
       return {
-        encontrado: true,
-        cliente: { nombre_completo: nombreCompleto, rut },
+        ...base,
         tiene_deuda: false,
         saldo_total: 0,
         facturas: [],
-        planes: [],
+        planes,
         detalle_disponible: false,
         informacion_completa: true,
       };
     }
 
-    // CU-41 Excepción 2: detectar montos o fechas inconsistentes
-    let informacionCompleta = true;
-
-    // CU-41: construir detalle con fecha de vencimiento y días
-    const facturasMapeadas: DetalleFacturaPublicaDto[] = facturas.map((f) => {
-      const limite = new Date(f.fecha_limite_pago);
-      const fechaInvalida = Number.isNaN(limite.getTime());
-      if (f.monto == null || fechaInvalida) {
-        informacionCompleta = false;
-      }
-
-      const diffMs = limite.getTime() - hoy.getTime();
-      const diffDias = Math.ceil(diffMs / 86_400_000);
-
-      return {
-        id_factura: f.id_factura,
-        periodo: formatPeriodo(f.periodo_mes, f.periodo_anio),
-        monto: Number(f.monto ?? 0),
-        fecha_limite_pago: fechaInvalida
-          ? ''
-          : limite.toISOString().split('T')[0],
-        estado: f.estado,
-        // Si diffDias < 0 → ya vencida, informamos cuántos días hace
-        dias_vencida:
-          !fechaInvalida && diffDias < 0 ? Math.abs(diffDias) : null,
-        // Si diffDias >= 0 → cuántos días faltan para vencer
-        dias_para_vencer: !fechaInvalida && diffDias >= 0 ? diffDias : null,
-      };
-    });
-
-    const saldo_total = facturasMapeadas.reduce((acc, f) => acc + f.monto, 0);
+    const facturas: DetalleFacturaPublicaDto[] = deuda.facturas.map((f) => ({
+      id_factura: f.idFactura,
+      periodo: f.periodo,
+      monto: f.monto,
+      fecha_limite_pago: f.fechaLimite ?? '',
+      estado: f.vencida ? 'vencida' : 'pendiente',
+      dias_vencida: f.diasVencida,
+      dias_para_vencer: f.diasParaVencer,
+    }));
 
     return {
-      encontrado: true,
-      cliente: { nombre_completo: nombreCompleto, rut },
-      tiene_deuda: facturasMapeadas.length > 0,
-      saldo_total,
-      facturas: facturasMapeadas,
+      ...base,
+      // CU-41 Excepción 3: sin deuda, la vista deriva a la cuenta al día.
+      tiene_deuda: facturas.length > 0,
+      saldo_total: deuda.saldoTotal,
+      facturas,
       planes,
       detalle_disponible: true,
-      informacion_completa: informacionCompleta,
+      // CU-41 Excepción 2: alguna factura vino sin vencimiento.
+      informacion_completa: deuda.completa,
     };
   }
 

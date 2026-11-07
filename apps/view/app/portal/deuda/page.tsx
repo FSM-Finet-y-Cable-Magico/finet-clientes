@@ -16,9 +16,9 @@ import { FilaFactura, TablaFacturas } from "@/app/_components/deuda/TablaFactura
 
 type Factura = {
   id_factura: number;
-  periodo: string;
+  periodo: string | null;
   monto: number;
-  fecha_limite_pago: string;
+  fecha_limite_pago: string | null;
   estado: string;
   dias_vencida: number | null;
 };
@@ -159,7 +159,9 @@ export default function DeudaPage() {
                       monto={f.monto}
                       vence={
                         <>
-                          {fechaCalendario(f.fecha_limite_pago, "larga")}
+                          {f.fecha_limite_pago
+                            ? fechaCalendario(f.fecha_limite_pago, "larga")
+                            : "Sin fecha"}
                           {f.dias_vencida != null && f.dias_vencida > 0 && (
                             <span className="block text-xs text-error">
                               Hace {f.dias_vencida} día
@@ -183,11 +185,9 @@ export default function DeudaPage() {
                 className="mx-auto text-success"
                 aria-hidden
               />
+              {/* CU-27: el mensaje tal como lo pide el Documento 0 */}
               <p className="mt-3 text-lg font-semibold text-success">
-                Estás al día
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                No tienes facturas pendientes de pago.
+                ¡Todo al día! No tienes pagos pendientes
               </p>
             </div>
           )}

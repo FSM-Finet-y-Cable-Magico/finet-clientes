@@ -16,7 +16,7 @@ export interface PanelPrincipalDto {
     telefono: string | null;
   };
   contratos: ContratoResumenDto[];
-  resumen_deuda: ResumenDeudaDto;
+  resumen_deuda: ResumenDeudaDto | null; // null: el saldo de G8 no está disponible
   tickets_recientes: TicketResumenDto[];
 }
 
@@ -38,16 +38,16 @@ export interface ContratoResumenDto {
 // ─── CU-27 / CU-28: Estado de deuda ──────────────────────────────────────────
 export interface ResumenDeudaDto {
   tiene_deuda: boolean;
-  saldo_total: number; // suma de facturas pendientes
+  saldo_total: number; // suma del saldo exigible que entrega G8
   saldo_confirmado: boolean; // false si el saldo es inconsistente o inválido (CU-27 Excepción 3)
   facturas_pendientes: FacturaPendienteDto[];
 }
 
 export interface FacturaPendienteDto {
   id_factura: number;
-  periodo: string; // ej: "Mayo 2026"
-  monto: number;
-  fecha_limite_pago: string;
+  periodo: string | null; // ej: "Mayo 2026"; null si la factura no está en la base
+  monto: number; // saldo exigible de G8
+  fecha_limite_pago: string | null; // vencimiento efectivo de G8; null si no vino
   estado: string;
   dias_vencida: number | null; // null si aún no vence
 }
