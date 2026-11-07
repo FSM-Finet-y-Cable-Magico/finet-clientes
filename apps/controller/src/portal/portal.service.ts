@@ -30,6 +30,7 @@ import {
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
 import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
+import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
 import { formatPeriodo } from '../common/utils/periodo.js';
 import { MailService } from '../mail/mail.service.js';
 import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
@@ -40,7 +41,6 @@ import {
   ContratoEstadoDto,
   ContratoResumenDto,
   CrearTicketResponseDto,
-  FacturaPendienteDto,
   PagosAnterioresDto,
   PanelPrincipalDto,
   ResumenDeudaDto,
@@ -61,6 +61,7 @@ export class PortalService {
     private readonly configService: ConfigService,
     private readonly g3Wifi: G3WifiService,
     private readonly g8: G8IntegracionService,
+    private readonly saldos: SaldoClienteService,
   ) {}
 
   //  CU-23: Consultar estado operativo del contrato
@@ -151,12 +152,18 @@ export class PortalService {
     }
 
     let contratos: ContratoResumenDto[];
-    let resumen_deuda: ResumenDeudaDto;
+    let resumen_deuda: ResumenDeudaDto | null;
     let tickets_recientes: TicketsResponseDto;
     try {
       [contratos, resumen_deuda, tickets_recientes] = await Promise.all([
         this.getContratosVigentes(idCliente),
-        this.getResumenDeuda(idCliente),
+        // Sin el saldo de G8 el resto del panel igual se muestra: la tarjeta de
+        // deuda dice que el estado de cuenta no está disponible (Excepción 2
+        // de los CU-27 y 28).
+        this.getResumenDeuda(idCliente).catch((error: unknown) => {
+          if (error instanceof ServiceUnavailableException) return null;
+          throw error;
+        }),
         this.getTickets(idCliente, 3),
       ]);
     } catch (error) {
@@ -233,57 +240,27 @@ export class PortalService {
         : null,
     }));
   }
-  //CU-27 / CU-28: Estado de deuda //
-  // tiene_deuda = false → el frontend muestra "cuenta al día" // tiene_deuda = true → el frontend muestra el saldo y detalle.
+  /**
+   * CU-27 / CU-28: el estado de deuda del cliente. El monto y el vencimiento son
+   * los de G8 (`GET …/invoices`), igual que en el pago: la deuda no se suma de la
+   * base (acuerdo v2.0, §3 y §5).
+   *
+   * - Sin respuesta de G8 → Excepción 2 de los dos CU: el estado de cuenta no
+   *   está disponible.
+   * - Un saldo negativo o que no es un número → Excepción 3 del CU-27: se
+   *   registra la incidencia y no se muestra "al día".
+   */
   async getResumenDeuda(idCliente: number): Promise<ResumenDeudaDto> {
-    const contratos = await this.prisma.contrato.findMany({
-      where: { id_cliente: idCliente },
-      select: { id_contrato: true },
-    });
-
-    if (!contratos.length) {
-      return {
-        tiene_deuda: false,
-        saldo_total: 0,
-        saldo_confirmado: true,
-        facturas_pendientes: [],
-      };
+    const deuda = await this.saldos.deudaDe({ idCliente });
+    if (deuda === null) {
+      throw new ServiceUnavailableException(
+        'El estado de cuenta no está disponible temporalmente',
+      );
     }
 
-    const idContratos = contratos.map((c) => c.id_contrato);
-    const hoy = new Date();
-
-    const facturas = await this.prisma.factura.findMany({
-      where: {
-        id_contrato: { in: idContratos },
-        estado: { in: ['pendiente', 'vencida'] },
-      },
-      orderBy: { fecha_limite_pago: 'asc' },
-    });
-
-    const facturasMapeadas: FacturaPendienteDto[] = facturas.map((f) => {
-      const limite = new Date(f.fecha_limite_pago);
-      const diasVencida =
-        limite < hoy
-          ? Math.floor((hoy.getTime() - limite.getTime()) / 86_400_000)
-          : null;
-
-      return {
-        id_factura: f.id_factura,
-        periodo: formatPeriodo(f.periodo_mes, f.periodo_anio),
-        monto: Number(f.monto ?? 0),
-        fecha_limite_pago: limite.toISOString().split('T')[0],
-        estado: f.estado,
-        dias_vencida: diasVencida,
-      };
-    });
-
-    const saldo_total = facturasMapeadas.reduce((acc, f) => acc + f.monto, 0);
-
-    // CU-27 Excepción 3: saldo inconsistente o inválido
-    if (saldo_total < 0) {
+    if (deuda.inconsistente) {
       this.logger.error(
-        `Saldo inconsistente (negativo: ${saldo_total}) para cliente ${idCliente}`,
+        `G8 entregó un saldo inconsistente para el cliente ${idCliente}`,
       );
       try {
         await this.prisma.log_auditoria.create({
@@ -291,7 +268,7 @@ export class PortalService {
             accion: 'SALDO_INCONSISTENTE',
             entidad_afectada: 'cliente',
             id_entidad_afectada: idCliente,
-            valor_anterior: { saldo_total },
+            valor_anterior: { saldo_total: deuda.saldoTotal },
           },
         });
       } catch {
@@ -299,7 +276,6 @@ export class PortalService {
           `No se pudo registrar auditoría de saldo inconsistente para cliente ${idCliente}`,
         );
       }
-
       return {
         tiene_deuda: false,
         saldo_total: 0,
@@ -309,10 +285,17 @@ export class PortalService {
     }
 
     return {
-      tiene_deuda: facturasMapeadas.length > 0,
-      saldo_total,
+      tiene_deuda: deuda.facturas.length > 0,
+      saldo_total: deuda.saldoTotal,
       saldo_confirmado: true,
-      facturas_pendientes: facturasMapeadas,
+      facturas_pendientes: deuda.facturas.map((f) => ({
+        id_factura: f.idFactura,
+        periodo: f.periodo,
+        monto: f.monto,
+        fecha_limite_pago: f.fechaLimite,
+        estado: f.vencida ? 'vencida' : 'pendiente',
+        dias_vencida: f.diasVencida,
+      })),
     };
   }
 

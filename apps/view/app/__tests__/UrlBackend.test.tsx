@@ -55,12 +55,6 @@ describe("URL del backend desde el navegador (NEXT_PUBLIC_API_URL)", () => {
     expect(urlLlamada()).toBe(`${BASE}/portal/tickets`);
   });
 
-  it("catálogo", async () => {
-    const { fetchLandingPlanes } = await import("@/app/_lib/api");
-    await fetchLandingPlanes("RESIDENCIAL");
-    expect(urlLlamada()).toBe(`${BASE}/landing/planes?tipo_cliente=RESIDENCIAL`);
-  });
-
   it("prueba de velocidad", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 503 });
     const { medirVelocidad } = await import("@/app/_lib/fast-speedtest");
@@ -142,6 +136,13 @@ describe("URL del backend desde el navegador (NEXT_PUBLIC_API_URL)", () => {
 });
 
 describe("URL del backend desde el servidor de Next (API_URL)", () => {
+  it("catálogo: usa API_URL aunque la del navegador sea otra", async () => {
+    process.env.NEXT_PUBLIC_API_URL = "https://navegador.ejemplo.test/api";
+    const { fetchLandingPlanes } = await import("@/app/_lib/api");
+    await fetchLandingPlanes("RESIDENCIAL");
+    expect(urlLlamada()).toBe(`${BASE}/landing/planes?tipo_cliente=RESIDENCIAL`);
+  });
+
   it("cambio de clave WiFi", async () => {
     const { changeWifiPassword } = await import(
       "@/app/portal/_lib/portal-actions"

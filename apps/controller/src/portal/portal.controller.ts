@@ -12,6 +12,7 @@ import {
 import { PortalService } from './portal.service.js';
 import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { ConLimiteDeSesion } from '../common/constants/limites.js';
 import { CurrentClient } from '../auth/decorators/current-client.decorator.js';
 import type { cliente } from '../../generated/prisma/client.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
@@ -34,6 +35,7 @@ import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasen
  */
 @Controller('portal')
 @UseGuards(JwtAuthGuard)
+@ConLimiteDeSesion()
 export class PortalController {
   constructor(
     private readonly portalService: PortalService,

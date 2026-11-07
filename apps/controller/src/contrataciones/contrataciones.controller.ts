@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { ContratacionesService } from './contrataciones.service.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
 import { ContratacionDto } from './dto/contratacion.dto.js';
+import { UN_MINUTO_MS } from '../common/constants/limites.js';
 
 /**
  * Endpoint público — no requiere autenticación.
@@ -23,7 +24,7 @@ export class ContratacionesController {
    * Rate limit: 3 intentos por minuto por IP.
    */
   @Post()
-  @Throttle({ default: { limit: 3, ttl: 60 } })
+  @Throttle({ default: { limit: 3, ttl: UN_MINUTO_MS } })
   @HttpCode(201)
   crear(
     @Body(new ZodValidationPipe(ContratacionDto))

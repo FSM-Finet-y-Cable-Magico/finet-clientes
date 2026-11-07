@@ -38,14 +38,15 @@ export function FilaFactura({
   vence,
   estado,
 }: {
-  periodo: string;
+  /** `null` si la factura no está en la base: se muestra un guion. */
+  periodo: string | null;
   monto: number;
   vence: ReactNode;
   estado: ReactNode;
 }) {
   return (
     <tr>
-      <td className="py-2 text-foreground">{periodo}</td>
+      <td className="py-2 text-foreground">{periodo ?? "—"}</td>
       <td className="py-2 text-foreground">{formatPrecio(monto)}</td>
       <td className="py-2 text-muted">{vence}</td>
       <td className="py-2">{estado}</td>

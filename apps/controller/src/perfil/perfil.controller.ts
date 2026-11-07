@@ -2,6 +2,7 @@ import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { PerfilService } from './perfil.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { ConLimiteDeSesion } from '../common/constants/limites.js';
 import { CurrentClient } from '../auth/decorators/current-client.decorator.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
 import {
@@ -19,6 +20,7 @@ import type { cliente } from '../../generated/prisma/client.js';
  */
 @Controller('auth/perfil')
 @UseGuards(JwtAuthGuard)
+@ConLimiteDeSesion()
 export class PerfilController {
   constructor(private readonly perfilService: PerfilService) {}
 

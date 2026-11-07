@@ -1,5 +1,6 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CambiarPasswordDto } from './dto/perfil.dto.js';
 
@@ -41,6 +42,13 @@ describe('PerfilService', () => {
             log_auditoria: {
               create: jest.fn(),
             },
+            historial_password_portal: {
+              findMany: jest.fn().mockResolvedValue([]),
+              create: jest.fn(),
+            },
+            $transaction: jest.fn((ops: Promise<unknown>[]) =>
+              Promise.all(ops),
+            ),
           },
         },
       ],
@@ -314,6 +322,14 @@ describe('PerfilService', () => {
         where: { id_cliente: 1 },
         data: { password_portal_hash: 'new-hash' },
       });
+      // RNF-08.2: la que se reemplaza pasa al historial, en la misma transacción
+      expect(prisma.historial_password_portal.create).toHaveBeenCalledWith({
+        data: {
+          id_cliente: 1,
+          password_hash: CLIENTE_DB_MOCK.password_portal_hash,
+        },
+      });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(prisma.log_auditoria.create).toHaveBeenCalledWith({
         data: {
           accion: 'CAMBIO_PASSWORD',
@@ -348,7 +364,71 @@ describe('PerfilService', () => {
 
       await expect(
         service.cambiarPassword(1, dto, '127.0.0.1'),
-      ).rejects.toThrow('La nueva contrasena no puede ser igual a la actual');
+      ).rejects.toThrow(
+        'La nueva contraseña no puede ser igual a ninguna de tus últimas 5 contraseñas',
+      );
+      expect(prisma.cliente.update).not.toHaveBeenCalled();
+    });
+
+    it('RNF-08.2: compara contra la actual y las 4 anteriores, de la más nueva a la más vieja', async () => {
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(
+        CLIENTE_DB_MOCK,
+      );
+      (
+        prisma.historial_password_portal.findMany as jest.Mock
+      ).mockResolvedValue([
+        { password_hash: 'h1' },
+        { password_hash: 'h2' },
+        { password_hash: 'h3' },
+        { password_hash: 'h4' },
+      ]);
+      (bcrypt.compare as jest.Mock).mockClear();
+      // la actual es correcta; la nueva no coincide con ninguna
+      (bcrypt.compare as jest.Mock)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValue(false);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+
+      await service.cambiarPassword(1, dto, '127.0.0.1');
+
+      expect(prisma.historial_password_portal.findMany).toHaveBeenCalledWith({
+        where: { id_cliente: 1 },
+        orderBy: [{ fecha: 'desc' }, { id_historial: 'desc' }],
+        take: 4,
+        select: { password_hash: true },
+      });
+      const comparados = (bcrypt.compare as jest.Mock).mock.calls
+        .slice(1)
+        .map((c) => c[1] as string);
+      expect(comparados).toEqual([
+        CLIENTE_DB_MOCK.password_portal_hash,
+        'h1',
+        'h2',
+        'h3',
+        'h4',
+      ]);
+    });
+
+    it('RNF-08.2: rechaza una contraseña del historial y no cambia nada', async () => {
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(
+        CLIENTE_DB_MOCK,
+      );
+      (
+        prisma.historial_password_portal.findMany as jest.Mock
+      ).mockResolvedValue([{ password_hash: 'h1' }, { password_hash: 'h2' }]);
+      (bcrypt.compare as jest.Mock).mockClear();
+      // actual correcta; distinta de la actual y de h1; igual a h2
+      (bcrypt.compare as jest.Mock)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+
+      await expect(
+        service.cambiarPassword(1, dto, '127.0.0.1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.cliente.update).not.toHaveBeenCalled();
+      expect(prisma.historial_password_portal.create).not.toHaveBeenCalled();
     });
 
     it('CU-10: lanza NotFoundException si no tiene password_hash', async () => {

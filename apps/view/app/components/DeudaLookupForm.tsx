@@ -20,7 +20,7 @@ import { FilaFactura, TablaFacturas } from "@/app/_components/deuda/TablaFactura
 
 type Factura = {
   id_factura: number;
-  periodo: string;
+  periodo: string | null;
   monto: number;
   fecha_limite_pago: string;
   estado: string;
@@ -254,7 +254,11 @@ export default function DeudaLookupForm() {
                   key={f.id_factura}
                   periodo={f.periodo}
                   monto={f.monto}
-                  vence={fechaCalendario(f.fecha_limite_pago, "corta")}
+                  vence={
+                    f.fecha_limite_pago
+                      ? fechaCalendario(f.fecha_limite_pago, "corta")
+                      : "Sin fecha"
+                  }
                   estado={
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${

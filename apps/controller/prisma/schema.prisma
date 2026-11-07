@@ -92,6 +92,7 @@ model cliente {
   contrato                  contrato[]
   conversacion_bot          conversacion_bot[]
   direccion_servicio        direccion_servicio[]
+  historial_password_portal historial_password_portal[]
   lista_negra               lista_negra[]
   log_notificacion          log_notificacion[]
   mensaje_whatsapp          mensaje_whatsapp[]
@@ -251,6 +252,16 @@ model factura {
   estado            String    @db.VarChar(20)
   contrato          contrato? @relation(fields: [id_contrato], references: [id_contrato], onDelete: NoAction, onUpdate: NoAction, map: "fk_factura_id_contrato")
   pago              pago[]
+}
+
+model historial_password_portal {
+  id_historial  Int       @id @default(autoincrement())
+  id_cliente    Int
+  password_hash String    @db.VarChar(72)
+  fecha         DateTime? @default(now()) @db.Timestamp(6)
+  cliente       cliente   @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_historial_password_portal_id_cliente")
+
+  @@index([id_cliente, fecha(sort: Desc)], map: "idx_historial_password_portal_cliente_fecha")
 }
 
 model historial_conexion_ont {

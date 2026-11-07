@@ -1,0 +1,14 @@
+# Solo HTTP dentro de la VPS: se publica en 127.0.0.1 y se entra por túnel SSH.
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	handle /api/* {
+		reverse_proxy controller:4000
+	}
+	handle {
+		reverse_proxy view:3000
+	}
+}
