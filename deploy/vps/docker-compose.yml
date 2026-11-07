@@ -1,0 +1,97 @@
+# Portal (Grupo 2) en la VPS compartida: Docker rootless, carpeta
+# /srv/finet/grupo2 y puertos 8200-8299, solo en 127.0.0.1 (se entra por túnel
+# SSH, como dice la guía del servidor). Ver deploy/vps/README.md.
+#
+# Los secretos no están aquí: van en los env_file de G2_CONFIG, fuera del repo.
+name: finet-portal
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file: ${G2_CONFIG:-/srv/finet/grupo2/config}/db.env
+    volumes:
+      - portal_db:/var/lib/postgresql/data
+    # Sin puertos publicados: solo la ven los otros servicios del compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+
+  # Buzón de prueba para los correos del portal. La interfaz, por túnel.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8225:8025"
+    volumes:
+      - portal_mailpit:/data
+    environment:
+      MP_DATABASE: /data/mailpit.db
+    mem_limit: 128m
+
+  controller:
+    build:
+      context: ../..
+      dockerfile: apps/controller/Dockerfile
+    restart: unless-stopped
+    env_file: ${G2_CONFIG:-/srv/finet/grupo2/config}/controller.env
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    healthcheck:
+      # El catálogo es público y pasa por la base.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/api/landing/planes').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    mem_limit: 768m
+
+  view:
+    build:
+      context: ../..
+      dockerfile: apps/view/Dockerfile
+    restart: unless-stopped
+    env_file: ${G2_CONFIG:-/srv/finet/grupo2/config}/view.env
+    depends_on:
+      controller:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 20s
+      timeout: 5s
+      retries: 15
+      # El build de Next corre al arrancar.
+      start_period: 300s
+    mem_limit: 2g
+
+  # Un solo origen para el navegador: /api al backend y el resto a la vista.
+  # La cookie de sesión es del host que la pone, y la vista la lee en proxy.ts.
+  proxy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8200:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - controller
+      - view
+    mem_limit: 128m
+
+volumes:
+  portal_db:
+  portal_mailpit:

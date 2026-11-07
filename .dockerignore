@@ -1,0 +1,18 @@
+# Lo que no entra a las imágenes. Los secretos (.env) nunca: van en el
+# servidor, en los env_file del compose (deploy/vps).
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/dist
+**/.next
+**/coverage
+**/*.tsbuildinfo
+apps/controller/generated
+apps/controller/src/generated
+.git
+.github
+.claude
+docs
+**/docs
+deploy
