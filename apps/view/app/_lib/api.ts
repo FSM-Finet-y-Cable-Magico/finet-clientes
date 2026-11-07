@@ -1,4 +1,8 @@
-import { API_URL } from "./consts";
+import { apiUrl } from "./api-servidor";
+
+// Todo lo de este archivo corre en el servidor de Next (paginas, sitemap e
+// imagen OG), asi que llama a `API_URL`, la URL interna del backend. En un
+// contenedor, la del navegador (`NEXT_PUBLIC_API_URL`) no llega al backend.
 
 export type PlanBackend = {
   id_plan: number;
@@ -32,7 +36,7 @@ export function idPlanDestacado(ordenados: PlanBackend[]): number | null {
 export async function fetchLandingPlanes(
   tipoCliente?: string
 ): Promise<PlanBackend[]> {
-  const url = new URL(`${API_URL}/landing/planes`);
+  const url = new URL(apiUrl("/landing/planes"));
   if (tipoCliente) {
     url.searchParams.set("tipo_cliente", tipoCliente);
   }
@@ -105,7 +109,7 @@ const COBERTURA_REVALIDATE = 86400;
  */
 export async function getVisorCoberturaConfig(): Promise<VisorCoberturaConfig | null> {
   try {
-    const res = await fetch(`${API_URL}/cobertura/config`, {
+    const res = await fetch(apiUrl("/cobertura/config"), {
       next: { revalidate: COBERTURA_REVALIDATE },
     });
 
@@ -130,7 +134,7 @@ export async function getPuntosCobertura(
   tipoCobertura?: string
 ): Promise<PuntoCobertura[]> {
   try {
-    const url = new URL(`${API_URL}/cobertura/puntos`);
+    const url = new URL(apiUrl("/cobertura/puntos"));
     if (tipoCobertura) {
       url.searchParams.set("tipo_cobertura", tipoCobertura);
     }
