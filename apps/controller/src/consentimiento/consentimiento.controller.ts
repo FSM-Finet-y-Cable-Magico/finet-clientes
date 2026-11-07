@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { ConsentimientoService } from './consentimiento.service.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
 import { ConsentimientoCookiesDto } from './dto/consentimiento-cookies.dto.js';
+import { UN_MINUTO_MS } from '../common/constants/limites.js';
 
 /**
  * Endpoint público — el banner sale antes de cualquier sesión.
@@ -21,7 +22,7 @@ export class ConsentimientoController {
    * es un script.
    */
   @Post('cookies')
-  @Throttle({ default: { limit: 3, ttl: 60 } })
+  @Throttle({ default: { limit: 3, ttl: UN_MINUTO_MS } })
   @HttpCode(201)
   registrarCookies(
     @Body(new ZodValidationPipe(ConsentimientoCookiesDto))
