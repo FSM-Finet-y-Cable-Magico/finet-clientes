@@ -245,7 +245,7 @@ describe('PagosService', () => {
         facturas as unknown as G8IntegracionService,
       );
 
-      await expect(real.saldoDe({ idCliente: 10 })).resolves.toBeNull();
+      await expect(real.saldoDe({ idCliente: 10 }, false)).resolves.toBeNull();
       expect(facturas.facturas).not.toHaveBeenCalled();
     });
   });

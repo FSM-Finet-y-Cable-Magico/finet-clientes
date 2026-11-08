@@ -114,7 +114,7 @@ describe('RecordatorioPagoService', () => {
   it('sin los datos de G8 no despacha nada y dice qué falta', async () => {
     (prisma.factura.findMany as jest.Mock).mockResolvedValue([fila()]);
 
-    const r = await service.ejecutar(HOY);
+    const r = await service.ejecutar(HOY, { saldoDefinido: false });
 
     expect(r).toMatchObject({
       ejecutada: false,

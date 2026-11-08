@@ -38,7 +38,7 @@ describe('SaldoClienteService', () => {
   });
 
   it('mientras G8 no confirme su deploy, no se le pregunta y no hay saldo', async () => {
-    await expect(service.saldoDe({ idCliente: 10 })).resolves.toBeNull();
+    await expect(service.saldoDe({ idCliente: 10 }, false)).resolves.toBeNull();
     expect(g8.facturas).not.toHaveBeenCalled();
     expect(prisma.cliente.findUnique).not.toHaveBeenCalled();
   });
@@ -89,7 +89,9 @@ describe('SaldoClienteService', () => {
     const AHORA = new Date('2026-11-07T15:00:00Z');
 
     it('mientras G8 no confirme su deploy, no hay deuda que mostrar', async () => {
-      await expect(service.deudaDe({ idCliente: 10 })).resolves.toBeNull();
+      await expect(
+        service.deudaDe({ idCliente: 10 }, false),
+      ).resolves.toBeNull();
       expect(g8.facturas).not.toHaveBeenCalled();
     });
 

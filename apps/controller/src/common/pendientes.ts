@@ -35,12 +35,14 @@ export const REGISTRO_PAGO_DEFINIDO = false;
  * derivadas (§5). En su respuesta del 01-10, G8 confirmó que el saldo no es una
  * columna: lo calcula su Billing y lo entrega `GET /api/integrations/g2/invoices`.
  * El 02-10 mandó el formato (`saldoExigible` por factura), y la lectura ya está
- * construida (`common/saldo/saldo-cliente.service.ts`). Falta que G8 confirme su
- * deploy y el smoke (su §15). Sin él, el pago no tiene un total que cobrar (la
- * precondición del CU-42 es "una deuda pendiente identificada"), y
- * el aviso de corte (CU-68) no tiene monto.
+ * construida (`common/saldo/saldo-cliente.service.ts`). El 07-11 G8 activó la
+ * clave de G2 y validó la consulta (HTTP 200 con su cliente QA), y pidió prender
+ * este interruptor, dejando apagado el registro del pago hasta probar Webpay en
+ * conjunto. Sin el saldo, el pago no tiene un total que cobrar (la precondición
+ * del CU-42 es "una deuda pendiente identificada"), y el aviso de corte (CU-68)
+ * no tiene monto.
  */
-export const SALDO_CLIENTE_DEFINIDO = false;
+export const SALDO_CLIENTE_DEFINIDO = true;
 
 /**
  * El ticket del cambio de clave WiFi. G8 lo definió el 01-10: categoría
