@@ -6,9 +6,9 @@
 
 :80 {
 	handle /api/* {
-		reverse_proxy controller:4000
+		reverse_proxy controller:{$PUERTO_CONTROLLER}
 	}
 	handle {
-		reverse_proxy view:3000
+		reverse_proxy view:{$PUERTO_VIEW}
 	}
 }
