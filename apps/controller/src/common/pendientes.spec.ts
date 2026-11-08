@@ -3,9 +3,8 @@ import { PENDIENTES, pendientesVacios } from './pendientes.js';
 
 /** Lo que el backend lista al arrancar: qué falta, de quién, y qué destraba. */
 describe('pendientes del Incremento 3', () => {
-  it('hoy faltan tres datos, todos de Grupo 8: la pasarela y el saldo de G8 ya están (CU-42)', () => {
+  it('hoy faltan dos datos, los dos de Grupo 8: la pasarela, el saldo y el registro del pago ya están (CU-42)', () => {
     expect(pendientesVacios()).toEqual([
-      'CU-42, CU-69 ← Registro del pago desplegado (POST /api/integrations/g2/payments) (Grupo 8)',
       'CU-32 (envío directo a G3) ← Ticket WiFi desplegado (categoría, ticket.id_servicio y wifi-result) (Grupo 8)',
       'CU-52 ← Boleta del pago (GET /api/integrations/g2/payments/{id}/tax-document) y que Finet confirme la descarga (Grupo 8)',
     ]);

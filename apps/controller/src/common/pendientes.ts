@@ -23,11 +23,13 @@ export const PASARELA_ACTIVA = true;
  * El registro de un pago confirmado (RF-32: fecha, monto y código de
  * autorización). Es de Grupo 8 (§3 del acuerdo v2.0). En su respuesta del 01-10
  * lo definió: `POST /api/integrations/g2/payments`, con `codigo_autorizacion`
- * como campo nuevo. Falta que apliquen la migración y lo desplieguen, y hasta que
- * lo confirmen no se consume. Sin él no hay pago registrado, y el CU-69, cuya
- * precondición es justamente ese registro, no tiene qué confirmar.
+ * como campo nuevo. El 08-11 G8 lo confirmó desplegado y validado en la VPS
+ * (QA-G2-14: 201 la primera vez y `duplicado: true` la segunda, con un solo
+ * pago) y autorizó prenderlo, con Webpay en integración. Sin él no hay pago
+ * registrado, y el CU-69, cuya precondición es justamente ese registro, no
+ * tiene qué confirmar.
  */
-export const REGISTRO_PAGO_DEFINIDO = false;
+export const REGISTRO_PAGO_DEFINIDO = true;
 
 /**
  * El saldo que debe cada cliente. La deuda la calcula G8, no nosotros: el acuerdo

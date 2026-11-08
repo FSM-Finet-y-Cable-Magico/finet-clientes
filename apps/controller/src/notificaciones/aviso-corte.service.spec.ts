@@ -142,13 +142,13 @@ describe('AvisoCorteService', () => {
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
+  });
 
-    it('con los valores por defecto de pendientes.ts, hoy no despacha', async () => {
-      const r = await service.ejecutar(HOY);
+  it('con los valores de pendientes.ts ya no falta nada: G8 confirmó saldo y registro (07 y 08-11)', async () => {
+    const r = await service.ejecutar(HOY);
 
-      expect(r.ejecutada).toBe(false);
-      expect(r.faltan.length).toBeGreaterThan(0);
-    });
+    expect(r.faltan).toEqual([]);
+    expect(prisma.factura.findMany).toHaveBeenCalled();
   });
 
   // ─── Con los datos: el flujo del CU-68 ───────────────────────────────────
