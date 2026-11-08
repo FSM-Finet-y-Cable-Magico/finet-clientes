@@ -30,6 +30,7 @@ import {
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
 import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
+import { crearTicket } from '../common/tickets/crear-ticket.js';
 import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
 import { formatPeriodo } from '../common/utils/periodo.js';
 import { MailService } from '../mail/mail.service.js';
@@ -431,48 +432,21 @@ export class PortalService {
           );
         }
 
-        const ticket = await tx.ticket.create({
-          data: {
-            id_cliente: cliente.id_cliente,
-            id_empresa: cliente.id_empresa,
-            id_categoria: categoria.id_categoria,
-            prioridad: 'media',
-            estado: 'abierto',
-            descripcion: dto.descripcion,
-            origen: 'portal',
-          },
-          select: { id_ticket: true, fecha_creacion: true },
-        });
-
-        const anio =
-          ticket.fecha_creacion?.getFullYear() ?? new Date().getFullYear();
-        const codigoSeguimiento = `FIN-${anio}-${String(ticket.id_ticket).padStart(6, '0')}`;
-
-        await tx.ticket.update({
-          where: { id_ticket: ticket.id_ticket },
-          data: { codigo_seguimiento: codigoSeguimiento },
-        });
-
-        await tx.log_auditoria.create({
-          data: {
+        const creado = await crearTicket(tx, {
+          cliente,
+          idCategoria: categoria.id_categoria,
+          valores: { prioridad: 'media', estado: 'abierto', origen: 'portal' },
+          descripcion: dto.descripcion,
+          auditoria: {
             accion: 'CREAR_TICKET_PORTAL',
-            entidad_afectada: 'ticket',
-            id_entidad_afectada: ticket.id_ticket,
-            valor_nuevo: {
-              codigo_seguimiento: codigoSeguimiento,
+            detalle: {
               id_categoria: categoria.id_categoria,
               estado: 'abierto',
-              origen: 'portal',
             },
           },
         });
 
-        return {
-          id_ticket: ticket.id_ticket,
-          codigo_seguimiento: codigoSeguimiento,
-          cliente,
-          categoria: categoria.nombre,
-        };
+        return { ...creado, cliente, categoria: categoria.nombre };
       });
     } catch (error) {
       if (error instanceof HttpException) throw error;

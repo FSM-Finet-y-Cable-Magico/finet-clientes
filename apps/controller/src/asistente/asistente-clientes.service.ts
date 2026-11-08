@@ -15,6 +15,7 @@ import {
   TICKET_ASISTENTE,
 } from '../common/constants/ticket.js';
 import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
+import { crearTicket } from '../common/tickets/crear-ticket.js';
 import type { ClienteIdentificadoDto } from './dto/asistente.dto.js';
 import type {
   CrearSolicitudSoporteDto,
@@ -35,12 +36,6 @@ export interface SolicitudSoporteCreadaDto {
 /** Descripcion del ticket cuando el asistente no mando un motivo. */
 const DESCRIPCION_ESCALAMIENTO =
   'Conversacion derivada a una persona desde el asistente virtual.';
-
-/** `FIN-2026-000123`: el codigo que se le da al cliente. */
-function codigoSeguimiento(idTicket: number, creado: Date | null): string {
-  const anio = creado?.getFullYear() ?? new Date().getFullYear();
-  return `FIN-${anio}-${String(idTicket).padStart(6, '0')}`;
-}
 
 /**
  * CU-63: verifica el RUT que el cliente le da al asistente y devuelve los
@@ -216,46 +211,20 @@ export class AsistenteClientesService {
           select: { id_conversacion: true },
         });
 
-        const ticket = await tx.ticket.create({
-          data: {
-            id_cliente: cliente.id_cliente,
-            id_empresa: cliente.id_empresa,
-            id_categoria: categoria.id_categoria,
-            id_conversacion_bot: conversacion.id_conversacion,
-            ...TICKET_ASISTENTE,
-            descripcion: dto.descripcion,
-          },
-          select: { id_ticket: true, fecha_creacion: true },
-        });
-
-        const codigo = codigoSeguimiento(
-          ticket.id_ticket,
-          ticket.fecha_creacion,
-        );
-
-        await tx.ticket.update({
-          where: { id_ticket: ticket.id_ticket },
-          data: { codigo_seguimiento: codigo },
-        });
-
-        await tx.log_auditoria.create({
-          data: {
+        return crearTicket(tx, {
+          cliente,
+          idCategoria: categoria.id_categoria,
+          idConversacionBot: conversacion.id_conversacion,
+          valores: TICKET_ASISTENTE,
+          descripcion: dto.descripcion,
+          auditoria: {
             accion: 'CREAR_TICKET_ASISTENTE',
-            entidad_afectada: 'ticket',
-            id_entidad_afectada: ticket.id_ticket,
-            valor_nuevo: {
-              codigo_seguimiento: codigo,
+            detalle: {
               id_categoria: categoria.id_categoria,
               id_sesion: dto.id_sesion,
-              origen: TICKET_ASISTENTE.origen,
             },
           },
         });
-
-        return {
-          id_ticket: ticket.id_ticket,
-          codigo_seguimiento: codigo,
-        };
       });
     } catch (error) {
       if (
@@ -326,43 +295,21 @@ export class AsistenteClientesService {
           select: { id_conversacion: true },
         });
 
-        const ticket = await tx.ticket.create({
-          data: {
-            id_cliente: cliente.id_cliente,
-            id_empresa: cliente.id_empresa,
-            id_categoria: categoria.id_categoria,
-            id_conversacion_bot: conversacion.id_conversacion,
-            ...TICKET_ASISTENTE,
-            descripcion: dto.motivo ?? DESCRIPCION_ESCALAMIENTO,
-          },
-          select: { id_ticket: true, fecha_creacion: true },
-        });
-
-        const codigo = codigoSeguimiento(
-          ticket.id_ticket,
-          ticket.fecha_creacion,
-        );
-        await tx.ticket.update({
-          where: { id_ticket: ticket.id_ticket },
-          data: { codigo_seguimiento: codigo },
-        });
-
-        await tx.log_auditoria.create({
-          data: {
+        return crearTicket(tx, {
+          cliente,
+          idCategoria: categoria.id_categoria,
+          idConversacionBot: conversacion.id_conversacion,
+          valores: TICKET_ASISTENTE,
+          descripcion: dto.motivo ?? DESCRIPCION_ESCALAMIENTO,
+          auditoria: {
             accion: 'ESCALAR_CONVERSACION_ASISTENTE',
-            entidad_afectada: 'ticket',
-            id_entidad_afectada: ticket.id_ticket,
-            valor_nuevo: {
-              codigo_seguimiento: codigo,
+            detalle: {
               id_conversacion_bot: conversacion.id_conversacion,
               id_sesion: dto.id_sesion,
               plataforma: dto.plataforma,
-              origen: TICKET_ASISTENTE.origen,
             },
           },
         });
-
-        return { id_ticket: ticket.id_ticket, codigo_seguimiento: codigo };
       });
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
