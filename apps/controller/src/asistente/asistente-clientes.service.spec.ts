@@ -33,7 +33,7 @@ describe('AsistenteClientesService', () => {
     cliente: { findFirst: jest.Mock };
     categoria_falla: { findFirst: jest.Mock; create: jest.Mock };
     conversacion_bot: { create: jest.Mock };
-    ticket: { create: jest.Mock; update: jest.Mock };
+    ticket: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
     log_auditoria: { create: jest.Mock };
   };
 
@@ -66,6 +66,7 @@ describe('AsistenteClientesService', () => {
         create: jest.fn().mockResolvedValue({ id_conversacion: 55 } as never),
       },
       ticket: {
+        findFirst: jest.fn().mockResolvedValue(null as never),
         create: jest.fn().mockResolvedValue({
           id_ticket: 123,
           fecha_creacion: new Date('2026-10-04T12:00:00'),
@@ -112,8 +113,49 @@ describe('AsistenteClientesService', () => {
       });
     });
 
+    it('sin sesion da el nombre pero no los planes', async () => {
+      findFirst.mockResolvedValue({
+        id_cliente: 7,
+        nombre_completo: 'Juan Pérez',
+        contrato: [{ estado: 'activo', plan: { nombre_comercial: 'Fibra' } }],
+      } as never);
+
+      await expect(service.identificar('12.345.678-5')).resolves.toEqual({
+        encontrado: true,
+        cliente: { nombre_completo: 'Juan Pérez', planes: null },
+      });
+    });
+
+    it('con la sesion de otro cliente tampoco da los planes', async () => {
+      findFirst.mockResolvedValue({
+        id_cliente: 7,
+        nombre_completo: 'Juan Pérez',
+        contrato: [{ estado: 'activo', plan: { nombre_comercial: 'Fibra' } }],
+      } as never);
+      verifyAsync.mockResolvedValue({ sub: 8, type: 'access' } as never);
+      sesionPortal.mockResolvedValue({ id_cliente: 8 } as never);
+
+      const r = await service.identificar('12.345.678-5', 'token-ajeno');
+
+      expect(r.cliente?.planes).toBeNull();
+    });
+
+    it('con una sesion invalida no da los planes y no falla', async () => {
+      findFirst.mockResolvedValue({
+        id_cliente: 7,
+        nombre_completo: 'Juan Pérez',
+        contrato: [],
+      } as never);
+      verifyAsync.mockRejectedValue(new Error('expirado') as never);
+
+      const r = await service.identificar('12.345.678-5', 'token-viejo');
+
+      expect(r.cliente?.planes).toBeNull();
+    });
+
     it('devuelve nombre y planes con el estado de cada contrato', async () => {
       findFirst.mockResolvedValue({
+        id_cliente: 7,
         nombre_completo: 'Juan Pérez',
         contrato: [
           {
@@ -129,7 +171,9 @@ describe('AsistenteClientesService', () => {
         ],
       } as never);
 
-      await expect(service.identificar('12.345.678-5')).resolves.toEqual({
+      await expect(
+        service.identificar('12.345.678-5', 'token-propio'),
+      ).resolves.toEqual({
         encontrado: true,
         cliente: {
           nombre_completo: 'Juan Pérez',
@@ -171,6 +215,7 @@ describe('AsistenteClientesService', () => {
       };
       expect(Object.keys(select).sort()).toEqual([
         'contrato',
+        'id_cliente',
         'nombre_completo',
       ]);
     });
@@ -340,6 +385,31 @@ describe('AsistenteClientesService', () => {
         { rol: 'assistant', contenido: 'Puedo derivarte con una persona.' },
       ],
     };
+
+    it('si ya tiene un ticket abierto del ultimo dia, informa ese y no crea otro', async () => {
+      tx.ticket.findFirst.mockResolvedValue({
+        id_ticket: 90,
+        codigo_seguimiento: 'FIN-2026-000090',
+      } as never);
+
+      await expect(service.escalar(derivacion)).resolves.toEqual({
+        id_ticket: 90,
+        codigo_seguimiento: 'FIN-2026-000090',
+      });
+      expect(tx.ticket.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id_cliente: 7,
+            id_categoria: 9,
+            origen: 'ASISTENTE',
+            estado: 'ABIERTO',
+            fecha_creacion: { gte: expect.any(Date) },
+          }),
+        }),
+      );
+      expect(tx.ticket.create).not.toHaveBeenCalled();
+      expect(tx.conversacion_bot.create).not.toHaveBeenCalled();
+    });
 
     it('abre un ticket del cliente y devuelve su codigo de seguimiento', async () => {
       await expect(service.escalar(derivacion)).resolves.toEqual({

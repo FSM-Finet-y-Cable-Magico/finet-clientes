@@ -48,6 +48,7 @@ export class AsistenteService {
   async responder(
     dto: MensajeAsistenteDto,
     accessToken?: string,
+    ip?: string,
   ): Promise<RespuestaAsistenteDto> {
     const baseUrl = this.configService.get<string>('CHATBOT_URL')?.trim();
     const apiKey = this.configService.get<string>('CHATBOT_API_KEY')?.trim();
@@ -69,6 +70,7 @@ export class AsistenteService {
           sessionId: dto.id_sesion,
           content: dto.mensaje,
           ...(accessToken ? { accessToken } : {}),
+          ...(ip ? { clientIp: ip } : {}),
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });

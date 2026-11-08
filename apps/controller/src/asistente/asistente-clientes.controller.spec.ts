@@ -49,7 +49,7 @@ describe('AsistenteClientesController', () => {
     it('acepta un RUT valido y llama al service', async () => {
       const dto = IdentificarClienteDto.parse({ rut: '123456785' });
       await controller.identificar(dto);
-      expect(service.identificar).toHaveBeenCalledWith('123456785');
+      expect(service.identificar).toHaveBeenCalledWith('123456785', undefined);
     });
 
     it('rechaza un RUT con digito verificador incorrecto', () => {

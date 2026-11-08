@@ -65,6 +65,25 @@ describe('AsistenteService', () => {
       });
     });
 
+    it('le manda al chatbot la IP del visitante', async () => {
+      fetchMock.mockResolvedValueOnce(
+        respuestaFetch(201, { content: 'Hola' }) as never,
+      );
+
+      await service.responder(
+        { id_sesion: SESION, mensaje: 'hola' },
+        undefined,
+        '203.0.113.9',
+      );
+
+      const [, init] = fetchMock.mock.calls[0];
+      expect(JSON.parse(init?.body as string)).toEqual({
+        sessionId: SESION,
+        content: 'hola',
+        clientIp: '203.0.113.9',
+      });
+    });
+
     it('responde 503 sin llamar al chatbot si falta la configuracion', async () => {
       env.CHATBOT_API_KEY = '';
 

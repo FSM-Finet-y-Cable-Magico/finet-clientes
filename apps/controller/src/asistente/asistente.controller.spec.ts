@@ -30,11 +30,33 @@ describe('AsistenteController', () => {
       });
       const result = await controller.enviar(dto);
 
-      expect(service.responder).toHaveBeenCalledWith({
-        id_sesion: SESION,
-        mensaje: '¿Que planes tienen?',
-      });
+      expect(service.responder).toHaveBeenCalledWith(
+        {
+          id_sesion: SESION,
+          mensaje: '¿Que planes tienen?',
+        },
+        undefined,
+        undefined,
+      );
       expect(result).toEqual({ respuesta: 'Hola' });
+    });
+
+    it('le pasa al service la IP del visitante', async () => {
+      const dto = MensajeAsistenteDto.parse({
+        id_sesion: SESION,
+        mensaje: 'hola',
+      });
+
+      await controller.enviar(dto, {
+        ip: '203.0.113.9',
+        headers: {},
+      } as never);
+
+      expect(service.responder).toHaveBeenCalledWith(
+        dto,
+        undefined,
+        '203.0.113.9',
+      );
     });
 
     it('rechaza una sesion que no es UUID', () => {
