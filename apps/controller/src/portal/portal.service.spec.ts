@@ -199,6 +199,7 @@ describe('PortalService', () => {
         'Juan Pérez',
         'FIN-2026-000042',
         'Falla de Internet',
+        2,
       );
     });
 

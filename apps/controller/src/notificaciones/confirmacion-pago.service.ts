@@ -59,7 +59,7 @@ export class ConfirmacionPagoService {
       // "El sistema recupera los datos del pago y los canales de contacto del cliente."
       const cliente = await this.prisma.cliente.findUnique({
         where: { id_cliente: pago.idCliente },
-        select: { nombre_completo: true, email: true },
+        select: { id_empresa: true, nombre_completo: true, email: true },
       });
       const idPlantilla = await this.despacho.plantilla();
 
@@ -76,6 +76,7 @@ export class ConfirmacionPagoService {
             pago.monto,
             pago.fecha,
             pago.codigoAutorizacion,
+            cliente!.id_empresa,
           ),
       });
     } catch (error) {

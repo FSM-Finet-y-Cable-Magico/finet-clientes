@@ -395,6 +395,7 @@ export class PortalService {
       codigo_seguimiento: string;
       cliente: {
         id_cliente: number;
+        id_empresa: number | null;
         nombre_completo: string;
         email: string | null;
       };
@@ -508,6 +509,7 @@ export class PortalService {
     categoria: string;
     cliente: {
       id_cliente: number;
+      id_empresa: number | null;
       nombre_completo: string;
       email: string | null;
     };
@@ -521,6 +523,7 @@ export class PortalService {
           ticket.cliente.nombre_completo,
           ticket.codigo_seguimiento,
           ticket.categoria,
+          ticket.cliente.id_empresa,
         );
         estadoEnvio = 'enviado';
       } catch (error) {

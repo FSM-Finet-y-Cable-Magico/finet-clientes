@@ -86,6 +86,8 @@ EOF
 # Claves externas: solo estos nombres.
 printf '%s\n' "$EXTERNO" | grep -E '^(INTEGRACION_G8_API_URL|INTEGRACION_G8_API_KEY|G3_API_URL|G3_API_KEY|G3_WIFI_PUBLIC_KEY|FAST_API_URL|FAST_TOKEN)=' \
   >> "$G2_CONFIG/controller.env" || true
+printf '%s\n' "$EXTERNO" | grep -E '^(SMTP_HOST|SMTP_PORT|SMTP_USER|SMTP_PASS|MAIL_FROM|SMTP_COMPANIES|SMTP_[A-Z0-9_]+_(HOST|PORT|USER|PASSWORD|FROM|FROM_NAME))=' \
+  >> "$G2_CONFIG/controller.env" || true
 printf '%s\n' "$EXTERNO" | grep -E '^OPENAI_(BASE_URL|API_KEY|MODEL)=' \
   >> "$G2_CONFIG/chatbot.env" || true
 

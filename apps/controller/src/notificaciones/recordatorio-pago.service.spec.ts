@@ -33,6 +33,7 @@ function fila(over: Record<string, unknown> = {}) {
     contrato: {
       cliente: {
         id_cliente: 10,
+        id_empresa: 1,
         nombre_completo: 'Juan Pérez',
         email: 'juan@example.com',
       },
@@ -145,6 +146,7 @@ describe('RecordatorioPagoService', () => {
       'Juan Pérez',
       24990,
       EN_TRES_DIAS,
+      1,
     );
     expect(r).toMatchObject({ detectadas: 1, enviados: 1 });
   });
@@ -166,6 +168,7 @@ describe('RecordatorioPagoService', () => {
       'Juan Pérez',
       24990,
       new Date(`${dia}T00:00:00.000Z`),
+      1,
     );
   });
 
@@ -219,6 +222,7 @@ describe('RecordatorioPagoService', () => {
       'Juan Pérez',
       29990,
       EN_TRES_DIAS,
+      1,
     );
     expect(r.detectadas).toBe(1);
   });

@@ -35,7 +35,12 @@ function factura(over: Record<string, unknown> = {}) {
   return {
     id_factura: 7,
     contrato: {
-      cliente: { id_cliente: 10, nombre_completo: 'Ana', email: 'ana@b.cl' },
+      cliente: {
+        id_cliente: 10,
+        id_empresa: 2,
+        nombre_completo: 'Ana',
+        email: 'ana@b.cl',
+      },
     },
     ...over,
   };
@@ -175,6 +180,7 @@ describe('AvisoCorteService', () => {
       57980,
       AYER,
       expect.stringContaining('/pagar?t='),
+      2,
     );
     expect(r).toMatchObject({ detectadas: 1, enviados: 1, ejecutada: true });
   });
