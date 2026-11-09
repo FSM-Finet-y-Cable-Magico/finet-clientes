@@ -34,6 +34,11 @@ export const TICKET_PORTAL = {
 /** CU-32: categoria del ticket de cambio de clave WiFi (acuerdo v2.0, §6.1). */
 export const CATEGORIA_CAMBIO_WIFI = 'CAMBIO_CREDENCIALES_WIFI';
 
+/** Como ve el cliente la categoria en su historial (CU-30). */
+export function categoriaVisible(nombre: string): string {
+  return nombre === CATEGORIA_CAMBIO_WIFI ? 'Cambio de clave WiFi' : nombre;
+}
+
 /**
  * CU-77: rol de los operadores que atienden lo que deriva el asistente. En la
  * base esta como `Soporte`; se compara sin distinguir mayusculas.

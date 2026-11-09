@@ -33,6 +33,7 @@ import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket
 import { crearTicket } from '../common/tickets/crear-ticket.js';
 import {
   CATEGORIA_CAMBIO_WIFI,
+  categoriaVisible,
   TICKET_PORTAL,
 } from '../common/constants/ticket.js';
 import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
@@ -499,7 +500,7 @@ export class PortalService {
       descripcion: t.descripcion,
       fecha_creacion: t.fecha_creacion ? t.fecha_creacion.toISOString() : '',
       fecha_cierre: t.fecha_cierre ? t.fecha_cierre.toISOString() : null,
-      categoria: t.categoria_falla.nombre,
+      categoria: categoriaVisible(t.categoria_falla.nombre),
       origen: t.origen,
     }));
 
