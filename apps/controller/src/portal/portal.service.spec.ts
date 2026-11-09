@@ -661,7 +661,11 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      const resultado = await service.solicitarCambioContrasenaWifi(1, DTO);
+      const resultado = await service.solicitarCambioContrasenaWifi(
+        1,
+        DTO,
+        false,
+      );
 
       expect(resultado).toEqual({
         id_solicitud: 7,
@@ -688,7 +692,7 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await service.solicitarCambioContrasenaWifi(1, DTO);
+      await service.solicitarCambioContrasenaWifi(1, DTO, false);
 
       const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
         .mock.calls[0][0] as { data: Record<string, unknown> };
@@ -710,7 +714,7 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await service.solicitarCambioContrasenaWifi(1, DTO);
+      await service.solicitarCambioContrasenaWifi(1, DTO, false);
 
       const llamada = (prisma.log_auditoria.create as jest.Mock).mock
         .calls[0][0] as { data: { accion: string; valor_nuevo: unknown } };
@@ -738,7 +742,7 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await service.solicitarCambioContrasenaWifi(1, DTO);
+      await service.solicitarCambioContrasenaWifi(1, DTO, false);
 
       const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
         .mock.calls[0][0] as { data: { password_nueva_cifrada: string } };
@@ -766,7 +770,11 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      const resultado = await service.solicitarCambioContrasenaWifi(1, DTO);
+      const resultado = await service.solicitarCambioContrasenaWifi(
+        1,
+        DTO,
+        false,
+      );
 
       const { data } = (prisma.solicitud_contrasena_wifi.create as jest.Mock)
         .mock.calls[0][0] as {
@@ -796,7 +804,7 @@ describe('PortalService', () => {
       });
       (prisma.log_auditoria.create as jest.Mock).mockResolvedValue({});
 
-      await service.solicitarCambioContrasenaWifi(1, DTO);
+      await service.solicitarCambioContrasenaWifi(1, DTO, false);
 
       expect(prisma.solicitud_contrasena_wifi.create).toHaveBeenCalled();
     });
@@ -805,7 +813,7 @@ describe('PortalService', () => {
       (prisma.contrato.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        service.solicitarCambioContrasenaWifi(1, DTO),
+        service.solicitarCambioContrasenaWifi(1, DTO, false),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.solicitud_contrasena_wifi.create).not.toHaveBeenCalled();
     });
@@ -818,10 +826,10 @@ describe('PortalService', () => {
       });
 
       await expect(
-        service.solicitarCambioContrasenaWifi(1, DTO),
+        service.solicitarCambioContrasenaWifi(1, DTO, false),
       ).rejects.toThrow(ConflictException);
       await expect(
-        service.solicitarCambioContrasenaWifi(1, DTO),
+        service.solicitarCambioContrasenaWifi(1, DTO, false),
       ).rejects.toThrow(
         'Solo puedes solicitar el cambio de clave en un servicio activo',
       );
@@ -838,7 +846,7 @@ describe('PortalService', () => {
       );
 
       await expect(
-        service.solicitarCambioContrasenaWifi(1, DTO),
+        service.solicitarCambioContrasenaWifi(1, DTO, false),
       ).rejects.toThrow(ServiceUnavailableException);
     });
     // Flujo v2, el del acuerdo v2.0 (§6.4): corre cuando G8 defina el ticket
