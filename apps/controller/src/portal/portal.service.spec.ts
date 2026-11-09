@@ -334,6 +334,18 @@ describe('PortalService', () => {
       expect(result[0].plan?.precio_mensual).toBe(25000);
     });
 
+    it('busca los contratos sin distinguir mayusculas: G8 guarda "Activo"', async () => {
+      (prisma.contrato.findMany as jest.Mock).mockResolvedValue([]);
+
+      await service.getContratosVigentes(1);
+
+      const { where } = (prisma.contrato.findMany as jest.Mock).mock
+        .calls[0][0] as { where: { OR: unknown[] } };
+      expect(where.OR).toContainEqual({
+        estado: { equals: 'ACTIVO', mode: 'insensitive' },
+      });
+    });
+
     it('retorna array vacío si no hay contratos vigentes (sin error)', async () => {
       (prisma.contrato.findMany as jest.Mock).mockResolvedValue([]);
 

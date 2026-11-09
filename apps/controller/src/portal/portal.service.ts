@@ -204,11 +204,11 @@ export class PortalService {
           // Se listan todos los estados en los que el servicio sigue siendo del
           // cliente, incluidos SUSPENDIDO y CORTADO: si el CRM corta por
           // morosidad, el cliente tiene que verlo en su portal. Queda fuera
-          // solo BAJA. Se comparan ambas capitalizaciones porque en la base
-          // conviven valores viejos en minúscula con los de la tabla 11.15.
-          estado: {
-            in: ESTADOS_CONTRATO_VIGENTES.flatMap((e) => [e, e.toLowerCase()]),
-          },
+          // solo BAJA. Sin distinguir mayusculas: en la base conviven `activo`,
+          // `Activo` (como lo guarda G8) y `ACTIVO` (tabla 11.15).
+          OR: ESTADOS_CONTRATO_VIGENTES.map((e) => ({
+            estado: { equals: e, mode: 'insensitive' as const },
+          })),
         },
         include: {
           plan: {
