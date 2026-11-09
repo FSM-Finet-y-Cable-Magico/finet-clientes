@@ -43,6 +43,10 @@ services:
     environment:
       PORT: ${PUERTO_CONTROLLER:-4000}
       CHATBOT_URL: http://chatbot:${PUERTO_CHATBOT:-3001}
+    volumes:
+      # Socket de la base compartida (finet_global_validacion), para Docker
+      # rootless. La conexión del portal sigue siendo DATABASE_URL.
+      - ${G2_GLOBAL_PG_SOCKET:-/run/user/1002/g2-global-pg}:/run/g2-global-pg
     depends_on:
       db:
         condition: service_healthy

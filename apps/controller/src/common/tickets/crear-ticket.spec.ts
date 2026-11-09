@@ -93,6 +93,16 @@ describe('crearTicket', () => {
     );
   });
 
+  it('guarda el servicio cuando el ticket lo trae (CU-32)', async () => {
+    await crear({ ...NUEVO, idServicio: 4 });
+
+    expect(tx.ticket.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ id_servicio: 4 }),
+      }),
+    );
+  });
+
   it('si falla la auditoría, el error sube para que se revierta todo', async () => {
     tx.log_auditoria.create.mockRejectedValue(new Error('falló'));
 

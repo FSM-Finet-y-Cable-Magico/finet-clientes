@@ -182,9 +182,9 @@ describe('PortalService', () => {
         data: expect.objectContaining({
           id_cliente: 1,
           id_categoria: 3,
-          estado: 'abierto',
-          prioridad: 'media',
-          origen: 'portal',
+          estado: 'ABIERTO',
+          prioridad: 'MEDIA',
+          origen: 'PORTAL',
         }),
         select: { id_ticket: true, fecha_creacion: true },
       });
@@ -898,11 +898,13 @@ describe('PortalService', () => {
           true,
         );
 
-        expect(orden).toEqual(['ticket', 'auditoria', 'G3', 'auditoria', 'G8']);
+        expect(orden).toEqual(['ticket', 'G3', 'auditoria', 'G8']);
         expect(crearTicket).toHaveBeenCalledWith(expect.anything(), {
           idCliente: 1,
           idEmpresa: 1,
           idContrato: 1,
+          requestId: expect.stringMatching(UUID_V4),
+          traceId: expect.stringMatching(UUID_V4),
         });
         const envio = g3.enviarClaveWifi.mock.calls[0][0] as {
           requestId: string;
@@ -916,10 +918,13 @@ describe('PortalService', () => {
           requestId: expect.stringMatching(UUID_V4),
           traceId: expect.stringMatching(UUID_V4),
         });
-        expect(auditoria(0).valor_nuevo).toMatchObject({
-          request_id: envio.requestId,
-          trace_id: envio.traceId,
-        });
+        expect(crearTicket).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            requestId: envio.requestId,
+            traceId: envio.traceId,
+          }),
+        );
         // CU-32: "la solicitud fue creada", con los datos que devuelve G3.
         expect(resultado).toEqual({
           id_solicitud: 2,
@@ -942,8 +947,8 @@ describe('PortalService', () => {
       it('la respuesta de G3 queda en la auditoria, sin secretos', async () => {
         await service.solicitarCambioContrasenaWifi(1, DTO, true);
 
-        expect(auditoria(1).accion).toBe('RESPUESTA_G3_CAMBIO_CONTRASENA_WIFI');
-        expect(auditoria(1).valor_nuevo).toEqual({
+        expect(auditoria(0).accion).toBe('RESPUESTA_G3_CAMBIO_CONTRASENA_WIFI');
+        expect(auditoria(0).valor_nuevo).toEqual({
           request_id: expect.stringMatching(UUID_V4),
           resultado: 'REGISTRADA',
           id_solicitud_g3: 2,
@@ -964,7 +969,7 @@ describe('PortalService', () => {
           service.solicitarCambioContrasenaWifi(1, DTO, true),
         ).rejects.toThrow(ServiceUnavailableException);
         expect(crearTicket).toHaveBeenCalledTimes(1);
-        expect(auditoria(1).valor_nuevo).toEqual({
+        expect(auditoria(0).valor_nuevo).toEqual({
           request_id: expect.stringMatching(UUID_V4),
           resultado: 'ERROR',
           status_g3: 403,
@@ -1044,16 +1049,103 @@ describe('PortalService', () => {
         expect(g3.enviarClaveWifi).not.toHaveBeenCalled();
       });
 
-      it('el hueco: el ticket WiFi no se crea hasta que G8 responda', async () => {
-        crearTicket.mockRestore();
+      describe('crearTicketWifi', () => {
+        const DATOS = {
+          idCliente: 1,
+          idEmpresa: 1,
+          idContrato: 1,
+          requestId: 'req-1',
+          traceId: 'trace-1',
+        };
+        let tx: {
+          categoria_falla: { findFirst: jest.Mock };
+          servicio_contratado: { findFirst: jest.Mock };
+          ticket: { create: jest.Mock; update: jest.Mock };
+          log_auditoria: { create: jest.Mock };
+        };
 
-        await expect(
-          service.crearTicketWifi({} as never, {
-            idCliente: 1,
-            idEmpresa: 1,
-            idContrato: 1,
-          }),
-        ).rejects.toThrow('pendiente de G8');
+        beforeEach(() => {
+          crearTicket.mockRestore();
+          tx = {
+            categoria_falla: {
+              findFirst: jest
+                .fn()
+                .mockResolvedValue({ id_categoria: 15 } as never),
+            },
+            servicio_contratado: {
+              findFirst: jest
+                .fn()
+                .mockResolvedValue({ id_servicio: 4 } as never),
+            },
+            ticket: {
+              create: jest.fn().mockResolvedValue({
+                id_ticket: 77,
+                fecha_creacion: new Date(2026, 10, 8, 12),
+              } as never),
+              update: jest.fn().mockResolvedValue({} as never),
+            },
+            log_auditoria: {
+              create: jest.fn().mockResolvedValue({} as never),
+            },
+          };
+        });
+
+        it('crea el ticket abierto con la categoria WiFi y el servicio (§6.2)', async () => {
+          await expect(
+            service.crearTicketWifi(tx as never, DATOS),
+          ).resolves.toBe(77);
+
+          expect(tx.categoria_falla.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: { nombre: 'CAMBIO_CREDENCIALES_WIFI' },
+            }),
+          );
+          expect(tx.ticket.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                id_cliente: 1,
+                id_empresa: 1,
+                id_categoria: 15,
+                id_servicio: 4,
+                estado: 'ABIERTO',
+                origen: 'PORTAL',
+              }),
+            }),
+          );
+        });
+
+        it('deja request_id y trace_id en la auditoria, antes del envio (§6.6)', async () => {
+          await service.crearTicketWifi(tx as never, DATOS);
+
+          const { data } = tx.log_auditoria.create.mock.calls[0][0] as {
+            data: { accion: string; valor_nuevo: Record<string, unknown> };
+          };
+          expect(data.accion).toBe('SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL');
+          expect(data.valor_nuevo).toMatchObject({
+            request_id: 'req-1',
+            trace_id: 'trace-1',
+            id_servicio: 4,
+            destino: 'G3',
+          });
+        });
+
+        it('sin la categoria no crea el ticket', async () => {
+          tx.categoria_falla.findFirst.mockResolvedValue(null as never);
+
+          await expect(
+            service.crearTicketWifi(tx as never, DATOS),
+          ).rejects.toThrow('CAMBIO_CREDENCIALES_WIFI');
+          expect(tx.ticket.create).not.toHaveBeenCalled();
+        });
+
+        it('sin servicio de internet no crea el ticket', async () => {
+          tx.servicio_contratado.findFirst.mockResolvedValue(null as never);
+
+          await expect(
+            service.crearTicketWifi(tx as never, DATOS),
+          ).rejects.toThrow('no tiene servicio de internet');
+          expect(tx.ticket.create).not.toHaveBeenCalled();
+        });
       });
     });
   });

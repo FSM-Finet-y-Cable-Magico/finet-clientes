@@ -49,7 +49,8 @@ export const SALDO_CLIENTE_DEFINIDO = true;
 /**
  * El ticket del cambio de clave WiFi. G8 lo definió el 01-10: categoría
  * `CAMBIO_CREDENCIALES_WIFI` y servicio en `ticket.id_servicio` (FK a
- * `servicio_contratado`), que nuestro esquema todavía no tiene. El resultado se
+ * `servicio_contratado`). Ya se crea (`crearTicketWifi`), pero esos datos solo
+ * existen en la base compartida: se prende al cambiar a ella. El resultado se
  * le informa con `POST /api/integrations/g2/tickets/{idTicket}/wifi-result`,
  * cuyo formato mandó el 02-10 y ya está construido. Falta que G8 lo despliegue. El §6.4 pide crear el ticket antes de llamar a G3 y
  * mandarle su id como correlación, así que sin él el CU-32 no llama a G3: sigue

@@ -299,7 +299,7 @@ model historial_ot {
 model intento_fallido {
   id_intento      BigInt    @id @default(autoincrement())
   id_empresa      Int?
-  ip_address      String    @db.Inet
+  ip_address      String    @db.VarChar(45)
   rut_intentado   String?   @db.VarChar(12)
   timestamp       DateTime? @default(now()) @db.Timestamp(6)
   bloqueado_hasta DateTime? @db.Timestamp(6)
@@ -335,7 +335,7 @@ model log_auditoria {
   id_entidad_afectada Int?
   valor_anterior      Json?
   valor_nuevo         Json?
-  ip_origen           String?   @db.Inet
+  ip_origen           String?   @db.VarChar(45)
   fecha_hora          DateTime? @default(now()) @db.Timestamp(6)
   usuario             usuario?  @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_log_auditoria_id_usuario")
 }
@@ -602,7 +602,7 @@ model sesion_portal {
   token            String    @db.Text
   fecha_inicio     DateTime? @db.Timestamp(6)
   fecha_expiracion DateTime? @db.Timestamp(6)
-  ip_origen        String?   @db.Inet
+  ip_origen        String?   @db.VarChar(45)
   cliente          cliente?  @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_sesion_portal_id_cliente")
 }
 
@@ -652,6 +652,7 @@ model ticket {
   id_empresa           Int?
   id_usuario_asignado  Int?
   id_categoria         Int
+  id_servicio          Int?
   id_conversacion_bot  Int?              @unique
   codigo_seguimiento   String?           @unique @db.VarChar(20)
   prioridad            String            @db.VarChar(10)
@@ -666,7 +667,19 @@ model ticket {
   cliente              cliente?          @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_ticket_id_cliente")
   conversacion_bot     conversacion_bot? @relation(fields: [id_conversacion_bot], references: [id_conversacion], onDelete: NoAction, onUpdate: NoAction, map: "fk_ticket_id_conversacion_bot")
   empresa              empresa?          @relation(fields: [id_empresa], references: [id_empresa], onDelete: NoAction, onUpdate: NoAction, map: "fk_ticket_id_empresa")
+  servicio_contratado  servicio_contratado? @relation(fields: [id_servicio], references: [id_servicio], onDelete: NoAction, onUpdate: NoAction, map: "fk_ticket_id_servicio")
   usuario              usuario?          @relation(fields: [id_usuario_asignado], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_ticket_id_usuario_asignado")
+}
+
+/// Solo lo que usa el portal. La tabla es de G8 y allá tiene más columnas.
+model servicio_contratado {
+  id_servicio      Int      @id @default(autoincrement())
+  id_cliente       Int
+  id_empresa       Int?
+  id_contrato      Int?
+  tipo_servicio    String   @db.VarChar(40)
+  estado_operativo String   @db.VarChar(30)
+  ticket           ticket[]
 }
 
 model tipo_equipo {

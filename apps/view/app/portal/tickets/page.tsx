@@ -47,9 +47,12 @@ function estadoBadge(estado: string): { label: string; tone: StatusTone } {
   const map: Record<string, { label: string; tone: StatusTone }> = {
     abierto: { label: "Abierto", tone: "info" },
     en_progreso: { label: "En progreso", tone: "warning" },
+    escalado: { label: "Escalado", tone: "warning" },
+    resuelto: { label: "Resuelto", tone: "success" },
     cerrado: { label: "Cerrado", tone: "success" },
   };
-  return map[estado] ?? { label: estado, tone: "neutral" };
+  // El CRM los guarda en mayúsculas y los tickets antiguos están en minúsculas.
+  return map[estado.toLowerCase()] ?? { label: estado, tone: "neutral" };
 }
 
 function prioridadBadge(prioridad: string): {
@@ -57,11 +60,12 @@ function prioridadBadge(prioridad: string): {
   tone: StatusTone;
 } {
   const map: Record<string, { label: string; tone: StatusTone }> = {
+    critica: { label: "Crítica", tone: "error" },
     alta: { label: "Alta", tone: "error" },
     media: { label: "Media", tone: "warning" },
     baja: { label: "Baja", tone: "success" },
   };
-  return map[prioridad] ?? { label: prioridad, tone: "neutral" };
+  return map[prioridad.toLowerCase()] ?? { label: prioridad, tone: "neutral" };
 }
 
 export default function TicketsPage() {

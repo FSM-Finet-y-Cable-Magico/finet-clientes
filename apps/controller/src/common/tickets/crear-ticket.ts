@@ -15,6 +15,8 @@ export type NuevoTicket = {
   descripcion: string;
   valores: { prioridad: string; estado: string; origen: string };
   idConversacionBot?: number;
+  /** CU-32: el servicio afectado (acuerdo v2.0, §6.2). */
+  idServicio?: number;
   auditoria: {
     accion: string;
     /** Lo propio de cada flujo; el código y el origen los agrega esta función. */
@@ -45,6 +47,9 @@ export async function crearTicket(
       ...(nuevo.idConversacionBot === undefined
         ? {}
         : { id_conversacion_bot: nuevo.idConversacionBot }),
+      ...(nuevo.idServicio === undefined
+        ? {}
+        : { id_servicio: nuevo.idServicio }),
       ...nuevo.valores,
       descripcion: nuevo.descripcion,
     },
