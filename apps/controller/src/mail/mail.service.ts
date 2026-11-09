@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import type { SendMailOptions, Transporter } from 'nodemailer';
 import {
   escaparHtml,
   fechaCliente,
@@ -10,6 +10,7 @@ import {
 } from './formato.js';
 import { comprobante, plantillaCorreo } from './plantilla-correo.js';
 import { formatRut } from '../common/utils/rut.js';
+import { leerSmtpEmpresas } from './smtp-empresas.js';
 
 /** CU-77, excepcion 1: lo que habria llevado el ticket que no se creo. */
 export interface EscalamientoSinTicket {
@@ -22,6 +23,11 @@ export interface EscalamientoSinTicket {
 @Injectable()
 export class MailService {
   private transporter: Transporter;
+  /** La cuenta y el remitente de cada empresa que tiene los suyos. */
+  private readonly porEmpresa = new Map<
+    number,
+    { transporter: Transporter; from: string }
+  >();
   private readonly logger = new Logger(MailService.name);
 
   constructor(private configService: ConfigService) {
@@ -42,17 +48,52 @@ export class MailService {
     });
 
     this.logger.log(`Mail configured: ${host}:${port}`);
+
+    const cuentas = leerSmtpEmpresas(
+      (clave) => this.configService.get<string>(clave),
+      (mensaje) => this.logger.warn(mensaje),
+    );
+    for (const cuenta of cuentas) {
+      this.porEmpresa.set(cuenta.idEmpresa, {
+        transporter: nodemailer.createTransport({
+          host: cuenta.host,
+          port: cuenta.port,
+          secure: cuenta.port === 465,
+          auth: { user: cuenta.user, pass: cuenta.pass },
+        }),
+        from: cuenta.from,
+      });
+      this.logger.log(`Mail configured for ${cuenta.alias}: ${cuenta.host}`);
+    }
   }
 
-  async sendPasswordReset(email: string, nombre: string, link: string) {
-    const from =
-      this.configService.get<string>('MAIL_FROM') ||
-      '"Portal Clientes" <no-reply@finet.cl>';
+  /** Sale por la cuenta de la empresa del cliente; si no tiene, por la general. */
+  private async enviar(
+    idEmpresa: number | null | undefined,
+    correo: Omit<SendMailOptions, 'from'>,
+  ): Promise<void> {
+    const cuenta =
+      idEmpresa === null || idEmpresa === undefined
+        ? undefined
+        : this.porEmpresa.get(idEmpresa);
+    await (cuenta?.transporter ?? this.transporter).sendMail({
+      ...correo,
+      from:
+        cuenta?.from ??
+        (this.configService.get<string>('MAIL_FROM') ||
+          '"Portal Clientes" <no-reply@finet.cl>'),
+    });
+  }
 
+  async sendPasswordReset(
+    email: string,
+    nombre: string,
+    link: string,
+    idEmpresa?: number | null,
+  ) {
     const html = this.resetTemplate(nombre, link);
 
-    await this.transporter.sendMail({
-      from,
+    await this.enviar(idEmpresa, {
       to: email,
       subject: 'Recuperación de contraseña - Portal Clientes',
       html,
@@ -65,13 +106,13 @@ export class MailService {
    * CU-04: el enlace de un solo uso para que un cliente que ya existe cree su
    * contraseña del portal (G8, 01-10, §6).
    */
-  async sendRegistroCuenta(email: string, nombre: string, link: string) {
-    const from =
-      this.configService.get<string>('MAIL_FROM') ||
-      '"Portal Clientes" <no-reply@finet.cl>';
-
-    await this.transporter.sendMail({
-      from,
+  async sendRegistroCuenta(
+    email: string,
+    nombre: string,
+    link: string,
+    idEmpresa?: number | null,
+  ) {
+    await this.enviar(idEmpresa, {
       to: email,
       subject: 'Crea tu cuenta - Portal Clientes',
       html: this.registroCuentaTemplate(nombre, link),
@@ -80,15 +121,14 @@ export class MailService {
     this.logger.log('Account registration email sent');
   }
 
-  async sendPasswordChanged(email: string, nombre: string) {
-    const from =
-      this.configService.get<string>('MAIL_FROM') ||
-      '"Portal Clientes" <no-reply@finet.cl>';
-
+  async sendPasswordChanged(
+    email: string,
+    nombre: string,
+    idEmpresa?: number | null,
+  ) {
     const html = this.changedTemplate(nombre);
 
-    await this.transporter.sendMail({
-      from,
+    await this.enviar(idEmpresa, {
       to: email,
       subject: 'Contraseña actualizada - Portal Clientes',
       html,
@@ -107,13 +147,9 @@ export class MailService {
     nombre: string,
     monto: number,
     fechaLimite: Date,
+    idEmpresa?: number | null,
   ) {
-    const from =
-      this.configService.get<string>('MAIL_FROM') ||
-      '"Portal Clientes" <no-reply@finet.cl>';
-
-    await this.transporter.sendMail({
-      from,
+    await this.enviar(idEmpresa, {
       to: email,
       subject: 'Tu factura vence en 3 días - Portal Clientes',
       html: this.recordatorioPagoTemplate(nombre, monto, fechaLimite),
@@ -134,13 +170,9 @@ export class MailService {
     deuda: number,
     vencimiento: Date,
     enlacePago: string,
+    idEmpresa?: number | null,
   ) {
-    const from =
-      this.configService.get<string>('MAIL_FROM') ||
-      '"Portal Clientes" <no-reply@finet.cl>';
-
-    await this.transporter.sendMail({
-      from,
+    await this.enviar(idEmpresa, {
       to: email,
       subject: 'Aviso de corte de servicio - Portal Clientes',
       html: this.avisoCorteTemplate(nombre, deuda, vencimiento, enlacePago),
@@ -160,13 +192,9 @@ export class MailService {
     monto: number,
     fecha: Date,
     codigoAutorizacion: string,
+    idEmpresa?: number | null,
   ) {
-    const from =
-      this.configService.get<string>('MAIL_FROM') ||
-      '"Portal Clientes" <no-reply@finet.cl>';
-
-    await this.transporter.sendMail({
-      from,
+    await this.enviar(idEmpresa, {
       to: email,
       subject: 'Confirmación de pago - Portal Clientes',
       html: this.confirmacionPagoTemplate(
@@ -185,13 +213,9 @@ export class MailService {
     nombre: string,
     codigoSeguimiento: string,
     categoria: string,
+    idEmpresa?: number | null,
   ) {
-    const from =
-      this.configService.get<string>('MAIL_FROM') ||
-      '"Portal Clientes" <no-reply@finet.cl>';
-
-    await this.transporter.sendMail({
-      from,
+    await this.enviar(idEmpresa, {
       to: email,
       subject: `Solicitud de soporte ${codigoSeguimiento}`,
       html: this.ticketCreadoTemplate(nombre, codigoSeguimiento, categoria),
@@ -209,12 +233,7 @@ export class MailService {
     destinatarios: string[],
     escalamiento: EscalamientoSinTicket,
   ) {
-    const from =
-      this.configService.get<string>('MAIL_FROM') ||
-      '"Portal Clientes" <no-reply@finet.cl>';
-
-    await this.transporter.sendMail({
-      from,
+    await this.enviar(undefined, {
       to: destinatarios,
       subject: `Asistente virtual: derivacion sin ticket (RUT ${formatRut(escalamiento.rut)})`,
       html: this.escalamientoSinTicketTemplate(escalamiento),

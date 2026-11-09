@@ -15,6 +15,7 @@ import {
   TICKET_ASISTENTE,
 } from '../common/constants/ticket.js';
 import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
+import { crearTicket } from '../common/tickets/crear-ticket.js';
 import type { ClienteIdentificadoDto } from './dto/asistente.dto.js';
 import type {
   CrearSolicitudSoporteDto,
@@ -32,15 +33,11 @@ export interface SolicitudSoporteCreadaDto {
   codigo_seguimiento: string;
 }
 
+const UN_DIA_MS = 24 * 60 * 60 * 1000;
+
 /** Descripcion del ticket cuando el asistente no mando un motivo. */
 const DESCRIPCION_ESCALAMIENTO =
   'Conversacion derivada a una persona desde el asistente virtual.';
-
-/** `FIN-2026-000123`: el codigo que se le da al cliente. */
-function codigoSeguimiento(idTicket: number, creado: Date | null): string {
-  const anio = creado?.getFullYear() ?? new Date().getFullYear();
-  return `FIN-${anio}-${String(idTicket).padStart(6, '0')}`;
-}
 
 /**
  * CU-63: verifica el RUT que el cliente le da al asistente y devuelve los
@@ -60,12 +57,21 @@ export class AsistenteClientesService {
     private readonly configService: ConfigService,
   ) {}
 
-  async identificar(rut: string): Promise<ClienteIdentificadoDto> {
+  /**
+   * El RUT identifica pero no autentica: los planes solo van si ademas viene
+   * la sesion del portal de ese mismo cliente. El nombre y la deuda siguen como
+   * los piden el CU-63 y el CU-64.
+   */
+  async identificar(
+    rut: string,
+    accessToken?: string,
+  ): Promise<ClienteIdentificadoDto> {
     // Con y sin guion, y la K en ambas cajas: la base es compartida y no hay
     // garantia de como quedo guardado (ver variantesRut).
     const cliente = await this.prisma.cliente.findFirst({
       where: { rut: { in: variantesRut(rut) } },
       select: {
+        id_cliente: true,
         nombre_completo: true,
         contrato: {
           select: {
@@ -86,24 +92,42 @@ export class AsistenteClientesService {
       return { encontrado: false, cliente: null };
     }
 
+    const conSesion =
+      accessToken !== undefined &&
+      (await this.esSesionDe(accessToken, cliente.id_cliente));
+
     return {
       encontrado: true,
       cliente: {
         nombre_completo: cliente.nombre_completo,
-        planes: cliente.contrato.flatMap((contrato) =>
-          contrato.plan
-            ? [
-                {
-                  nombre_comercial: contrato.plan.nombre_comercial,
-                  tipo_plan: contrato.plan.tipo_plan,
-                  velocidad_mbps: contrato.plan.velocidad_mbps,
-                  estado_contrato: contrato.estado,
-                },
-              ]
-            : [],
-        ),
+        planes: conSesion
+          ? cliente.contrato.flatMap((contrato) =>
+              contrato.plan
+                ? [
+                    {
+                      nombre_comercial: contrato.plan.nombre_comercial,
+                      tipo_plan: contrato.plan.tipo_plan,
+                      velocidad_mbps: contrato.plan.velocidad_mbps,
+                      estado_contrato: contrato.estado,
+                    },
+                  ]
+                : [],
+            )
+          : null,
       },
     };
+  }
+
+  /** Si no se puede comprobar, cuenta como que no es: no se muestran los planes. */
+  private async esSesionDe(
+    accessToken: string,
+    idCliente: number,
+  ): Promise<boolean> {
+    try {
+      return (await this.clienteDeLaSesion(accessToken)) === idCliente;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -216,46 +240,20 @@ export class AsistenteClientesService {
           select: { id_conversacion: true },
         });
 
-        const ticket = await tx.ticket.create({
-          data: {
-            id_cliente: cliente.id_cliente,
-            id_empresa: cliente.id_empresa,
-            id_categoria: categoria.id_categoria,
-            id_conversacion_bot: conversacion.id_conversacion,
-            ...TICKET_ASISTENTE,
-            descripcion: dto.descripcion,
-          },
-          select: { id_ticket: true, fecha_creacion: true },
-        });
-
-        const codigo = codigoSeguimiento(
-          ticket.id_ticket,
-          ticket.fecha_creacion,
-        );
-
-        await tx.ticket.update({
-          where: { id_ticket: ticket.id_ticket },
-          data: { codigo_seguimiento: codigo },
-        });
-
-        await tx.log_auditoria.create({
-          data: {
+        return crearTicket(tx, {
+          cliente,
+          idCategoria: categoria.id_categoria,
+          idConversacionBot: conversacion.id_conversacion,
+          valores: TICKET_ASISTENTE,
+          descripcion: dto.descripcion,
+          auditoria: {
             accion: 'CREAR_TICKET_ASISTENTE',
-            entidad_afectada: 'ticket',
-            id_entidad_afectada: ticket.id_ticket,
-            valor_nuevo: {
-              codigo_seguimiento: codigo,
+            detalle: {
               id_categoria: categoria.id_categoria,
               id_sesion: dto.id_sesion,
-              origen: TICKET_ASISTENTE.origen,
             },
           },
         });
-
-        return {
-          id_ticket: ticket.id_ticket,
-          codigo_seguimiento: codigo,
-        };
       });
     } catch (error) {
       if (
@@ -308,6 +306,28 @@ export class AsistenteClientesService {
             select: { id_categoria: true },
           }));
 
+        // Esta ruta no pide sesion, asi que con un RUT ajeno se podria abrir un
+        // ticket tras otro a nombre de ese cliente. Mientras tenga uno abierto
+        // del ultimo dia, se le informa ese mismo.
+        const abierto = await tx.ticket.findFirst({
+          where: {
+            id_cliente: cliente.id_cliente,
+            id_categoria: categoria.id_categoria,
+            origen: TICKET_ASISTENTE.origen,
+            estado: TICKET_ASISTENTE.estado,
+            codigo_seguimiento: { not: null },
+            fecha_creacion: { gte: new Date(Date.now() - UN_DIA_MS) },
+          },
+          orderBy: { id_ticket: 'desc' },
+          select: { id_ticket: true, codigo_seguimiento: true },
+        });
+        if (abierto?.codigo_seguimiento) {
+          return {
+            id_ticket: abierto.id_ticket,
+            codigo_seguimiento: abierto.codigo_seguimiento,
+          };
+        }
+
         const ahora = new Date();
         const conversacion = await tx.conversacion_bot.create({
           data: {
@@ -326,43 +346,21 @@ export class AsistenteClientesService {
           select: { id_conversacion: true },
         });
 
-        const ticket = await tx.ticket.create({
-          data: {
-            id_cliente: cliente.id_cliente,
-            id_empresa: cliente.id_empresa,
-            id_categoria: categoria.id_categoria,
-            id_conversacion_bot: conversacion.id_conversacion,
-            ...TICKET_ASISTENTE,
-            descripcion: dto.motivo ?? DESCRIPCION_ESCALAMIENTO,
-          },
-          select: { id_ticket: true, fecha_creacion: true },
-        });
-
-        const codigo = codigoSeguimiento(
-          ticket.id_ticket,
-          ticket.fecha_creacion,
-        );
-        await tx.ticket.update({
-          where: { id_ticket: ticket.id_ticket },
-          data: { codigo_seguimiento: codigo },
-        });
-
-        await tx.log_auditoria.create({
-          data: {
+        return crearTicket(tx, {
+          cliente,
+          idCategoria: categoria.id_categoria,
+          idConversacionBot: conversacion.id_conversacion,
+          valores: TICKET_ASISTENTE,
+          descripcion: dto.motivo ?? DESCRIPCION_ESCALAMIENTO,
+          auditoria: {
             accion: 'ESCALAR_CONVERSACION_ASISTENTE',
-            entidad_afectada: 'ticket',
-            id_entidad_afectada: ticket.id_ticket,
-            valor_nuevo: {
-              codigo_seguimiento: codigo,
+            detalle: {
               id_conversacion_bot: conversacion.id_conversacion,
               id_sesion: dto.id_sesion,
               plataforma: dto.plataforma,
-              origen: TICKET_ASISTENTE.origen,
             },
           },
         });
-
-        return { id_ticket: ticket.id_ticket, codigo_seguimiento: codigo };
       });
     } catch (error) {
       if (error instanceof BadRequestException) throw error;

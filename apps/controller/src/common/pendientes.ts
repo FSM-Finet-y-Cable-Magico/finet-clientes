@@ -23,11 +23,13 @@ export const PASARELA_ACTIVA = true;
  * El registro de un pago confirmado (RF-32: fecha, monto y código de
  * autorización). Es de Grupo 8 (§3 del acuerdo v2.0). En su respuesta del 01-10
  * lo definió: `POST /api/integrations/g2/payments`, con `codigo_autorizacion`
- * como campo nuevo. Falta que apliquen la migración y lo desplieguen, y hasta que
- * lo confirmen no se consume. Sin él no hay pago registrado, y el CU-69, cuya
- * precondición es justamente ese registro, no tiene qué confirmar.
+ * como campo nuevo. El 08-11 G8 lo confirmó desplegado y validado en la VPS
+ * (QA-G2-14: 201 la primera vez y `duplicado: true` la segunda, con un solo
+ * pago) y autorizó prenderlo, con Webpay en integración. Sin él no hay pago
+ * registrado, y el CU-69, cuya precondición es justamente ese registro, no
+ * tiene qué confirmar.
  */
-export const REGISTRO_PAGO_DEFINIDO = false;
+export const REGISTRO_PAGO_DEFINIDO = true;
 
 /**
  * El saldo que debe cada cliente. La deuda la calcula G8, no nosotros: el acuerdo
@@ -47,13 +49,14 @@ export const SALDO_CLIENTE_DEFINIDO = true;
 /**
  * El ticket del cambio de clave WiFi. G8 lo definió el 01-10: categoría
  * `CAMBIO_CREDENCIALES_WIFI` y servicio en `ticket.id_servicio` (FK a
- * `servicio_contratado`), que nuestro esquema todavía no tiene. El resultado se
+ * `servicio_contratado`). Se crea con `crearTicketWifi` y corre desde el 08-11,
+ * con el portal ya en la base compartida, la única con esos datos. El resultado se
  * le informa con `POST /api/integrations/g2/tickets/{idTicket}/wifi-result`,
  * cuyo formato mandó el 02-10 y ya está construido. Falta que G8 lo despliegue. El §6.4 pide crear el ticket antes de llamar a G3 y
  * mandarle su id como correlación, así que sin él el CU-32 no llama a G3: sigue
  * con el flujo v1, que el §6.7 permite conservar mientras tanto.
  */
-export const TICKET_WIFI_DEFINIDO = false;
+export const TICKET_WIFI_DEFINIDO = true;
 
 /**
  * La boleta de un pago, para descargarla (CU-52). En la reunión con G8 quedó que

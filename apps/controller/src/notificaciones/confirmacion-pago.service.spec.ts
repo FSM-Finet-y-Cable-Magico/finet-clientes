@@ -27,9 +27,11 @@ describe('ConfirmacionPagoService', () => {
   beforeEach(async () => {
     const mockPrisma = {
       cliente: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ nombre_completo: 'Ana', email: 'ana@b.cl' }),
+        findUnique: jest.fn().mockResolvedValue({
+          id_empresa: 2,
+          nombre_completo: 'Ana',
+          email: 'ana@b.cl',
+        }),
       },
       plantilla_notificacion: {
         findFirst: jest.fn().mockResolvedValue({ id_plantilla: 9 }),
@@ -60,7 +62,7 @@ describe('ConfirmacionPagoService', () => {
 
     expect(prisma.cliente.findUnique).toHaveBeenCalledWith({
       where: { id_cliente: 10 },
-      select: { nombre_completo: true, email: true },
+      select: { id_empresa: true, nombre_completo: true, email: true },
     });
   });
 
@@ -73,6 +75,7 @@ describe('ConfirmacionPagoService', () => {
       57980,
       PAGO.fecha,
       'AUT-123456',
+      2,
     );
     expect(estado).toBe('enviado');
   });

@@ -14,6 +14,7 @@ import { ESTADOS_IMPAGOS } from './recordatorio-pago.constantes.js';
 
 export type ClienteConDeuda = {
   idCliente: number;
+  idEmpresa: number | null;
   nombre: string;
   email: string | null;
 };
@@ -33,7 +34,12 @@ export async function clientesConFacturasImpagas(
       contrato: {
         select: {
           cliente: {
-            select: { id_cliente: true, nombre_completo: true, email: true },
+            select: {
+              id_cliente: true,
+              id_empresa: true,
+              nombre_completo: true,
+              email: true,
+            },
           },
         },
       },
@@ -47,6 +53,7 @@ export async function clientesConFacturasImpagas(
     if (!cliente || porCliente.has(cliente.id_cliente)) continue;
     porCliente.set(cliente.id_cliente, {
       idCliente: cliente.id_cliente,
+      idEmpresa: cliente.id_empresa ?? null,
       nombre: cliente.nombre_completo ?? '',
       email: cliente.email ?? null,
     });

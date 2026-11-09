@@ -211,6 +211,7 @@ export class AvisoCorteService {
               deuda,
               ayer,
               this.enlacePago(sitio, c.idCliente),
+              c.idEmpresa,
             ),
         });
 

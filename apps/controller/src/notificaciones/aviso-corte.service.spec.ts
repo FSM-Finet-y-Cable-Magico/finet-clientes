@@ -35,7 +35,12 @@ function factura(over: Record<string, unknown> = {}) {
   return {
     id_factura: 7,
     contrato: {
-      cliente: { id_cliente: 10, nombre_completo: 'Ana', email: 'ana@b.cl' },
+      cliente: {
+        id_cliente: 10,
+        id_empresa: 2,
+        nombre_completo: 'Ana',
+        email: 'ana@b.cl',
+      },
     },
     ...over,
   };
@@ -142,13 +147,13 @@ describe('AvisoCorteService', () => {
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
+  });
 
-    it('con los valores por defecto de pendientes.ts, hoy no despacha', async () => {
-      const r = await service.ejecutar(HOY);
+  it('con los valores de pendientes.ts ya no falta nada: G8 confirmó saldo y registro (07 y 08-11)', async () => {
+    const r = await service.ejecutar(HOY);
 
-      expect(r.ejecutada).toBe(false);
-      expect(r.faltan.length).toBeGreaterThan(0);
-    });
+    expect(r.faltan).toEqual([]);
+    expect(prisma.factura.findMany).toHaveBeenCalled();
   });
 
   // ─── Con los datos: el flujo del CU-68 ───────────────────────────────────
@@ -175,6 +180,7 @@ describe('AvisoCorteService', () => {
       57980,
       AYER,
       expect.stringContaining('/pagar?t='),
+      2,
     );
     expect(r).toMatchObject({ detectadas: 1, enviados: 1, ejecutada: true });
   });

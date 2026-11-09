@@ -30,6 +30,12 @@ import {
   normalizarEstadoContrato,
 } from '../common/constants/contrato.js';
 import { FILTRO_CATEGORIAS_CLIENTE } from '../common/constants/categorias-ticket.js';
+import { crearTicket } from '../common/tickets/crear-ticket.js';
+import {
+  CATEGORIA_CAMBIO_WIFI,
+  categoriaVisible,
+  TICKET_PORTAL,
+} from '../common/constants/ticket.js';
 import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
 import { formatPeriodo } from '../common/utils/periodo.js';
 import { MailService } from '../mail/mail.service.js';
@@ -394,6 +400,7 @@ export class PortalService {
       codigo_seguimiento: string;
       cliente: {
         id_cliente: number;
+        id_empresa: number | null;
         nombre_completo: string;
         email: string | null;
       };
@@ -431,48 +438,21 @@ export class PortalService {
           );
         }
 
-        const ticket = await tx.ticket.create({
-          data: {
-            id_cliente: cliente.id_cliente,
-            id_empresa: cliente.id_empresa,
-            id_categoria: categoria.id_categoria,
-            prioridad: 'media',
-            estado: 'abierto',
-            descripcion: dto.descripcion,
-            origen: 'portal',
-          },
-          select: { id_ticket: true, fecha_creacion: true },
-        });
-
-        const anio =
-          ticket.fecha_creacion?.getFullYear() ?? new Date().getFullYear();
-        const codigoSeguimiento = `FIN-${anio}-${String(ticket.id_ticket).padStart(6, '0')}`;
-
-        await tx.ticket.update({
-          where: { id_ticket: ticket.id_ticket },
-          data: { codigo_seguimiento: codigoSeguimiento },
-        });
-
-        await tx.log_auditoria.create({
-          data: {
+        const creado = await crearTicket(tx, {
+          cliente,
+          idCategoria: categoria.id_categoria,
+          valores: TICKET_PORTAL,
+          descripcion: dto.descripcion,
+          auditoria: {
             accion: 'CREAR_TICKET_PORTAL',
-            entidad_afectada: 'ticket',
-            id_entidad_afectada: ticket.id_ticket,
-            valor_nuevo: {
-              codigo_seguimiento: codigoSeguimiento,
+            detalle: {
               id_categoria: categoria.id_categoria,
-              estado: 'abierto',
-              origen: 'portal',
+              estado: TICKET_PORTAL.estado,
             },
           },
         });
 
-        return {
-          id_ticket: ticket.id_ticket,
-          codigo_seguimiento: codigoSeguimiento,
-          cliente,
-          categoria: categoria.nombre,
-        };
+        return { ...creado, cliente, categoria: categoria.nombre };
       });
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -501,7 +481,10 @@ export class PortalService {
       // Los resueltos no le sirven al cliente en su panel de soporte activo:
       // se excluyen aca para no traerlos de la base ni tener que filtrarlos
       // despues en memoria.
-      where: { id_cliente: idCliente, estado: { not: 'resuelto' } },
+      where: {
+        id_cliente: idCliente,
+        NOT: { estado: { equals: 'resuelto', mode: 'insensitive' } },
+      },
       include: {
         categoria_falla: { select: { nombre: true } },
       },
@@ -517,7 +500,7 @@ export class PortalService {
       descripcion: t.descripcion,
       fecha_creacion: t.fecha_creacion ? t.fecha_creacion.toISOString() : '',
       fecha_cierre: t.fecha_cierre ? t.fecha_cierre.toISOString() : null,
-      categoria: t.categoria_falla.nombre,
+      categoria: categoriaVisible(t.categoria_falla.nombre),
       origen: t.origen,
     }));
 
@@ -534,6 +517,7 @@ export class PortalService {
     categoria: string;
     cliente: {
       id_cliente: number;
+      id_empresa: number | null;
       nombre_completo: string;
       email: string | null;
     };
@@ -547,6 +531,7 @@ export class PortalService {
           ticket.cliente.nombre_completo,
           ticket.codigo_seguimiento,
           ticket.categoria,
+          ticket.cliente.id_empresa,
         );
         estadoEnvio = 'enviado';
       } catch (error) {
@@ -739,26 +724,13 @@ export class PortalService {
     let idTicket: number;
     try {
       idTicket = await this.prisma.$transaction(async (tx) => {
-        const id = await this.crearTicketWifi(tx, {
+        return this.crearTicketWifi(tx, {
           idCliente,
           idEmpresa,
           idContrato,
+          requestId,
+          traceId,
         });
-        await tx.log_auditoria.create({
-          data: {
-            accion: 'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
-            entidad_afectada: 'ticket',
-            id_entidad_afectada: id,
-            valor_nuevo: {
-              id_contrato: idContrato,
-              request_id: requestId,
-              trace_id: traceId,
-              destino: 'G3',
-              origen: 'portal',
-            },
-          },
-        });
-        return id;
       });
     } catch (error) {
       this.logger.error(
@@ -829,24 +801,64 @@ export class PortalService {
 
   /**
    * §6.4 paso 3: el ticket del cambio de clave WiFi, abierto, con origen PORTAL
-   * y asociado al cliente y al servicio (§6.2 y §7).
+   * y asociado al cliente y al servicio (§6.2 y §7). No lleva la clave.
    *
-   * Es el hueco `TICKET_WIFI_DEFINIDO`. G8 lo definio el 01-10: categoria
-   * `CAMBIO_CREDENCIALES_WIFI` y el servicio en `ticket.id_servicio` (FK a
-   * `servicio_contratado`), que nuestro esquema todavia no tiene. Mientras G8 no
-   * lo despliegue no se llega aca: el CU-32 sigue con el v1. Despues se escribe
-   * como `crearTicket`, que crea los tickets genericos del portal, y devuelve el
-   * `id_ticket`.
+   * Si falta la categoria o el servicio, lanza: sin ellos G3 no puede ejecutar
+   * nada (§6.2), y el cliente recibe que no se pudo registrar.
    */
-  crearTicketWifi(
+  async crearTicketWifi(
     tx: Prisma.TransactionClient,
-    datos: { idCliente: number; idEmpresa: number; idContrato: number },
+    datos: {
+      idCliente: number;
+      idEmpresa: number;
+      idContrato: number;
+      requestId: string;
+      traceId: string;
+    },
   ): Promise<number> {
-    return Promise.reject(
-      new Error(
-        `Ticket WiFi del cliente ${datos.idCliente} pendiente de G8: categoria y servicio (acuerdo v2.0, §6.1 y §6.2)`,
-      ),
-    );
+    const categoria = await tx.categoria_falla.findFirst({
+      where: { nombre: CATEGORIA_CAMBIO_WIFI },
+      select: { id_categoria: true },
+    });
+    if (!categoria) {
+      throw new Error(`Falta la categoria ${CATEGORIA_CAMBIO_WIFI}`);
+    }
+
+    // El WiFi es del servicio de internet del contrato. G8 lo guarda como
+    // "Internet + Television" cuando el plan trae los dos.
+    const servicio = await tx.servicio_contratado.findFirst({
+      where: {
+        id_cliente: datos.idCliente,
+        id_contrato: datos.idContrato,
+        tipo_servicio: { contains: 'internet', mode: 'insensitive' },
+      },
+      orderBy: { id_servicio: 'asc' },
+      select: { id_servicio: true },
+    });
+    if (!servicio) {
+      throw new Error(
+        `El contrato ${datos.idContrato} no tiene servicio de internet`,
+      );
+    }
+
+    const { id_ticket: idTicket } = await crearTicket(tx, {
+      cliente: { id_cliente: datos.idCliente, id_empresa: datos.idEmpresa },
+      idCategoria: categoria.id_categoria,
+      idServicio: servicio.id_servicio,
+      valores: TICKET_PORTAL,
+      descripcion: 'Solicitud de cambio de contraseña WiFi desde el portal.',
+      auditoria: {
+        accion: 'SOLICITAR_CAMBIO_CONTRASENA_WIFI_PORTAL',
+        detalle: {
+          id_contrato: datos.idContrato,
+          id_servicio: servicio.id_servicio,
+          request_id: datos.requestId,
+          trace_id: datos.traceId,
+          destino: 'G3',
+        },
+      },
+    });
+    return idTicket;
   }
 
   /**

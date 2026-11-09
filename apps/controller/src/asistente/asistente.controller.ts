@@ -38,8 +38,7 @@ export class AsistenteController {
     const accessToken =
       cookies?.access_token ??
       request?.headers.authorization?.replace(/^Bearer\s+/i, '');
-    return accessToken
-      ? this.asistenteService.responder(dto, accessToken)
-      : this.asistenteService.responder(dto);
+    // La IP del visitante: el chatbot limita con ella cuantos RUT se prueban.
+    return this.asistenteService.responder(dto, accessToken, request?.ip);
   }
 }

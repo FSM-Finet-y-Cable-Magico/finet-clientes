@@ -44,6 +44,8 @@ export const IdentificarClienteDto = z.object({
     .min(1, 'El RUT es requerido')
     .max(12)
     .refine((val) => validateRut(val), { message: 'RUT invalido' }),
+  /** Sesion del portal, si el visitante inicio una: de ella dependen los planes. */
+  access_token: z.string().trim().min(1).max(4096).optional(),
 });
 export type IdentificarClienteDto = z.infer<typeof IdentificarClienteDto>;
 
@@ -105,7 +107,8 @@ export interface ClienteIdentificadoDto {
   encontrado: boolean;
   cliente: {
     nombre_completo: string;
-    planes: PlanClienteAsistenteDto[];
+    /** `null` sin la sesion del portal de ese mismo cliente. */
+    planes: PlanClienteAsistenteDto[] | null;
   } | null;
 }
 

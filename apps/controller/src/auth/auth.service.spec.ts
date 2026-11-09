@@ -338,7 +338,7 @@ describe('AuthService', () => {
       });
 
       it('manda un enlace de un solo uso, de 30 minutos, al correo registrado', async () => {
-        porRut.mockResolvedValue(sinCuenta);
+        porRut.mockResolvedValue({ ...sinCuenta, id_empresa: 2 });
         (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
 
         await expect(
@@ -352,6 +352,7 @@ describe('AuthService', () => {
           'juan@test.cl',
           'Juan Pérez',
           expect.stringContaining('/registro/confirmar#token=registro-token'),
+          2,
         );
       });
 

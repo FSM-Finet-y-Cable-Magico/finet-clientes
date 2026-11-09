@@ -3,6 +3,8 @@
 # SSH, como dice la guía del servidor). Ver deploy/vps/README.md.
 #
 # Los secretos no están aquí: van en los env_file de G2_CONFIG, fuera del repo.
+# Los puertos salen de deploy/vps/.env (ver .env.example): cada servicio lee el
+# suyo y el de los servicios a los que llama.
 name: finet-portal
 
 services:
@@ -25,7 +27,7 @@ services:
     image: axllent/mailpit:v1.27
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8225:8025"
+      - "127.0.0.1:${PUERTO_MAILPIT_WEB:-8225}:8025"
     volumes:
       - portal_mailpit:/data
     environment:
@@ -38,6 +40,13 @@ services:
       dockerfile: apps/controller/Dockerfile
     restart: unless-stopped
     env_file: ${G2_CONFIG:-/srv/finet/grupo2/config}/controller.env
+    environment:
+      PORT: ${PUERTO_CONTROLLER:-4000}
+      CHATBOT_URL: http://chatbot:${PUERTO_CHATBOT:-3001}
+    volumes:
+      # Socket de la base compartida (finet_global_validacion), para Docker
+      # rootless. La conexión del portal sigue siendo DATABASE_URL.
+      - ${G2_GLOBAL_PG_SOCKET:-/run/user/1002/g2-global-pg}:/run/g2-global-pg
     depends_on:
       db:
         condition: service_healthy
@@ -49,7 +58,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:4000/api/landing/planes').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - "fetch('http://127.0.0.1:'+process.env.PORT+'/api/landing/planes').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 15s
       timeout: 5s
       retries: 10
@@ -62,6 +71,9 @@ services:
       dockerfile: apps/view/Dockerfile
     restart: unless-stopped
     env_file: ${G2_CONFIG:-/srv/finet/grupo2/config}/view.env
+    environment:
+      PORT: ${PUERTO_VIEW:-3000}
+      API_URL: http://controller:${PUERTO_CONTROLLER:-4000}/api
     depends_on:
       controller:
         condition: service_healthy
@@ -70,7 +82,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - "fetch('http://127.0.0.1:'+process.env.PORT+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 20s
       timeout: 5s
       retries: 15
@@ -78,13 +90,44 @@ services:
       start_period: 300s
     mem_limit: 2g
 
+  # Asistente virtual (CU-63 a 66 y 77). Sin puerto publicado: solo lo llama el
+  # backend. El código se copia a G2_CHATBOT_SRC, fuera de este repo.
+  chatbot:
+    build:
+      context: .
+      dockerfile: chatbot.Dockerfile
+      additional_contexts:
+        fuente: ${G2_CHATBOT_SRC:-/srv/finet/grupo2/finet-chatbot}
+    restart: unless-stopped
+    env_file: ${G2_CONFIG:-/srv/finet/grupo2/config}/chatbot.env
+    environment:
+      PORT: ${PUERTO_CHATBOT:-3001}
+      CLIENTES_API_URL: http://controller:${PUERTO_CONTROLLER:-4000}/api
+    depends_on:
+      controller:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:'+process.env.PORT+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    mem_limit: 384m
+
   # Un solo origen para el navegador: /api al backend y el resto a la vista.
   # La cookie de sesión es del host que la pone, y la vista la lee en proxy.ts.
   proxy:
     image: caddy:2.10-alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8200:80"
+      - "127.0.0.1:${PUERTO_PROXY:-8200}:80"
+    environment:
+      PUERTO_CONTROLLER: ${PUERTO_CONTROLLER:-4000}
+      PUERTO_VIEW: ${PUERTO_VIEW:-3000}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:

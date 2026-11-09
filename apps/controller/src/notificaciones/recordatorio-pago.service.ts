@@ -29,6 +29,7 @@ import { ZONA_HORARIA } from '../common/constants/zona-horaria.js';
 /** Lo que el recordatorio necesita saber de un cliente con facturas por vencer. */
 type PorVencer = {
   id_cliente: number;
+  id_empresa: number | null;
   nombre: string;
   email: string | null;
   /** La suma del `saldoExigible` de G8 de las facturas que vencen ese día. */
@@ -206,6 +207,7 @@ export class RecordatorioPagoService {
 
     return {
       id_cliente: cliente.idCliente,
+      id_empresa: cliente.idEmpresa,
       nombre: cliente.nombre,
       email: cliente.email,
       monto: vencen.reduce((total, f) => total + f.saldoExigible, 0),
@@ -248,6 +250,7 @@ export class RecordatorioPagoService {
           factura.nombre,
           factura.monto,
           factura.fechaLimite,
+          factura.id_empresa,
         ),
     });
 

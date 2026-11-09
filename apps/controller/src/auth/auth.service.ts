@@ -78,6 +78,7 @@ function clienteActivo(estado: string): boolean {
 /** Lo que el portal necesita del cliente para abrirle una sesión. */
 type ClienteSesion = {
   id_cliente: number;
+  id_empresa: number | null;
   rut: string | null;
   nombre_completo: string;
   email: string | null;
@@ -398,6 +399,7 @@ export class AuthService {
           cliente.email,
           cliente.nombre_completo,
           link,
+          cliente.id_empresa,
         );
       } catch (error) {
         this.logger.error(
@@ -425,6 +427,7 @@ export class AuthService {
         await this.mailService.sendPasswordChanged(
           cliente.email,
           cliente.nombre_completo,
+          cliente.id_empresa,
         );
       } catch (error) {
         this.logger.error(
@@ -465,6 +468,7 @@ export class AuthService {
         cliente.email,
         cliente.nombre_completo,
         link,
+        cliente.id_empresa,
       );
     } catch (error) {
       this.logger.error(
@@ -574,6 +578,7 @@ export class AuthService {
       where: { id_cliente: payload.sub },
       select: {
         rut: true,
+        id_empresa: true,
         nombre_completo: true,
         email: true,
         telefono: true,

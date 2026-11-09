@@ -47,7 +47,7 @@ export class AsistenteClientesController {
     @Body(new ZodValidationPipe(IdentificarClienteDto))
     dto: IdentificarClienteDto,
   ) {
-    return this.asistenteClientesService.identificar(dto.rut);
+    return this.asistenteClientesService.identificar(dto.rut, dto.access_token);
   }
 
   @Get('soporte/categorias')

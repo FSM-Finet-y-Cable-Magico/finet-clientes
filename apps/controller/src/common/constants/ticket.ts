@@ -22,6 +22,26 @@ export const TICKET_ASISTENTE = {
 } as const;
 
 /**
+ * Como nacen los tickets del portal (CU-71 y CU-32). El acuerdo v2.0 (§7) pide
+ * origen PORTAL, y el CRM los filtra en mayusculas.
+ */
+export const TICKET_PORTAL = {
+  estado: 'ABIERTO',
+  prioridad: 'MEDIA',
+  origen: 'PORTAL',
+} as const;
+
+/** CU-32: categoria del ticket de cambio de clave WiFi (acuerdo v2.0, §6.1). */
+export const CATEGORIA_CAMBIO_WIFI = 'CAMBIO_CREDENCIALES_WIFI';
+
+/** Como ve el cliente la categoria en su historial (CU-30). */
+export function categoriaVisible(nombre: string): string {
+  return nombre === CATEGORIA_CAMBIO_WIFI
+    ? 'Cambio de contraseña WiFi'
+    : nombre;
+}
+
+/**
  * CU-77: rol de los operadores que atienden lo que deriva el asistente. En la
  * base esta como `Soporte`; se compara sin distinguir mayusculas.
  */
