@@ -90,7 +90,7 @@ describe('ContratacionesService', () => {
   // ─── Happy path ───────────────────────────────────────────────────────────
 
   describe('crear', () => {
-    it('crea el prospecto en la etapa NUEVO del pipeline (§11.10) y retorna su id', async () => {
+    it('crea el prospecto en la etapa que espera el CRM y retorna su id', async () => {
       mockTransaccionExitosa();
 
       const result = await service.crear(DTO_MOCK, IP);
@@ -103,8 +103,11 @@ describe('ContratacionesService', () => {
           nombre_completo: 'Juan Pérez',
           email: 'juan@example.com',
           telefono: '+56912345678',
-          direccion: 'Av. Siempre Viva 742, Providencia, Santiago',
-          estado_pipeline: 'NUEVO',
+          direccion: 'Av. Siempre Viva 742',
+          comuna: 'Providencia',
+          region: 'Metropolitana de Santiago',
+          id_plan_interes: 1,
+          estado_pipeline: 'Prospecto Nuevo',
         }),
         select: { id_prospecto: true },
       });
@@ -133,7 +136,7 @@ describe('ContratacionesService', () => {
       expect(data.data).not.toHaveProperty('fecha_conversion');
     });
 
-    it('registra la auditoría con el plan de interés, que prospecto no tiene dónde guardar', async () => {
+    it('registra la auditoría con el plan de interés', async () => {
       mockTransaccionExitosa();
 
       await service.crear(DTO_MOCK, IP);
@@ -146,7 +149,7 @@ describe('ContratacionesService', () => {
           valor_nuevo: {
             rut: '123456789',
             id_plan: 1,
-            etapa: 'NUEVO',
+            etapa: 'Prospecto Nuevo',
             origen: 'PORTAL',
           },
         },
@@ -179,7 +182,8 @@ describe('ContratacionesService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             telefono: null,
-            direccion: 'Av. Siempre Viva 742, Providencia',
+            direccion: 'Av. Siempre Viva 742',
+            comuna: 'Providencia',
           }),
         }),
       );
