@@ -36,7 +36,9 @@ export const CATEGORIA_CAMBIO_WIFI = 'CAMBIO_CREDENCIALES_WIFI';
 
 /** Como ve el cliente la categoria en su historial (CU-30). */
 export function categoriaVisible(nombre: string): string {
-  return nombre === CATEGORIA_CAMBIO_WIFI ? 'Cambio de clave WiFi' : nombre;
+  return nombre === CATEGORIA_CAMBIO_WIFI
+    ? 'Cambio de contraseña WiFi'
+    : nombre;
 }
 
 /**

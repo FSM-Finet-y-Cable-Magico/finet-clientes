@@ -4,7 +4,7 @@ import { categoriaVisible } from './ticket.js';
 describe('categoriaVisible', () => {
   it('no le muestra al cliente el nombre técnico de la categoría WiFi', () => {
     expect(categoriaVisible('CAMBIO_CREDENCIALES_WIFI')).toBe(
-      'Cambio de clave WiFi',
+      'Cambio de contraseña WiFi',
     );
   });
 
