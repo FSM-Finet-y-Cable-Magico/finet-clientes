@@ -143,6 +143,10 @@ describe("formato mientras se escribe", () => {
     ["+56912345678", "9 1234 5678"],
     ["56912345678", "9 1234 5678"],
     ["9-1234-5678", "9 1234 5678"],
+    ["0056912345678", "9 1234 5678"],
+    ["09 1234 5678", "9 1234 5678"],
+    ["0", ""],
+    ["abc", ""],
   ])("teléfono %s queda %s", (escrito, esperado) => {
     expect(formatTelefono(escrito)).toBe(esperado);
   });

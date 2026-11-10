@@ -5,7 +5,6 @@ import PrimaryButton from "../ui/PrimaryButton";
 import CasillaPoliticaPrivacidad from "../legal/CasillaPoliticaPrivacidad";
 import type { PlanBackend } from "../../_lib/api";
 import { API_URL } from "../../_lib/consts";
-import { COMUNAS_CON_SERVICIO } from "../../_lib/company";
 import {
   MENSAJE_POLITICA_REQUERIDA,
   POLITICA_PRIVACIDAD_VERSION,
@@ -208,22 +207,14 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
 
         <label className="grid gap-1" htmlFor="comuna">
           Comuna
-          <select
+          <input
             id="comuna"
             name="comuna"
             required
-            defaultValue=""
+            placeholder="Nombre oficial"
+            title="Title Case. Usar catalogo oficial de comunas."
             className="border border-border bg-background p-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary"
-          >
-            <option value="" disabled>
-              Elige tu comuna
-            </option>
-            {COMUNAS_CON_SERVICIO.map((comuna) => (
-              <option key={comuna} value={comuna}>
-                {comuna}
-              </option>
-            ))}
-          </select>
+          />
         </label>
       </fieldset>
 

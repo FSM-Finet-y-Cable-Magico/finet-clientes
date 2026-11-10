@@ -5,7 +5,6 @@ import { Hero } from "./_components/layout/hero/Hero";
 import PlanCard from "./_components/catalog/PlanCard";
 import PrimaryButton from "./_components/ui/PrimaryButton";
 import { getLandingPlanes, idPlanDestacado, ordenarPorPrecio } from "./_lib/api";
-import { COMUNAS_CON_SERVICIO } from "./_lib/company";
 import {
   Zap,
   Wifi,
@@ -50,6 +49,13 @@ const beneficios = [
     title: "Sin limites de datos",
     desc: "Navega, descarga y streamea sin restricciones. Datos ilimitados en todos los planes.",
   },
+];
+
+const comunas = [
+  "La Pintana",
+  "Puente Alto",
+  "La Florida",
+  "La Granja",
 ];
 
 export default async function HomePage() {
@@ -168,7 +174,7 @@ export default async function HomePage() {
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-3xl mx-auto">
-            {COMUNAS_CON_SERVICIO.map((comuna) => (
+            {comunas.map((comuna) => (
               <div
                 key={comuna}
                 className="flex items-center gap-3 border border-border rounded-xl p-4 bg-background"

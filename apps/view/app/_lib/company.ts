@@ -27,14 +27,6 @@ export const COMPANY_PHONE_TEL = "+56945002319";
 /** Enlace directo a WhatsApp de la empresa. */
 export const WHATSAPP_URL = `https://wa.me/${COMPANY_PHONE_E164}`;
 
-/** Comunas con servicio, confirmadas por Finet. */
-export const COMUNAS_CON_SERVICIO = [
-  "La Pintana",
-  "Puente Alto",
-  "La Florida",
-  "La Granja",
-] as const;
-
 /*
  * Los `null` de abajo son datos que todavía no entrega Finet: las páginas
  * legales (CU-73) muestran el hueco marcado. Están listados en "Pendientes del

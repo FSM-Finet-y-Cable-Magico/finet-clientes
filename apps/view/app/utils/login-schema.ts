@@ -24,7 +24,9 @@ export function formatRut(value: string) {
  * es el código del país o parte del número.
  */
 export function formatTelefono(value: string) {
-  let digits = value.replace(/\D/g, "");
+  // Ningún número de 9 dígitos empieza con 0: los ceros de adelante son del
+  // 0056 internacional o del 09 antiguo.
+  let digits = value.replace(/\D/g, "").replace(/^0+/, "");
   // Si lo pegan con el código del país (+56 9 1234 5678 o 56912345678).
   if (digits.length > 9 && digits.startsWith("56")) digits = digits.slice(2);
   digits = digits.slice(0, 9);
