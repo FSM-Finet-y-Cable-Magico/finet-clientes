@@ -1,5 +1,7 @@
 import {
   changePasswordSchema,
+  formatRut,
+  formatTelefono,
   loginSchema,
   recoverySchema,
   resetPasswordSchema,
@@ -117,5 +119,41 @@ describe("clave WiFi (CU-31): de 8 a 63 caracteres, sin espacios", () => {
       success: false,
       error: "No se permiten espacios en blanco",
     });
+  });
+});
+
+describe("formato mientras se escribe", () => {
+  it.each([
+    ["1", "1"],
+    ["123456785", "12.345.678-5"],
+    ["12.345.678-5", "12.345.678-5"],
+    ["1234567k", "1.234.567-K"],
+    ["12345678-k", "12.345.678-K"],
+  ])("RUT %s queda %s", (escrito, esperado) => {
+    expect(formatRut(escrito)).toBe(esperado);
+  });
+
+  it.each([
+    ["", ""],
+    ["9", "9"],
+    ["91234", "9 1234"],
+    ["912345678", "9 1234 5678"],
+    ["9123456789", "9 1234 5678"],
+    ["+56 9 1234 5678", "9 1234 5678"],
+    ["+56912345678", "9 1234 5678"],
+    ["56912345678", "9 1234 5678"],
+    ["9-1234-5678", "9 1234 5678"],
+  ])("teléfono %s queda %s", (escrito, esperado) => {
+    expect(formatTelefono(escrito)).toBe(esperado);
+  });
+
+  it("teléfono: escribir 569... de corrido termina en el mismo número", () => {
+    let valor = "";
+    for (const tecla of "56912345678") valor = formatTelefono(valor + tecla);
+    expect(valor).toBe("9 1234 5678");
+  });
+
+  it("teléfono: borrar el último dígito no deja un espacio colgando", () => {
+    expect(formatTelefono("9 1234 ")).toBe("9 1234");
   });
 });

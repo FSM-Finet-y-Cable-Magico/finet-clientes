@@ -38,13 +38,36 @@ describe("CU-75: formulario de contratación", () => {
   async function completarFormulario() {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Nombre completo"), "Juan Pérez Soto");
-    await user.type(screen.getByLabelText("RUT"), "11.111.111-1");
-    await user.type(screen.getByLabelText("Correo electronico"), "juan@ejemplo.cl");
-    await user.type(screen.getByLabelText("Telefono movil"), "+56 9 1234 5678");
+    // Como lo escribiría alguien: sin puntos, con mayúsculas y sin el +56.
+    await user.type(screen.getByLabelText("RUT"), "111111111");
+    await user.type(screen.getByLabelText("Correo electronico"), "Juan@Ejemplo.cl");
+    await user.type(screen.getByLabelText("Telefono movil"), "912345678");
     await user.type(screen.getByLabelText("Calle + numero"), "Av. Siempre Viva 742");
-    await user.type(screen.getByLabelText("Comuna"), "La Pintana");
+    await user.selectOptions(screen.getByLabelText("Comuna"), "La Pintana");
     return user;
   }
+
+  it("da formato al RUT y al teléfono, y pasa el correo a minúsculas mientras se escribe", async () => {
+    render(<FormularioContratacion plan={plan} />);
+    await completarFormulario();
+
+    expect(screen.getByLabelText("RUT")).toHaveValue("11.111.111-1");
+    expect(screen.getByLabelText("Correo electronico")).toHaveValue("juan@ejemplo.cl");
+    expect(screen.getByLabelText("Telefono movil")).toHaveValue("9 1234 5678");
+  });
+
+  it("solo ofrece las comunas con servicio", () => {
+    render(<FormularioContratacion plan={plan} />);
+
+    const opciones = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(opciones).toEqual([
+      "Elige tu comuna",
+      "La Pintana",
+      "Puente Alto",
+      "La Florida",
+      "La Granja",
+    ]);
+  });
 
   it("presenta la casilla con enlace directo a la Política de Privacidad", () => {
     render(<FormularioContratacion plan={plan} />);
@@ -86,7 +109,7 @@ describe("CU-75: formulario de contratación", () => {
       nombre_completo: "Juan Pérez Soto",
       rut: "11.111.111-1",
       email: "juan@ejemplo.cl",
-      telefono: "+56 9 1234 5678",
+      telefono: "+56912345678",
       direccion_completa: "Av. Siempre Viva 742",
       comuna: "La Pintana",
       acepta_politica_privacidad: true,
