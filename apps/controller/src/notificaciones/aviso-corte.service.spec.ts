@@ -163,7 +163,7 @@ describe('AvisoCorteService', () => {
 
     expect(prisma.factura.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { estado: { in: ['pendiente', 'vencida'] } },
+        where: { estado: { in: ['Pendiente'] } },
       }),
     );
   });

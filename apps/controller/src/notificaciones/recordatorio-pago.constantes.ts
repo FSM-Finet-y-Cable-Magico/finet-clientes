@@ -36,11 +36,13 @@ export const ESTADO_ENVIO = {
 } as const;
 
 /**
- * Estados de factura que cuentan como deuda viva (igual que deuda-publica). En
- * el CU-67 y el CU-68 solo sirven para saber a quién preguntarle a G8: si se
- * avisa lo deciden sus datos (`deuda-g8.ts`).
+ * Estados de factura que cuentan como deuda viva, escritos como los guarda G8:
+ * `Pendiente`, `Pagada` o `Anulada`. "Vencida" y "Parcial" los calcula G8 al
+ * responder y no quedan en la base. En el CU-67 y el CU-68 solo sirven para
+ * saber a quién preguntarle a G8: si se avisa lo deciden sus datos
+ * (`deuda-g8.ts`).
  */
-export const ESTADOS_IMPAGOS = ['pendiente', 'vencida'];
+export const ESTADOS_IMPAGOS = ['Pendiente'];
 
 /**
  * RNF-49.1: tope de 50 mensajes por segundo. Se despacha en tandas de ese
