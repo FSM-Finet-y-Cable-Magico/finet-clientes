@@ -170,6 +170,16 @@ export function rutaMarca(marca: Marca, ruta: `/${string}`): string {
   return ruta === "/" ? marca.prefijo : `${marca.prefijo}${ruta}`;
 }
 
+/**
+ * Un enlace de la configuración (barra, pie): los internos van al sitio de la
+ * marca; los externos (http, wa.me) quedan igual.
+ */
+export function hrefMarca(marca: Marca, href: string): string {
+  return href.startsWith("/") && !href.startsWith("//")
+    ? rutaMarca(marca, href as `/${string}`)
+    : href;
+}
+
 /** La marca de una ruta del navegador y la ruta sin su prefijo. */
 export function separarMarca(pathname: string): { marca: Marca; ruta: string } {
   for (const marca of Object.values(MARCAS)) {

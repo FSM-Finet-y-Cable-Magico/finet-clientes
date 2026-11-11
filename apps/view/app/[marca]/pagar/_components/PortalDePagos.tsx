@@ -11,9 +11,10 @@ import {
 } from "lucide-react";
 import { api } from "@/app/utils/api";
 import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
-import { WHATSAPP_URL } from "@/app/_lib/company";
+import { useMarca } from "@/app/_lib/marca";
 import IdentificarCuenta from "./IdentificarCuenta";
 import RedireccionWebpay from "./RedireccionWebpay";
+import { rutaMarca } from "@/app/_lib/company";
 
 export type Identificador = { rut: string } | { t: string };
 
@@ -132,6 +133,7 @@ function Encabezado({
   resumen: Resumen | null;
   conCuenta: boolean;
 }) {
+  const marca = useMarca();
   const cliente = resumen?.cliente;
   return (
     <header className="relative overflow-hidden bg-foreground px-6 pb-6 pt-7 text-background">
@@ -158,7 +160,7 @@ function Encabezado({
       ) : null}
       {conCuenta ? (
         <Link
-          href="/pagar"
+          href={rutaMarca(marca, "/pagar")}
           className="relative mt-4 inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
         >
           Pagar otra cuenta
@@ -175,6 +177,7 @@ function Cuenta({
   resumen: Resumen;
   identificador: Identificador;
 }) {
+  const { whatsappUrl } = useMarca();
   if (!resumen.encontrado) {
     return (
       <Aviso tono="neutro" titulo="No encontramos una cuenta con esos datos">
@@ -205,7 +208,7 @@ function Cuenta({
         <p className="mt-1">
           Escríbenos por{" "}
           <a
-            href={WHATSAPP_URL}
+            href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium underline"

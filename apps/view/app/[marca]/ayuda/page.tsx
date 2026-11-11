@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { metadataSeccion } from "../../_lib/seo";
 import { faqJsonLd } from "../../_lib/jsonld";
-import { WHATSAPP_URL } from "../../_lib/company";
+import { marcaPorSlug, type Marca } from "../../_lib/company";
 
 export const metadata: Metadata = metadataSeccion({
   path: "/ayuda",
@@ -10,7 +10,8 @@ export const metadata: Metadata = metadataSeccion({
     "Resuelve tus dudas sobre contratacion, instalacion, cobertura, pagos y soporte de Finet. Preguntas frecuentes de Internet fibra optica en La Pintana y Puente Alto.",
 });
 
-const faqs = [
+/** Las mismas preguntas para cada empresa, con su zona. */
+const faqsDe = (marca: Marca) => [
   {
     question: "¿Que necesito para contratar?",
     answer:
@@ -29,7 +30,7 @@ const faqs = [
   {
     question: "¿En que comunas tienen cobertura?",
     answer:
-      "Actualmente tenemos cobertura en La Pintana, Puente Alto, La Florida y La Granja. Estamos expandiendo nuestra red. Si no estas en estas comunas, consulta igualmente: revisamos tu direccion y te avisamos cuando lleguemos a tu zona.",
+      `Actualmente tenemos cobertura en ${marca.zonaTexto}. Estamos expandiendo nuestra red. Si no estas en estas comunas, consulta igualmente: revisamos tu direccion y te avisamos cuando lleguemos a tu zona.`,
   },
   {
     question: "¿Que hago si tengo problemas de conexion?",
@@ -43,7 +44,13 @@ const faqs = [
   },
 ];
 
-export default function AyudaPage() {
+export default async function AyudaPage({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}) {
+  const marca = marcaPorSlug((await params).marca);
+  const faqs = faqsDe(marca);
   return (
     <section className="px-4 py-12">
       <script
@@ -95,7 +102,7 @@ export default function AyudaPage() {
           <p className="text-sm text-muted">
             ¿No encuentras lo que buscas?{" "}
             <a
-              href={WHATSAPP_URL}
+              href={marca.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"

@@ -5,13 +5,17 @@ import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { NavItem } from "./nav.config";
+import { useMarca } from "../../../_lib/marca";
+import { hrefMarca, separarMarca } from "../../../_lib/company";
 
 type MobileMenuProps = {
   items: NavItem[];
 };
 
 export default function MobileMenu({ items }: MobileMenuProps) {
-  const pathname = usePathname();
+  const marca = useMarca();
+  // Sin el prefijo de la empresa: /cable-magico/planes es /planes.
+  const { ruta: pathname } = separarMarca(usePathname());
   const [isOpen, setIsOpen] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
@@ -82,7 +86,7 @@ export default function MobileMenu({ items }: MobileMenuProps) {
                         {item.children!.map((child) => (
                           <li key={child.href}>
                             <Link
-                              href={child.href}
+                              href={hrefMarca(marca, child.href)}
                               onClick={closeMobileMenu}
                               aria-current={
                                 pathname === child.href ? "page" : undefined
@@ -102,7 +106,7 @@ export default function MobileMenu({ items }: MobileMenuProps) {
                   </>
                 ) : (
                   <Link
-                    href={item.href}
+                    href={hrefMarca(marca, item.href)}
                     onClick={closeMobileMenu}
                     aria-current={isActive ? "page" : undefined}
                     className={`block rounded-md px-3 py-2 text-sm transition-colors ${

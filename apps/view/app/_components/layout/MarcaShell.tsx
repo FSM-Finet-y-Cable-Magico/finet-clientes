@@ -25,7 +25,7 @@ export default function MarcaShell({
         <main id="main-content" className="flex-1">
           {children}
         </main>
-        <Footer />
+        <Footer marca={marcaPorSlug(slug)} />
         <AsistenteWidget />
         {/* CU-76: sale solo si el navegador no tiene preferencia guardada. */}
         <BannerCookies />

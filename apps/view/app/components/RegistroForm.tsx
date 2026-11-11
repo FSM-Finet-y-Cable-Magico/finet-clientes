@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowLeft, CheckCircle2, UserCheck } from "lucide-react";
-import { WHATSAPP_URL } from "../_lib/company";
 import LoginBranding from "./LoginBranding";
 import PanelAviso from "./PanelAviso";
 import SolicitudPorRut from "./SolicitudPorRut";
@@ -100,7 +99,7 @@ export default function RegistroForm({
           por WhatsApp y te ayudamos a crear tu cuenta.
         </p>
         <a
-          href={WHATSAPP_URL}
+          href={marca.whatsappUrl}
           target="_blank"
           rel="noopener noreferrer"
           className={botonPrincipal}

@@ -5,8 +5,9 @@ import Link from "next/link";
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { api } from "@/app/utils/api";
 import { formatPrecio, fechaInstante } from "@/app/_lib/formato";
-import { WHATSAPP_URL } from "@/app/_lib/company";
+import { useMarca } from "@/app/_lib/marca";
 import PanelAviso from "@/app/components/PanelAviso";
+import { rutaMarca } from "@/app/_lib/company";
 
 /** Lo que Transbank dice del pago, a través del backend. */
 type Detalle = {
@@ -208,9 +209,10 @@ function Dato({ nombre, children }: { nombre: string; children: ReactNode }) {
 }
 
 function VolverAPagar() {
+  const marca = useMarca();
   return (
     <Link
-      href="/pagar"
+      href={rutaMarca(marca, "/pagar")}
       className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90"
     >
       Volver al portal de pagos
@@ -219,9 +221,10 @@ function VolverAPagar() {
 }
 
 function EnlaceWhatsApp() {
+  const { whatsappUrl } = useMarca();
   return (
     <a
-      href={WHATSAPP_URL}
+      href={whatsappUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90"

@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMarca } from "../../../_lib/marca";
+import { hrefMarca, separarMarca } from "../../../_lib/company";
 
 type AudienceSwitchProps = {
   items: { label: string; href: string }[];
 };
 
 export default function AudienceSwitch({ items }: AudienceSwitchProps) {
-  const pathname = usePathname();
+  const marca = useMarca();
+  // Sin el prefijo de la empresa: /cable-magico/planes es /planes.
+  const { ruta: pathname } = separarMarca(usePathname());
   const isEmpresas = pathname.startsWith("/empresas");
 
   return (
@@ -23,7 +27,7 @@ export default function AudienceSwitch({ items }: AudienceSwitchProps) {
           return (
             <li key={item.href}>
               <Link
-                href={item.href}
+                href={hrefMarca(marca, item.href)}
                 aria-current={isActive ? "page" : undefined}
                 className={
                   isActive
