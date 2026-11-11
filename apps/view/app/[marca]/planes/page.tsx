@@ -3,6 +3,7 @@ import { metadataSeccion, resumenPlanes } from "../../_lib/seo";
 import { getLandingPlanes, ordenarPorPrecio } from "../../_lib/api";
 import { itemListJsonLd } from "../../_lib/jsonld";
 import PlanesClient from "../../_components/catalog/PlanesClient";
+import { marcaPorSlug } from "../../_lib/company";
 
 export async function generateMetadata(): Promise<Metadata> {
   const resumen = resumenPlanes(await getLandingPlanes());
@@ -23,8 +24,13 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default async function PlanesPage() {
-  const planes = await getLandingPlanes();
+export default async function PlanesPage({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}) {
+  const marca = marcaPorSlug((await params).marca);
+  const planes = await getLandingPlanes(undefined, marca.idEmpresa);
   const sorted = ordenarPorPrecio(planes);
 
   return (
@@ -40,7 +46,8 @@ export default async function PlanesPage() {
           <h1 className="text-3xl font-bold">Planes de Internet Fibra Optica</h1>
           <p className="text-muted mt-2 max-w-2xl mx-auto">
             Conexion simetrica de alta velocidad para tu hogar o empresa. Sin
-            limites de datos, instalacion incluida y soporte local en La Pintana.
+            limites de datos, instalacion incluida y soporte local en{" "}
+            {marca.comunaSoporte}.
           </p>
         </div>
         <PlanesClient planes={sorted} />

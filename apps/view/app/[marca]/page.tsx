@@ -5,6 +5,7 @@ import { Hero } from "../_components/layout/hero/Hero";
 import PlanCard from "../_components/catalog/PlanCard";
 import PrimaryButton from "../_components/ui/PrimaryButton";
 import { getLandingPlanes, idPlanDestacado, ordenarPorPrecio } from "../_lib/api";
+import { marcaPorSlug, rutaMarca, type Marca } from "../_lib/company";
 import {
   Zap,
   Wifi,
@@ -28,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-const beneficios = [
+const beneficiosDe = (marca: Marca) => [
   {
     icon: Zap,
     title: "Fibra optica simetrica",
@@ -42,7 +43,7 @@ const beneficios = [
   {
     icon: Headphones,
     title: "Soporte local",
-    desc: "Atencion directa en La Pintana. Te ayudamos por telefono, WhatsApp y presencial.",
+    desc: `Atencion directa en ${marca.comunaSoporte}. Te ayudamos por telefono, WhatsApp y presencial.`,
   },
   {
     icon: ShieldCheck,
@@ -51,15 +52,14 @@ const beneficios = [
   },
 ];
 
-const comunas = [
-  "La Pintana",
-  "Puente Alto",
-  "La Florida",
-  "La Granja",
-];
-
-export default async function HomePage() {
-  const planes = await getLandingPlanes();
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}) {
+  const marca = marcaPorSlug((await params).marca);
+  const planes = await getLandingPlanes(undefined, marca.idEmpresa);
+  const beneficios = beneficiosDe(marca);
 
   const sorted = ordenarPorPrecio(planes);
   const featuredId = idPlanDestacado(sorted);
@@ -80,11 +80,11 @@ export default async function HomePage() {
               id="beneficios-heading"
               className="text-3xl font-bold text-foreground"
             >
-              Por que elegir Finet
+              Por que elegir {marca.nombre}
             </h2>
             <p className="text-muted mt-3 max-w-xl mx-auto">
               Internet de fibra optica pensado para tu hogar, con la mejor
-              relacion precio-calidad del sur de Santiago.
+              relacion precio-calidad de {marca.zonaRegion}.
             </p>
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
@@ -122,6 +122,7 @@ export default async function HomePage() {
                 <PlanCard
                   key={plan.id_plan}
                   plan={plan}
+                  marca={marca}
                   featured={plan.id_plan === featuredId}
                 />
               ))}
@@ -132,7 +133,7 @@ export default async function HomePage() {
             </p>
           )}
           <div className="text-center mt-10">
-            <PrimaryButton href="/planes" variant="outline">
+            <PrimaryButton href={rutaMarca(marca, "/planes")} variant="outline">
               Ver todos los planes
             </PrimaryButton>
           </div>
@@ -169,12 +170,12 @@ export default async function HomePage() {
               Zona de cobertura
             </h2>
             <p className="opacity-60 mt-3 max-w-xl mx-auto">
-              Estamos presentes en las siguientes comunas del sur de Santiago.
+              Estamos presentes en las siguientes comunas de {marca.zonaRegion}.
               Consulta disponibilidad en tu direccion.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-3xl mx-auto">
-            {comunas.map((comuna) => (
+            {marca.comunas.map((comuna) => (
               <div
                 key={comuna}
                 className="flex items-center gap-3 border border-border rounded-xl p-4 bg-background"
@@ -185,7 +186,7 @@ export default async function HomePage() {
             ))}
           </div>
           <div className="mt-8 text-center">
-            <PrimaryButton href="/cobertura" variant="solid">
+            <PrimaryButton href={rutaMarca(marca, "/cobertura")} variant="solid">
               <MapPinned size={18} aria-hidden />
               Ver mapa de cobertura
             </PrimaryButton>

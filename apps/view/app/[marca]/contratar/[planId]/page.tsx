@@ -7,15 +7,23 @@ import { formatPrecio } from "../../../_lib/formato";
 import { productJsonLd, breadcrumbJsonLd } from "../../../_lib/jsonld";
 import { BASE_URL } from "../../../_lib/consts";
 import { metadataPlan } from "../../../_lib/seo";
+import { marcaPorEmpresa, marcaPorSlug, rutaMarca } from "../../../_lib/company";
 
 type ContratarPlanPageProps = {
   params: Promise<{
+    marca: string;
     planId: string;
   }>;
 };
 
-export async function generateStaticParams() {
-  const planes = await getLandingPlanes();
+/** Cada sitio genera la contratación de sus planes. */
+export async function generateStaticParams({
+  params,
+}: {
+  params: { marca: string };
+}) {
+  const marca = marcaPorSlug(params.marca);
+  const planes = await getLandingPlanes(undefined, marca.idEmpresa);
   return planes.map((plan) => ({
     planId: String(plan.id_plan),
   }));
@@ -30,11 +38,18 @@ export async function generateMetadata({
 }
 
 export default async function ContratarPlanPage({ params }: ContratarPlanPageProps) {
-  const { planId } = await params;
+  const { marca: slug, planId } = await params;
+  const marca = marcaPorSlug(slug);
   const plan = await getPlanById(Number(planId));
 
   if (!plan) {
-    redirect("/planes");
+    redirect(rutaMarca(marca, "/planes"));
+  }
+
+  // Un plan se contrata en el sitio de su empresa: el prospecto queda en ella.
+  const deLaEmpresa = marcaPorEmpresa(plan.id_empresa);
+  if (plan.id_empresa != null && deLaEmpresa.slug !== marca.slug) {
+    redirect(rutaMarca(deLaEmpresa, `/contratar/${planId}`));
   }
 
   return (
@@ -58,13 +73,13 @@ export default async function ContratarPlanPage({ params }: ContratarPlanPagePro
       <nav aria-label="Breadcrumb" className="mx-auto max-w-7xl mb-4">
         <ol className="flex items-center gap-2 text-sm text-muted">
           <li>
-            <Link href="/" className="hover:text-foreground transition-colors">
+            <Link href={rutaMarca(marca, "/")} className="hover:text-foreground transition-colors">
               Inicio
             </Link>
           </li>
           <li aria-hidden>/</li>
           <li>
-            <Link href="/planes" className="hover:text-foreground transition-colors">
+            <Link href={rutaMarca(marca, "/planes")} className="hover:text-foreground transition-colors">
               Planes
             </Link>
           </li>

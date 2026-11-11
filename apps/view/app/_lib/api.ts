@@ -6,6 +6,8 @@ import { apiUrl } from "./api-servidor";
 
 export type PlanBackend = {
   id_plan: number;
+  /** De qué empresa es (1 Finet, 2 Cable Mágico). Opcional en los datos de prueba. */
+  id_empresa?: number | null;
   nombre_comercial: string;
   tipo_plan: string;
   tipo_cliente: string;
@@ -34,11 +36,16 @@ export function idPlanDestacado(ordenados: PlanBackend[]): number | null {
  * "backend caido" con "catalogo vacio", como el sitemap (CU-74).
  */
 export async function fetchLandingPlanes(
-  tipoCliente?: string
+  tipoCliente?: string,
+  idEmpresa?: number
 ): Promise<PlanBackend[]> {
   const url = new URL(apiUrl("/landing/planes"));
   if (tipoCliente) {
     url.searchParams.set("tipo_cliente", tipoCliente);
+  }
+  // Cada sitio (Finet o Cable Mágico) muestra solo sus planes.
+  if (idEmpresa) {
+    url.searchParams.set("id_empresa", String(idEmpresa));
   }
 
   const res = await fetch(url.toString(), { next: { revalidate: 300 } });
@@ -52,10 +59,11 @@ export async function fetchLandingPlanes(
 }
 
 export async function getLandingPlanes(
-  tipoCliente?: string
+  tipoCliente?: string,
+  idEmpresa?: number
 ): Promise<PlanBackend[]> {
   try {
-    return await fetchLandingPlanes(tipoCliente);
+    return await fetchLandingPlanes(tipoCliente, idEmpresa);
   } catch (error) {
     console.error(
       `Backend no disponible (${error instanceof Error ? error.message : error}). Mostrando catalogo vacio.`

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { metadataSeccion } from "../../_lib/seo";
 import PlanCard from "../../_components/catalog/PlanCard";
 import { getLandingPlanes, ordenarPorPrecio } from "../../_lib/api";
-import { COMPANY_PHONE_DISPLAY, WHATSAPP_URL } from "../../_lib/company";
+import { marcaPorSlug } from "../../_lib/company";
 
 export const metadata: Metadata = metadataSeccion({
   path: "/empresas",
@@ -14,8 +14,13 @@ export const metadata: Metadata = metadataSeccion({
     "Internet fibra optica corporativa para empresas en la zona sur de Santiago.",
 });
 
-export default async function EmpresasPage() {
-  const planes = await getLandingPlanes("EMPRESARIAL");
+export default async function EmpresasPage({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}) {
+  const marca = marcaPorSlug((await params).marca);
+  const planes = await getLandingPlanes("EMPRESARIAL", marca.idEmpresa);
   const sorted = ordenarPorPrecio(planes);
 
   return (
@@ -32,7 +37,7 @@ export default async function EmpresasPage() {
         {sorted.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-3">
             {sorted.map((plan) => (
-              <PlanCard key={plan.id_plan} plan={plan} />
+              <PlanCard key={plan.id_plan} plan={plan} marca={marca} />
             ))}
           </div>
         ) : (
@@ -47,10 +52,10 @@ export default async function EmpresasPage() {
             <p className="mt-4 text-sm font-medium text-foreground">
               WhatsApp:{" "}
               <a
-                href={WHATSAPP_URL}
+                href={marca.whatsappUrl}
                 className="text-primary hover:underline"
               >
-                {COMPANY_PHONE_DISPLAY}
+                {marca.telefono.display}
               </a>
             </p>
           </div>
