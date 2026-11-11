@@ -83,6 +83,29 @@ describe('LandingService', () => {
       expect(result).toHaveLength(1);
     });
 
+    it('filtra por empresa cuando se pasa: cada sitio muestra solo sus planes', async () => {
+      (prisma.plan.findMany as jest.Mock).mockResolvedValue([
+        {
+          id_plan: 2,
+          id_empresa: 2,
+          nombre_comercial: 'Plan QA Cable Magico',
+          tipo_plan: 'fibra',
+          tipo_cliente: 'Residencial',
+          velocidad_mbps: 300,
+          precio_mensual: 19990,
+          descripcion: null,
+        },
+      ]);
+
+      const result = await service.getPlanes(undefined, 2);
+
+      expect(prisma.plan.findMany).toHaveBeenCalledWith({
+        where: { activo: true, id_empresa: 2 },
+        orderBy: { precio_mensual: 'asc' },
+      });
+      expect(result[0].id_empresa).toBe(2);
+    });
+
     it('Excepcion 2: lanza NotFoundException cuando no hay planes para el segmento', async () => {
       (prisma.plan.findMany as jest.Mock).mockResolvedValue([]);
 

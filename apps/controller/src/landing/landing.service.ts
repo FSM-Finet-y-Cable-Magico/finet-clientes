@@ -16,13 +16,20 @@ export class LandingService {
    * CU-17: Mostrar detalles tecnicos y comerciales de cada plan
    *        (nombre, velocidad, precio, caracteristicas).
    * Endpoint publico — no requiere autenticacion.
+   *
+   * Con `idEmpresa`, solo los planes de esa empresa: el sitio de Finet y el de
+   * Cable Mágico muestran cada uno los suyos (Documento 0, §6.6).
    */
-  async getPlanes(tipoCliente?: string): Promise<PlanResponseDto[]> {
+  async getPlanes(
+    tipoCliente?: string,
+    idEmpresa?: number,
+  ): Promise<PlanResponseDto[]> {
     try {
       const planes = await this.prisma.plan.findMany({
         where: {
           activo: true,
           ...(tipoCliente ? { tipo_cliente: tipoCliente } : {}),
+          ...(idEmpresa ? { id_empresa: idEmpresa } : {}),
         },
         orderBy: { precio_mensual: 'asc' },
       });
@@ -35,6 +42,7 @@ export class LandingService {
 
       return planes.map((p) => ({
         id_plan: p.id_plan,
+        id_empresa: p.id_empresa,
         nombre_comercial: p.nombre_comercial,
         tipo_plan: p.tipo_plan,
         tipo_cliente: p.tipo_cliente,
