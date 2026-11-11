@@ -252,9 +252,31 @@ describe('AvisoCorteService', () => {
 
     const enlace = (mail.sendAvisoCorte as jest.Mock).mock
       .calls[0]![4] as string;
-    expect(enlace.startsWith(`${SITIO}/pagar?t=`)).toBe(true);
+    // El cliente del fixture es de Cable Mágico: el enlace va a su sitio.
+    expect(enlace.startsWith(`${SITIO}/cable-magico/pagar?t=`)).toBe(true);
     const token = new URL(enlace).searchParams.get('t')!;
     expect(enlaces.verificarEnlacePago(token)).toBe(10);
+  });
+
+  it('el enlace de un cliente de Finet va al sitio de Finet, sin prefijo', async () => {
+    (prisma.factura.findMany as jest.Mock).mockResolvedValue([
+      factura({
+        contrato: {
+          cliente: {
+            id_cliente: 10,
+            id_empresa: 1,
+            nombre_completo: 'Ana',
+            email: 'ana@b.cl',
+          },
+        },
+      }),
+    ]);
+
+    await service.ejecutar(HOY, CON_DATOS);
+
+    const enlace = (mail.sendAvisoCorte as jest.Mock).mock
+      .calls[0]![4] as string;
+    expect(enlace.startsWith(`${SITIO}/pagar?t=`)).toBe(true);
   });
 
   it('registra el aviso en log_notificacion con su propia plantilla', async () => {

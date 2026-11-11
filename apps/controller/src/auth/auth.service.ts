@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
+import { rutaDelSitio } from '../common/constants/empresas.js';
 
 /**
  * CU-05: "se registra el evento en la bitácora de auditoría". Y es lo que deja el
@@ -46,7 +47,7 @@ function huellaPassword(hash: string | null): string {
 type TipoEnlace = 'reset' | 'registro';
 
 /** Dónde abre cada enlace en la vista. */
-const RUTA_ENLACE: Record<TipoEnlace, string> = {
+const RUTA_ENLACE: Record<TipoEnlace, `/${string}`> = {
   reset: '/restablecer-password',
   registro: '/registro/confirmar',
 };
@@ -527,7 +528,11 @@ export class AuthService {
    * servir.
    */
   private async crearEnlace(
-    cliente: { id_cliente: number; password_portal_hash: string | null },
+    cliente: {
+      id_cliente: number;
+      id_empresa: number | null;
+      password_portal_hash: string | null;
+    },
     tipo: TipoEnlace,
   ): Promise<string> {
     const token = await this.jwtService.signAsync(
@@ -539,7 +544,8 @@ export class AuthService {
       { expiresIn: '30m' },
     );
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    return `${frontendUrl}${RUTA_ENLACE[tipo]}#token=${token}`;
+    // Al sitio de la empresa del cliente: Cable Mágico vive bajo su prefijo.
+    return `${frontendUrl}${rutaDelSitio(cliente.id_empresa, RUTA_ENLACE[tipo])}#token=${token}`;
   }
 
   /**

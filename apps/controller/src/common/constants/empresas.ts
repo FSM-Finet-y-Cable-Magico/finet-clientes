@@ -51,3 +51,14 @@ export function empresaDe(idEmpresa: number | null | undefined): Empresa {
     esEmpresaConocida(idEmpresa) ? idEmpresa : ID_EMPRESA_POR_DEFECTO
   ];
 }
+
+/**
+ * Una ruta del sitio de la empresa, para los enlaces que se mandan por correo
+ * o con que se vuelve de Webpay: Cable Mágico vive bajo su prefijo.
+ */
+export function rutaDelSitio(
+  idEmpresa: number | null | undefined,
+  ruta: `/${string}`,
+): string {
+  return `${empresaDe(idEmpresa).prefijoWeb}${ruta}`;
+}

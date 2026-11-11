@@ -1,5 +1,10 @@
 import { describe, it, expect } from '@jest/globals';
-import { EMPRESAS, empresaDe, esEmpresaConocida } from './empresas.js';
+import {
+  EMPRESAS,
+  empresaDe,
+  esEmpresaConocida,
+  rutaDelSitio,
+} from './empresas.js';
 
 /** Las dos empresas del portal (Documento 0, §6.6), con los ids de la base. */
 describe('empresas', () => {
@@ -30,5 +35,11 @@ describe('empresas', () => {
     expect(esEmpresaConocida(2)).toBe(true);
     expect(esEmpresaConocida(3)).toBe(false);
     expect(esEmpresaConocida(null)).toBe(false);
+  });
+
+  it('una ruta del sitio lleva el prefijo de su empresa', () => {
+    expect(rutaDelSitio(1, '/pagar')).toBe('/pagar');
+    expect(rutaDelSitio(2, '/pagar')).toBe('/cable-magico/pagar');
+    expect(rutaDelSitio(null, '/pagar')).toBe('/pagar');
   });
 });

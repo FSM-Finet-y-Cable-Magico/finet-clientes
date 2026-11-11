@@ -383,6 +383,29 @@ describe('AuthService', () => {
         );
       });
 
+      it('el enlace lleva al sitio de la empresa del cliente', async () => {
+        porRut.mockResolvedValue({ ...sinCuenta, id_empresa: 2 });
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
+
+        await authService.solicitarRegistro('123456785');
+
+        const enlace = correo().sendRegistroCuenta.mock.calls[0][2] as string;
+        expect(enlace).toMatch(
+          /\/cable-magico\/registro\/confirmar#token=registro-token$/,
+        );
+      });
+
+      it('el enlace de un cliente de Finet no lleva prefijo', async () => {
+        porRut.mockResolvedValue({ ...sinCuenta, id_empresa: 1 });
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
+
+        await authService.solicitarRegistro('123456785');
+
+        const enlace = correo().sendRegistroCuenta.mock.calls[0][2] as string;
+        expect(enlace).not.toContain('/cable-magico');
+        expect(enlace).toMatch(/\/registro\/confirmar#token=registro-token$/);
+      });
+
       it('si el correo no sale, lo dice en vez de decir que se envió', async () => {
         porRut.mockResolvedValue(sinCuenta);
         correo().sendRegistroCuenta.mockRejectedValueOnce(

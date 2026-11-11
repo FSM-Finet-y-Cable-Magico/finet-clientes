@@ -32,6 +32,7 @@ import {
   diaG8,
   facturasQueVencenEl,
 } from './deuda-g8.js';
+import { rutaDelSitio } from '../common/constants/empresas.js';
 
 /** Lo que el aviso necesita y todavía no está en el sistema. Ver `common/pendientes.ts`. */
 export type DatosAvisoCorte = {
@@ -210,7 +211,7 @@ export class AvisoCorteService {
               c.nombre,
               deuda,
               ayer,
-              this.enlacePago(sitio, c.idCliente),
+              this.enlacePago(sitio, c.idCliente, c.idEmpresa),
               c.idEmpresa,
             ),
         });
@@ -231,7 +232,12 @@ export class AvisoCorteService {
   }
 
   /** RF-50 y RNF-50.1: enlace corto, único y firmado. */
-  private enlacePago(sitio: string, idCliente: number): string {
-    return `${sitio}/pagar?t=${this.enlaces.crearEnlacePago(idCliente)}`;
+  /** Al sitio de la empresa del cliente: Cable Mágico vive bajo su prefijo. */
+  private enlacePago(
+    sitio: string,
+    idCliente: number,
+    idEmpresa: number | null,
+  ): string {
+    return `${sitio}${rutaDelSitio(idEmpresa, '/pagar')}?t=${this.enlaces.crearEnlacePago(idCliente)}`;
   }
 }
