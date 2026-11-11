@@ -1,4 +1,4 @@
-import { enrutarMarca } from "@/app/_lib/enrutar-marca";
+import { destinoInterno, enrutarMarca } from "@/app/_lib/enrutar-marca";
 
 /**
  * Qué hace `proxy.ts` con cada ruta. Una sola app para las dos empresas, como
@@ -109,5 +109,29 @@ describe("enrutarMarca", () => {
       destino: "/finet/cable-magicos",
       marca: "finet",
     });
+  });
+});
+
+/** OWASP A01: después del login solo se vuelve a una página del portal. */
+describe("destinoInterno", () => {
+  it("acepta una ruta del portal, con o sin prefijo de empresa", () => {
+    expect(destinoInterno("/portal/deuda", "/portal")).toBe("/portal/deuda");
+    expect(destinoInterno("/cable-magico/portal?x=1", "/portal")).toBe(
+      "/cable-magico/portal?x=1",
+    );
+  });
+
+  it("descarta cualquier destino fuera del portal", () => {
+    for (const malo of [
+      "https://evil.example",
+      "//evil.example",
+      "/\\evil.example",
+      "javascript:alert(1)",
+      "portal",
+      "",
+    ]) {
+      expect(destinoInterno(malo, "/portal")).toBe("/portal");
+    }
+    expect(destinoInterno(null, "/cable-magico/portal")).toBe("/cable-magico/portal");
   });
 });

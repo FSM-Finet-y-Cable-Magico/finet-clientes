@@ -86,3 +86,15 @@ export function enrutarMarca(entrada: EntradaMarca): DecisionMarca {
     guardarCookie: e.marcaCookie === elegida ? null : conPrefijo || e.marcaToken ? elegida : null,
   };
 }
+
+/**
+ * A dónde volver después del login (`?redirect=`): solo a una ruta del mismo
+ * sitio. Una URL absoluta, "//otro" o "/\\otro" sacaría al cliente del portal
+ * recién autenticado: un open redirect que sirve para phishing (OWASP A01).
+ */
+export function destinoInterno(
+  valor: string | null | undefined,
+  porDefecto: string,
+): string {
+  return valor && /^\/(?![/\\])/.test(valor) ? valor : porDefecto;
+}

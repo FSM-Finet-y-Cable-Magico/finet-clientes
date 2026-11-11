@@ -17,6 +17,7 @@ import { MensajeError } from "./MensajesFormulario";
 import { erroresPorCampo, validarCampo } from "../utils/errores-formulario";
 import { useMarca } from "../_lib/marca";
 import { rutaMarca } from "../_lib/company";
+import { destinoInterno } from "../_lib/enrutar-marca";
 
 export default function LoginForm() {
   const marca = useMarca();
@@ -61,7 +62,8 @@ export default function LoginForm() {
         { rut: cleanRut(result.data.rut), password: result.data.password }
       );
       login(data.cliente);
-      router.push(redirect ?? "/portal");
+      // Solo a una página del portal; por defecto, el de su empresa.
+      router.push(destinoInterno(redirect, rutaMarca(marca, "/portal")));
     } catch (err) {
       const error = err as ApiError;
       securityLogger.loginFailed(result.data.rut, error.message ?? "Error desconocido");
