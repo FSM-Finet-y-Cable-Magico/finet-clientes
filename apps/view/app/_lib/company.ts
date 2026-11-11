@@ -191,23 +191,3 @@ export function separarMarca(pathname: string): { marca: Marca; ruta: string } {
   }
   return { marca: MARCA_POR_DEFECTO, ruta: pathname };
 }
-
-/*
- * Transición: los nombres anteriores, derivados de Finet, mientras cada
- * pantalla pasa a usar la marca de su página. Se borran al terminar.
- */
-export const COMPANY_LEGAL_NAME = MARCAS.finet.razonSocial;
-export const COMPANY_BRAND = MARCAS.finet.nombre;
-export const COMPANY_PHONE_E164 = MARCAS.finet.telefono.e164;
-export const COMPANY_PHONE_DISPLAY = MARCAS.finet.telefono.display;
-export const COMPANY_PHONE_TEL = MARCAS.finet.telefono.tel;
-export const WHATSAPP_URL = MARCAS.finet.whatsappUrl;
-export const COMPANY_RUT: string | null = MARCAS.finet.rut;
-export const COMPANY_STREET_ADDRESS: string | null = MARCAS.finet.direccion.calle;
-export const COMPANY_CONTACT_EMAIL: string | null = MARCAS.finet.correoContacto;
-export const COMPANY_PRIVACY_EMAIL: string | null = MARCAS.finet.correoPrivacidad;
-export const COMPANY_ADDRESS = {
-  locality: MARCAS.finet.direccion.comuna,
-  region: MARCAS.finet.direccion.region,
-  country: MARCAS.finet.direccion.pais,
-} as const;

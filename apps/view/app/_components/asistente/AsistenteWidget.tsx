@@ -5,7 +5,8 @@ import { MessageCircle, RotateCcw, Send, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api } from "../../utils/api";
-import { COMPANY_PHONE_DISPLAY, WHATSAPP_URL } from "../../_lib/company";
+import { useMarca } from "../../_lib/marca";
+import type { Marca } from "../../_lib/company";
 
 type Mensaje = { rol: "usuario" | "asistente"; texto: string };
 
@@ -26,7 +27,10 @@ type RespuestaAsistente = { respuesta: string | null; derivado?: boolean };
 /** Mismo tope que valida el backend (MAX_LARGO_MENSAJE en apps/controller). */
 const MAX_LARGO_MENSAJE = 1000;
 
-const STORAGE_KEY = "finet-asistente";
+/** Una conversación por empresa: la de Finet sigue en `finet-asistente`. */
+function claveConversacion(marca: Marca): string {
+  return `${marca.slug}-asistente`;
+}
 
 /**
  * CU-63: pasadas 48 horas sin interacción la conversación empieza de nuevo y
@@ -35,8 +39,9 @@ const STORAGE_KEY = "finet-asistente";
  */
 const LIMITE_INACTIVIDAD_MS = 48 * 60 * 60 * 1000;
 
-const BIENVENIDA =
-  "¡Hola! Soy el asistente virtual de Finet. ¿En qué te puedo ayudar?";
+function bienvenidaDe(marca: Marca): string {
+  return `¡Hola! Soy el asistente virtual de ${marca.nombre}. ¿En qué te puedo ayudar?`;
+}
 
 /**
  * La conversación vive en localStorage para que sobreviva a cerrar la pestaña
@@ -47,9 +52,9 @@ const BIENVENIDA =
  * Todo acceso va en try/catch: el storage puede estar bloqueado (modo
  * privado, cookies deshabilitadas) y el widget tiene que funcionar igual.
  */
-function leerConversacion(): Conversacion | null {
+function leerConversacion(clave: string): Conversacion | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(clave);
     if (!raw) return null;
     const data = JSON.parse(raw) as Partial<ConversacionGuardada>;
     if (
@@ -58,7 +63,7 @@ function leerConversacion(): Conversacion | null {
       typeof data.ultimaActividad !== "number" ||
       Date.now() - data.ultimaActividad > LIMITE_INACTIVIDAD_MS
     ) {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(clave);
       return null;
     }
     return {
@@ -71,16 +76,16 @@ function leerConversacion(): Conversacion | null {
   }
 }
 
-function guardarConversacion(conversacion: Conversacion | null) {
+function guardarConversacion(clave: string, conversacion: Conversacion | null) {
   try {
     if (conversacion) {
       const guardada: ConversacionGuardada = {
         ...conversacion,
         ultimaActividad: Date.now(),
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(guardada));
+      localStorage.setItem(clave, JSON.stringify(guardada));
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(clave);
     }
   } catch {
     // Sin storage la conversación sigue funcionando, solo no sobrevive a una recarga.
@@ -93,10 +98,13 @@ function guardarConversacion(conversacion: Conversacion | null) {
  * no responde ni el chatbot. El CU pide decir que un agente humano tomará el
  * caso, pero todavía no hay ninguno: el texto dice lo que sí existe.
  */
-const SIN_RESPUESTA =
-  "No pude responder en este momento. Una persona de nuestro equipo puede " +
-  `atenderte por WhatsApp al ${COMPANY_PHONE_DISPLAY}. Desde aquí ya no podré ` +
-  "responder más mensajes en esta conversación.";
+function sinRespuestaDe(marca: Marca): string {
+  return (
+    "No pude responder en este momento. Una persona de nuestro equipo puede " +
+    `atenderte por WhatsApp al ${marca.telefono.display}. Desde aquí ya no podré ` +
+    "responder más mensajes en esta conversación."
+  );
+}
 
 function statusDeError(error: unknown): unknown {
   return typeof error === "object" && error !== null && "status" in error
@@ -128,6 +136,9 @@ function mensajeDeError(status: unknown): string {
  * que reenvía a finet-chatbot.
  */
 export default function AsistenteWidget() {
+  // El asistente del sitio en que está: su nombre, su WhatsApp y su empresa.
+  const marca = useMarca();
+  const clave = claveConversacion(marca);
   const [abierto, setAbierto] = useState(false);
   const [cargado, setCargado] = useState(false);
   const [idSesion, setIdSesion] = useState<string | null>(null);
@@ -159,7 +170,7 @@ export default function AsistenteWidget() {
     // Se lee al abrir y no al montar: el panel cerrado no necesita la
     // conversación, y así el render del servidor y el del cliente coinciden.
     if (!cargado) {
-      const guardada = leerConversacion();
+      const guardada = leerConversacion(clave);
       if (guardada) {
         setIdSesion(guardada.idSesion);
         setMensajes(guardada.mensajes);
@@ -180,7 +191,7 @@ export default function AsistenteWidget() {
     setMensajes([]);
     setError(null);
     setTerminada(false);
-    guardarConversacion(null);
+    guardarConversacion(clave, null);
     inputRef.current?.focus();
   }
 
@@ -202,6 +213,7 @@ export default function AsistenteWidget() {
         await api.post<RespuestaAsistente>("/asistente/mensajes", {
           id_sesion: sesion,
           mensaje: texto,
+          id_empresa: marca.idEmpresa,
         });
       // Sin respuesta, la conversación ya estaba derivada y el chatbot
       // descartó el mensaje: no se muestra como si se hubiera enviado.
@@ -211,7 +223,7 @@ export default function AsistenteWidget() {
           : [...conPregunta, { rol: "asistente", texto: respuesta }];
       setMensajes(conRespuesta);
       setTerminada(derivado);
-      guardarConversacion({
+      guardarConversacion(clave, {
         idSesion: sesion,
         mensajes: conRespuesta,
         terminada: derivado,
@@ -231,11 +243,11 @@ export default function AsistenteWidget() {
       // el chatbot cuando su motor no responde.
       const conAviso: Mensaje[] = [
         ...conPregunta,
-        { rol: "asistente", texto: SIN_RESPUESTA },
+        { rol: "asistente", texto: sinRespuestaDe(marca) },
       ];
       setMensajes(conAviso);
       setTerminada(true);
-      guardarConversacion({
+      guardarConversacion(clave, {
         idSesion: sesion,
         mensajes: conAviso,
         terminada: true,
@@ -269,13 +281,13 @@ export default function AsistenteWidget() {
         <section
           id="asistente-panel"
           role="dialog"
-          aria-label="Asistente virtual de Finet"
+          aria-label={`Asistente virtual de ${marca.nombre}`}
           onKeyDown={onKeyDownPanel}
           className="fixed bottom-24 right-4 z-40 flex h-[min(34rem,calc(100dvh-8rem))] w-[calc(100vw-2rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-background shadow-xl sm:right-6"
         >
           <header className="flex items-center justify-between gap-2 bg-primary px-4 py-3 text-background">
             <div>
-              <h2 className="text-sm font-semibold">Asistente Finet</h2>
+              <h2 className="text-sm font-semibold">Asistente {marca.nombre}</h2>
               <p className="text-xs opacity-90">Respuestas automáticas</p>
             </div>
             <div className="flex items-center gap-1">
@@ -307,7 +319,7 @@ export default function AsistenteWidget() {
             aria-label="Conversación"
             className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
           >
-            <Burbuja rol="asistente" texto={BIENVENIDA} />
+            <Burbuja rol="asistente" texto={bienvenidaDe(marca)} />
             {mensajes.map((m, i) => (
               <Burbuja key={i} rol={m.rol} texto={m.texto} />
             ))}
@@ -376,7 +388,7 @@ export default function AsistenteWidget() {
             pediremos tu RUT para identificarte: nunca compartas contraseñas.
             Para trámites, escríbenos por{" "}
             <a
-              href={WHATSAPP_URL}
+              href={marca.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="underline hover:text-primary"

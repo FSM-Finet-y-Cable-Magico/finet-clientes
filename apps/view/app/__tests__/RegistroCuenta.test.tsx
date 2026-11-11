@@ -13,7 +13,7 @@ jest.mock("@/app/_lib/auth", () => ({ useAuth: () => ({ ...sesion, login }) }));
 jest.mock("@/app/utils/api", () => ({ api: { post: jest.fn() } }));
 
 import { api } from "@/app/utils/api";
-import { WHATSAPP_URL } from "@/app/_lib/company";
+import { MARCAS } from "@/app/_lib/company";
 import RegistroForm from "@/app/components/RegistroForm";
 import ConfirmarRegistroForm from "@/app/components/ConfirmarRegistroForm";
 import ConfirmarRegistroPage from "@/app/[marca]/registro/confirmar/page";
@@ -77,7 +77,7 @@ describe("CU-04: el RUT (paso 1)", () => {
 
     expect(await screen.findByText("No podemos crear tu cuenta en línea")).toBeInTheDocument();
     const whatsapp = screen.getByRole("link", { name: /Escribir por WhatsApp/ });
-    expect(whatsapp).toHaveAttribute("href", WHATSAPP_URL);
+    expect(whatsapp).toHaveAttribute("href", MARCAS.finet.whatsappUrl);
     expect(whatsapp).toHaveAttribute("target", "_blank");
     expect(whatsapp).toHaveAttribute("rel", "noopener noreferrer");
   });
