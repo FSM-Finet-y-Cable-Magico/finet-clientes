@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import CoberturaPage from '@/app/cobertura/page';
+import CoberturaPage from '@/app/[marca]/cobertura/page';
 import type {
   PuntoCobertura,
   VisorCoberturaConfig,

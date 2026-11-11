@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 
-import ResultadoPago from '@/app/pagar/_components/ResultadoPago';
+import ResultadoPago from '@/app/[marca]/pagar/_components/ResultadoPago';
 import { WHATSAPP_URL } from '@/app/_lib/company';
 
 process.env.TZ = 'America/Santiago';

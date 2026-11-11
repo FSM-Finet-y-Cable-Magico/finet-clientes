@@ -145,7 +145,7 @@ describe("URL del backend desde el servidor de Next (API_URL)", () => {
 
   it("cambio de clave WiFi", async () => {
     const { changeWifiPassword } = await import(
-      "@/app/portal/_lib/portal-actions"
+      "@/app/[marca]/portal/_lib/portal-actions"
     );
     await expect(changeWifiPassword(1, "MiRed2026")).resolves.toEqual({
       success: true,
@@ -156,7 +156,7 @@ describe("URL del backend desde el servidor de Next (API_URL)", () => {
   it("cambio de clave WiFi sin API_URL: no llama y avisa", async () => {
     delete process.env.API_URL;
     const { changeWifiPassword } = await import(
-      "@/app/portal/_lib/portal-actions"
+      "@/app/[marca]/portal/_lib/portal-actions"
     );
     const r = await changeWifiPassword(1, "MiRed2026");
     expect(r.success).toBe(false);

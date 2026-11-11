@@ -3,6 +3,9 @@
 import { useState, type CSSProperties } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { useMarca } from "../../../_lib/marca";
+import { rutaMarca } from "../../../_lib/company";
 
 const SLIDES = [
   {
@@ -23,6 +26,7 @@ const SLIDES = [
 ];
 
 export const Hero = () => {
+  const marca = useMarca();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const prevSlide = () => {
@@ -93,13 +97,13 @@ export const Hero = () => {
                   {slide.subtitle}
                 </p>
 
-                <a
-                  href="/planes"
+                <Link
+                  href={rutaMarca(marca, "/planes")}
                   tabIndex={isActive ? 0 : -1}
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-3 text-base font-bold text-background hover:bg-primary-bright transition-colors shadow-lg shadow-primary/25"
                 >
                   Ver Planes
-                </a>
+                </Link>
               </div>
             </div>
           );

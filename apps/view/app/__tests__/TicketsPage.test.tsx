@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import TicketsPage from "@/app/portal/tickets/page";
+import TicketsPage from "@/app/[marca]/portal/tickets/page";
 
 process.env.TZ = "America/Santiago";
 

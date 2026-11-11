@@ -7,6 +7,8 @@ import { WHATSAPP_URL } from "../_lib/company";
 import LoginBranding from "./LoginBranding";
 import PanelAviso from "./PanelAviso";
 import SolicitudPorRut from "./SolicitudPorRut";
+import { useMarca } from "../_lib/marca";
+import { rutaMarca } from "../_lib/company";
 
 /** Lo que responde `POST /auth/registro`; el texto de cada caso lo pone la vista. */
 type ResultadoRegistro =
@@ -32,6 +34,7 @@ export default function RegistroForm({
 }: {
   onIniciarSesion: () => void;
 }) {
+  const marca = useMarca();
   const [resultado, setResultado] = useState<ResultadoRegistro | null>(null);
 
   const volverAlLogin = (margen: "mt-3" | "mt-6") => (
@@ -155,12 +158,12 @@ export default function RegistroForm({
 
       <p className="mt-6 text-center text-xs text-muted">
         Al registrarte aceptas nuestros{" "}
-        <a
-          href="/terminos"
+        <Link
+          href={rutaMarca(marca, "/terminos")}
           className="text-primary underline hover:opacity-80"
         >
           Términos y Condiciones
-        </a>
+        </Link>
       </p>
     </div>
   );

@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import { Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
-import Navbar from "./_components/layout/navbar/Navbar";
-import Footer from "./_components/layout/footer/Footer";
-import AsistenteWidget from "./_components/asistente/AsistenteWidget";
 import BannerCookies from "./_components/legal/BannerCookies";
 import { themeScript } from "./_components/layout/theme/theme-script";
 import { BASE_URL } from "./_lib/consts";
@@ -108,12 +105,9 @@ export default function RootLayout({
           Saltar al contenido principal
         </a>
         <AuthProvider>
-          <Navbar />
-          <main id="main-content" className="flex-1">
-            {children}
-          </main>
-          <Footer />
-          <AsistenteWidget />
+          {/* La barra, el pie y el asistente van con la marca de la página:
+              los pone app/[marca]/layout.tsx (MarcaShell). */}
+          {children}
           {/* CU-76: sale solo si el navegador no tiene preferencia guardada. */}
           <BannerCookies />
         </AuthProvider>

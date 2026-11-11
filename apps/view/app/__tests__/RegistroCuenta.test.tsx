@@ -16,8 +16,8 @@ import { api } from "@/app/utils/api";
 import { WHATSAPP_URL } from "@/app/_lib/company";
 import RegistroForm from "@/app/components/RegistroForm";
 import ConfirmarRegistroForm from "@/app/components/ConfirmarRegistroForm";
-import ConfirmarRegistroPage from "@/app/registro/confirmar/page";
-import InicioSesionPage from "@/app/inicio-sesion/page";
+import ConfirmarRegistroPage from "@/app/[marca]/registro/confirmar/page";
+import InicioSesionPage from "@/app/[marca]/inicio-sesion/page";
 
 // CU-04 sobre un cliente que G8 ya creó: se pide el RUT, se manda un enlace al
 // correo registrado y con él se crea la contraseña y se abre la sesión.

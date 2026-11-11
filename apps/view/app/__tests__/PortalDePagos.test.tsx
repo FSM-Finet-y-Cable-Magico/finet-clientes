@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
-import PortalDePagos from '@/app/pagar/_components/PortalDePagos';
+import PortalDePagos from '@/app/[marca]/pagar/_components/PortalDePagos';
 import { WHATSAPP_URL } from '@/app/_lib/company';
 
 const MEDIOS = [

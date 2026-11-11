@@ -15,8 +15,11 @@ import RutInput from "./RutInput";
 import PasswordInput from "./PasswordInput";
 import { MensajeError } from "./MensajesFormulario";
 import { erroresPorCampo, validarCampo } from "../utils/errores-formulario";
+import { useMarca } from "../_lib/marca";
+import { rutaMarca } from "../_lib/company";
 
 export default function LoginForm() {
+  const marca = useMarca();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
@@ -129,9 +132,12 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-xs text-muted">
         Al ingresar aceptas nuestros{" "}
-        <a href="/terminos" className="text-primary underline hover:opacity-80">
+        <Link
+          href={rutaMarca(marca, "/terminos")}
+          className="text-primary underline hover:opacity-80"
+        >
           Términos y Condiciones
-        </a>
+        </Link>
       </p>
     </div>
   );

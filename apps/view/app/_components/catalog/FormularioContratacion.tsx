@@ -10,6 +10,9 @@ import {
   POLITICA_PRIVACIDAD_VERSION,
 } from "../../_lib/legal";
 import { cleanTelefono, formatRut, formatTelefono } from "../../utils/login-schema";
+import Link from "next/link";
+import { useMarca } from "../../_lib/marca";
+import { rutaMarca } from "../../_lib/company";
 
 type FormularioContratacionProps = {
   plan: PlanBackend;
@@ -31,6 +34,7 @@ async function mensajeDeError(res: Response): Promise<string> {
 }
 
 export default function FormularioContratacion({ plan }: FormularioContratacionProps) {
+  const marca = useMarca();
   const [status, setStatus] = useState<FormState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
@@ -102,12 +106,12 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
           y quedó registrada tu aceptación de la Política de Privacidad. Te
           contactaremos pronto al telefono y correo proporcionados.
         </p>
-        <a
-          href="/planes"
+        <Link
+          href={rutaMarca(marca, "/planes")}
           className="text-sm text-primary hover:underline"
         >
           &larr; Volver a planes
-        </a>
+        </Link>
       </div>
     );
   }

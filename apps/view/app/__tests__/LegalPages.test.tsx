@@ -1,9 +1,9 @@
 import "@testing-library/jest-dom";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import PrivacidadPage from "@/app/(legal)/privacidad/page";
-import TerminosPage from "@/app/(legal)/terminos/page";
-import LegalError from "@/app/(legal)/error";
+import PrivacidadPage from "@/app/[marca]/(legal)/privacidad/page";
+import TerminosPage from "@/app/[marca]/(legal)/terminos/page";
+import LegalError from "@/app/[marca]/(legal)/error";
 import { Correo, Dato } from "@/app/_components/legal/Pendiente";
 import { legalLinks } from "@/app/_components/layout/footer/footer.config";
 

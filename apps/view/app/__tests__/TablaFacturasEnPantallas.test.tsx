@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push: jest.fn() }) }));
 
-import DeudaPage from "@/app/portal/deuda/page";
+import DeudaPage from "@/app/[marca]/portal/deuda/page";
 import DeudaLookupForm from "@/app/components/DeudaLookupForm";
 
 // Fija el HTML de la tabla de facturas de la consulta pública y de Mi deuda

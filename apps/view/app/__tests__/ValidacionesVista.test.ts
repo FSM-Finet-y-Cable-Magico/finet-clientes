@@ -6,7 +6,7 @@ import {
   recoverySchema,
   resetPasswordSchema,
 } from "@/app/utils/login-schema";
-import { changeWifiPassword } from "@/app/portal/_lib/portal-actions";
+import { changeWifiPassword } from "@/app/[marca]/portal/_lib/portal-actions";
 
 // Fija las reglas de RUT, contraseña y clave WiFi de la vista para que
 // juntarlas en una sola constante no cambie qué se acepta ni qué se muestra.

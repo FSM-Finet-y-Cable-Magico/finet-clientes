@@ -2,8 +2,21 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import type { JWTPayload } from "jose";
+import {
+  esSlugMarca,
+  marcaPorEmpresa,
+  marcaPorSlug,
+  rutaMarca,
+  separarMarca,
+  type SlugMarca,
+} from "./app/_lib/company";
+import { enrutarMarca } from "./app/_lib/enrutar-marca";
 
 const PROTECTED_PATHS = ["/portal", "/perfil"];
+
+/** La empresa que eligió el visitante: solo una preferencia, no da acceso. */
+const COOKIE_MARCA = "empresa";
+const UN_ANIO_S = 60 * 60 * 24 * 365;
 
 const JWT_SECRET = (() => {
   const secret = process.env.JWT_SECRET;
@@ -25,39 +38,70 @@ async function verifyToken(token: string): Promise<JWTPayload | null> {
   }
 }
 
-export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  const isProtected = PROTECTED_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
-
-  if (!isProtected) {
-    return NextResponse.next();
-  }
-
-  const tokenCookie = request.cookies.get("access_token");
-
-  if (!tokenCookie?.value) {
-    const loginUrl = new URL("/inicio-sesion", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  const payload = await verifyToken(tokenCookie.value);
-
-  if (!payload) {
-    const loginUrl = new URL("/inicio-sesion", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
-    loginUrl.searchParams.set("expired", "1");
-    const response = NextResponse.redirect(loginUrl);
-    response.cookies.delete("access_token");
-    return response;
-  }
-
-  return NextResponse.next();
+/** La empresa del token firmado; un token anterior al 11-11 no la trae. */
+function marcaDelToken(payload: JWTPayload | null): SlugMarca | null {
+  const idEmpresa = payload?.id_empresa;
+  return typeof idEmpresa === "number"
+    ? (marcaPorEmpresa(idEmpresa).slug as SlugMarca)
+    : null;
 }
 
-export const proxyConfig = {
-  matcher: ["/portal/:path*", "/perfil/:path*"],
+function alLogin(request: NextRequest, marca: SlugMarca, expirada: boolean) {
+  const { pathname } = request.nextUrl;
+  // El login del sitio de esa empresa.
+  const loginUrl = new URL(
+    rutaMarca(marcaPorSlug(marca), "/inicio-sesion"),
+    request.url,
+  );
+  loginUrl.searchParams.set("redirect", pathname);
+  if (expirada) loginUrl.searchParams.set("expired", "1");
+  const response = NextResponse.redirect(loginUrl);
+  if (expirada) response.cookies.delete("access_token");
+  return response;
+}
+
+export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  const token = request.cookies.get("access_token")?.value;
+  const payload = token ? await verifyToken(token) : null;
+  const cookie = request.cookies.get(COOKIE_MARCA)?.value;
+
+  const decision = enrutarMarca({
+    pathname,
+    search,
+    marcaToken: marcaDelToken(payload),
+    marcaCookie: esSlugMarca(cookie) ? cookie : null,
+  });
+
+  if (decision.tipo === "redirigir") {
+    return NextResponse.redirect(new URL(decision.destino, request.url));
+  }
+
+  // El portal y el perfil piden sesión, en el sitio de cualquier empresa.
+  const { ruta } = separarMarca(pathname);
+  const isProtected = PROTECTED_PATHS.some(
+    (p) => ruta === p || ruta.startsWith(p + "/"),
+  );
+  if (isProtected && !token) return alLogin(request, decision.marca, false);
+  if (isProtected && !payload) return alLogin(request, decision.marca, true);
+
+  const response = NextResponse.rewrite(new URL(decision.destino, request.url));
+  if (decision.guardarCookie) {
+    response.cookies.set(COOKIE_MARCA, decision.guardarCookie, {
+      path: "/",
+      maxAge: UN_ANIO_S,
+      sameSite: "lax",
+      secure: request.nextUrl.protocol === "https:",
+    });
+  }
+  return response;
+}
+
+/**
+ * Todas las páginas, menos lo que Next sirve solo y los archivos con extensión
+ * (imágenes, favicon, sitemap.xml, robots.txt, manifest.json). Next 16 lee
+ * `config`: con otro nombre el proxy correría también para `/_next/…`.
+ */
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|api/|.*\\.[A-Za-z0-9]+$).*)"],
 };

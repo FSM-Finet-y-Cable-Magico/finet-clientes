@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import ServiciosPage from '@/app/portal/servicios/page';
+import ServiciosPage from '@/app/[marca]/portal/servicios/page';
 
 // Las fechas de calendario (@db.Date) llegan como medianoche UTC. Con la hora de
 // Chile, si no se formatean en UTC, se ven un día antes: se fija para que el test
