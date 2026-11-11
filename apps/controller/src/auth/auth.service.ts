@@ -617,12 +617,17 @@ export class AuthService {
   /**
    * La sesión del portal: el JWT de tipo `access`, la fila de `sesion_portal`
    * y los datos del cliente. Cierra las sesiones anteriores del cliente.
+   *
+   * El token lleva la empresa del cliente, como los de G8: cada empresa tiene
+   * su token y la vista se arma según él. `JwtStrategy` la compara con la base
+   * en cada petición, así que no se puede cambiar desde el navegador.
    */
   private async abrirSesion(cliente: ClienteSesion, ip: string) {
     const token = await this.jwtService.signAsync({
       sub: cliente.id_cliente,
       rut: cliente.rut,
       type: 'access',
+      id_empresa: cliente.id_empresa,
     });
 
     await this.invalidarSesionesAnteriores(cliente.id_cliente);

@@ -107,6 +107,20 @@ describe('AuthService', () => {
       expect(result.cliente.rut).toBe('123456785');
     });
 
+    it('el token lleva la empresa del cliente: un token por empresa, como G8 (11-11)', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      porRut.mockResolvedValue({ ...mockCliente, id_empresa: 2 });
+
+      await authService.login('123456785', 'password', '127.0.0.1');
+
+      expect(jwtService.signAsync).toHaveBeenCalledWith({
+        sub: 1,
+        rut: '123456785',
+        type: 'access',
+        id_empresa: 2,
+      });
+    });
+
     it('encuentra al cliente aunque su RUT esté guardado con guion (G3, 29-09)', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       porRut.mockResolvedValue({ ...mockCliente, rut: '12345678-5' });
