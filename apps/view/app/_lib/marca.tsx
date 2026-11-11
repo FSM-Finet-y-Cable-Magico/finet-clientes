@@ -2,6 +2,9 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { MARCA_POR_DEFECTO, marcaPorSlug, type Marca, type SlugMarca } from "./company";
+import { COOKIE_MARCA } from "./enrutar-marca";
+
+const UN_ANIO_S = 60 * 60 * 24 * 365;
 
 /**
  * La marca de la página (Finet o Cable Mágico) para los componentes de
@@ -26,4 +29,12 @@ export function MarcaProvider({
 
 export function useMarca(): Marca {
   return useContext(MarcaContexto);
+}
+
+/**
+ * Deja recordada la empresa que eligió el visitante, para que `proxy.ts` lo
+ * mantenga en su sitio. Es solo una preferencia: no da acceso a nada.
+ */
+export function recordarMarca(slug: SlugMarca): void {
+  document.cookie = `${COOKIE_MARCA}=${slug}; path=/; max-age=${UN_ANIO_S}; samesite=lax`;
 }

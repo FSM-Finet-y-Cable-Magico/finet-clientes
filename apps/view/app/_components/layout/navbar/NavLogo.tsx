@@ -1,14 +1,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { rutaMarca, type Marca } from '../../../_lib/company';
 
-export default function NavLogo() {
+/** El logo de la empresa del sitio, que lleva a su inicio. */
+export default function NavLogo({ marca }: { marca: Marca }) {
   return (
-    <Link href="/" className="flex items-center shrink-0">
+    <Link href={rutaMarca(marca, '/')} className="flex items-center shrink-0">
       <Image
-        src="/brand/FinetLogo.webp"
-        alt="Finet — Internet y TV"
-        width={120}
-        height={40}
+        src={marca.logo.webp}
+        alt={marca.logo.alt}
+        width={marca.logo.ancho}
+        height={marca.logo.alto}
         priority
         className="h-10 w-auto"
       />

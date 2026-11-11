@@ -23,6 +23,9 @@ import {
  * Función pura, sin `next/server`, para probarla sin el runtime de Next.
  */
 
+/** La empresa que eligió el visitante: solo una preferencia, no da acceso. */
+export const COOKIE_MARCA = "empresa";
+
 export type DecisionMarca =
   | { tipo: "redirigir"; destino: string }
   | {

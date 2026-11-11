@@ -14,6 +14,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useAuth } from "../../_lib/auth";
+import { useMarca } from "../../_lib/marca";
+import { rutaMarca, separarMarca } from "../../_lib/company";
 
 const navItems = [
   { href: "/portal", label: "Panel", icon: LayoutDashboard },
@@ -29,7 +31,9 @@ type Props = {
 };
 
 export default function PortalSidebar({ open, onClose }: Props) {
-  const pathname = usePathname();
+  const marca = useMarca();
+  // La ruta sin el prefijo de la empresa: /cable-magico/portal es /portal.
+  const { ruta: pathname } = separarMarca(usePathname());
   const router = useRouter();
   const { logout } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -50,7 +54,7 @@ export default function PortalSidebar({ open, onClose }: Props) {
       setLogoutError(true);
       return;
     }
-    router.push("/inicio-sesion");
+    router.push(rutaMarca(marca, "/inicio-sesion"));
   }
 
   const logoutButton = (
@@ -82,7 +86,7 @@ export default function PortalSidebar({ open, onClose }: Props) {
         return (
           <Link
             key={item.href}
-            href={item.href}
+            href={rutaMarca(marca, item.href as `/${string}`)}
             onClick={onClose}
             aria-current={active ? "page" : undefined}
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
@@ -105,7 +109,7 @@ export default function PortalSidebar({ open, onClose }: Props) {
       <aside className="hidden lg:flex lg:flex-col lg:w-60 lg:border-r lg:border-border lg:bg-surface lg:shrink-0 lg:overflow-y-auto">
         <div className="px-3 pt-4 pb-2">
           <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted">
-            Portal Cliente
+            Portal Cliente {marca.nombre}
           </p>
         </div>
         <div className="flex-1">{sidebarContent}</div>
@@ -123,7 +127,7 @@ export default function PortalSidebar({ open, onClose }: Props) {
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-background border-r border-border shadow-xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-3 pt-4 pb-2">
               <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted">
-                Portal Cliente
+                Portal Cliente {marca.nombre}
               </p>
               <button
                 type="button"

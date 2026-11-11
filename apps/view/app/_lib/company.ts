@@ -85,7 +85,7 @@ export const MARCAS = {
       png: "/brand/FinetLogo.png",
       alt: "Finet — Internet y TV",
       ancho: 120,
-      alto: 79,
+      alto: 40,
     },
     telefono: TELEFONO_FINET,
     whatsappUrl: `https://wa.me/${TELEFONO_FINET.e164}`,

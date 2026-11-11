@@ -10,12 +10,10 @@ import {
   separarMarca,
   type SlugMarca,
 } from "./app/_lib/company";
-import { enrutarMarca } from "./app/_lib/enrutar-marca";
+import { COOKIE_MARCA, enrutarMarca } from "./app/_lib/enrutar-marca";
 
 const PROTECTED_PATHS = ["/portal", "/perfil"];
 
-/** La empresa que eligió el visitante: solo una preferencia, no da acceso. */
-const COOKIE_MARCA = "empresa";
 const UN_ANIO_S = 60 * 60 * 24 * 365;
 
 const JWT_SECRET = (() => {

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
-import BannerCookies from "./_components/legal/BannerCookies";
 import { themeScript } from "./_components/layout/theme/theme-script";
 import { BASE_URL } from "./_lib/consts";
 import {
@@ -105,11 +104,9 @@ export default function RootLayout({
           Saltar al contenido principal
         </a>
         <AuthProvider>
-          {/* La barra, el pie y el asistente van con la marca de la página:
-              los pone app/[marca]/layout.tsx (MarcaShell). */}
+          {/* La barra, el pie, el asistente y el aviso de cookies van con la
+              marca de la página: los pone MarcaShell (app/[marca]/layout.tsx). */}
           {children}
-          {/* CU-76: sale solo si el navegador no tiene preferencia guardada. */}
-          <BannerCookies />
         </AuthProvider>
       </body>
     </html>
