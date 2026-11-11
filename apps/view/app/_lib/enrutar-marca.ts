@@ -47,15 +47,27 @@ export type EntradaMarca = {
 
 const PREFIJO_INTERNO = `/${MARCA_POR_DEFECTO.slug}`;
 
-export function enrutarMarca(e: EntradaMarca): DecisionMarca {
+/**
+ * Una sola barra al comienzo: para el navegador "//sitio" es otro dominio, y
+ * una redirección a eso sacaría al visitante del portal (OWASP A01).
+ */
+function sinBarrasDobles(ruta: string): string {
+  return ruta.replace(/^\/{2,}/, "/");
+}
+
+export function enrutarMarca(entrada: EntradaMarca): DecisionMarca {
+  const e = { ...entrada, pathname: sinBarrasDobles(entrada.pathname) };
+
   // La ruta interna de la marca por defecto no se publica: sería la misma
   // página en dos URLs.
   if (e.pathname === PREFIJO_INTERNO || e.pathname.startsWith(`${PREFIJO_INTERNO}/`)) {
-    const ruta = e.pathname.slice(PREFIJO_INTERNO.length) || "/";
+    const ruta = sinBarrasDobles(e.pathname.slice(PREFIJO_INTERNO.length)) || "/";
     return { tipo: "redirigir", destino: `${ruta}${e.search}` };
   }
 
-  const { marca: deLaUrl, ruta } = separarMarca(e.pathname);
+  const separada = separarMarca(e.pathname);
+  const deLaUrl = separada.marca;
+  const ruta = sinBarrasDobles(separada.ruta);
   const conPrefijo = deLaUrl.prefijo !== "";
   const elegida: SlugMarca =
     e.marcaToken ??

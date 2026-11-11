@@ -83,6 +83,26 @@ describe("enrutarMarca", () => {
     });
   });
 
+  // OWASP A01: "//sitio" es una URL de otro dominio para el navegador.
+  it("nunca redirige fuera del sitio con una ruta que empieza con //", () => {
+    const destinos = [
+      enrutarMarca({ ...sinNada, pathname: "/finet//evil.example" }),
+      enrutarMarca({ ...sinNada, pathname: "/finet//evil.example/x", search: "?a=1" }),
+      enrutarMarca({
+        ...sinNada,
+        pathname: "/cable-magico//evil.example",
+        marcaToken: "finet",
+      }),
+      enrutarMarca({ ...sinNada, pathname: "//evil.example", marcaCookie: "cable-magico" }),
+    ].map((d) => d.destino);
+
+    for (const destino of destinos) {
+      expect(destino.startsWith("//")).toBe(false);
+      expect(destino.startsWith("/")).toBe(true);
+    }
+    expect(destinos[0]).toBe("/evil.example");
+  });
+
   it("un prefijo que solo se parece no es una marca", () => {
     expect(enrutarMarca({ ...sinNada, pathname: "/cable-magicos" })).toMatchObject({
       tipo: "reescribir",
