@@ -38,13 +38,133 @@ describe("CU-75: formulario de contratación", () => {
   async function completarFormulario() {
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Nombre completo"), "Juan Pérez Soto");
-    await user.type(screen.getByLabelText("RUT"), "11.111.111-1");
-    await user.type(screen.getByLabelText("Correo electronico"), "juan@ejemplo.cl");
-    await user.type(screen.getByLabelText("Telefono movil"), "+56 9 1234 5678");
+    // Como lo escribiría alguien: sin puntos, con mayúsculas y sin el +56.
+    await user.type(screen.getByLabelText("RUT"), "111111111");
+    await user.type(screen.getByLabelText("Correo electronico"), "Juan@Ejemplo.cl");
+    await user.type(screen.getByLabelText("Telefono movil"), "912345678");
     await user.type(screen.getByLabelText("Calle + numero"), "Av. Siempre Viva 742");
     await user.type(screen.getByLabelText("Comuna"), "La Pintana");
     return user;
   }
+
+  it("da formato al RUT y al teléfono, y pasa el correo a minúsculas mientras se escribe", async () => {
+    render(<FormularioContratacion plan={plan} />);
+    await completarFormulario();
+
+    expect(screen.getByLabelText("RUT")).toHaveValue("11.111.111-1");
+    expect(screen.getByLabelText("Correo electronico")).toHaveValue("juan@ejemplo.cl");
+    expect(screen.getByLabelText("Telefono movil")).toHaveValue("9 1234 5678");
+  });
+
+  describe("teléfono, como lo escribe o pega una persona", () => {
+    async function telefonoTras(accion: (u: ReturnType<typeof userEvent.setup>, campo: HTMLElement) => Promise<void>) {
+      const user = userEvent.setup();
+      render(<FormularioContratacion plan={plan} />);
+      const campo = screen.getByLabelText("Telefono movil");
+      await accion(user, campo);
+      return campo;
+    }
+
+    it.each([
+      ["+56 9 1234 5678"],
+      ["+56912345678"],
+      ["56912345678"],
+      ["912345678"],
+      ["9 1234 5678"],
+      ["9-1234-5678"],
+      ["(9) 1234 5678"],
+      ["+56 (9) 1234-5678"],
+      ["0056912345678"],
+    ])("pegar %s deja 9 1234 5678", async (pegado) => {
+      const campo = await telefonoTras(async (u, c) => {
+        await u.click(c);
+        await u.paste(pegado);
+      });
+      expect(campo).toHaveValue("9 1234 5678");
+    });
+
+    it("ignora letras y símbolos al escribir", async () => {
+      const campo = await telefonoTras((u, c) => u.type(c, "9a1b2c3d4 5.6/7*8"));
+      expect(campo).toHaveValue("9 1234 5678");
+    });
+
+    it("no deja pasar de 9 dígitos", async () => {
+      const campo = await telefonoTras((u, c) => u.type(c, "9123456789999"));
+      expect(campo).toHaveValue("9 1234 5678");
+    });
+
+    it("borrar desde el final saca un dígito por vez y no deja espacios colgando", async () => {
+      const campo = await telefonoTras(async (u, c) => {
+        await u.type(c, "912345678");
+        await u.type(c, "{Backspace}{Backspace}{Backspace}{Backspace}");
+      });
+      expect(campo).toHaveValue("9 1234");
+    });
+
+    it("borrar todo deja el campo vacío", async () => {
+      const campo = await telefonoTras(async (u, c) => {
+        await u.type(c, "912345678");
+        await u.clear(c);
+      });
+      expect(campo).toHaveValue("");
+    });
+
+    it("un número incompleto no pasa la validación del navegador", async () => {
+      const campo = await telefonoTras((u, c) => u.type(c, "91234"));
+      expect(campo).toHaveValue("9 1234");
+      expect(campo).not.toBeValid();
+    });
+
+    it("un celular que no empieza con 9 no pasa la validación del navegador", async () => {
+      const campo = await telefonoTras((u, c) => u.type(c, "212345678"));
+      expect(campo).toHaveValue("2 1234 5678");
+      expect(campo).not.toBeValid();
+    });
+
+    it("un celular completo pasa la validación del navegador", async () => {
+      const campo = await telefonoTras((u, c) => u.type(c, "912345678"));
+      expect(campo).toBeValid();
+    });
+  });
+
+  describe("RUT, como lo escribe o pega una persona", () => {
+    async function rutTras(accion: (u: ReturnType<typeof userEvent.setup>, campo: HTMLElement) => Promise<void>) {
+      const user = userEvent.setup();
+      render(<FormularioContratacion plan={plan} />);
+      const campo = screen.getByLabelText("RUT");
+      await accion(user, campo);
+      return campo;
+    }
+
+    it.each([
+      ["12.345.678-5", "12.345.678-5"],
+      ["123456785", "12.345.678-5"],
+      ["12345678-5", "12.345.678-5"],
+      ["1.234.567-k", "1.234.567-K"],
+      ["1234567K", "1.234.567-K"],
+    ])("pegar %s deja %s", async (pegado, esperado) => {
+      const campo = await rutTras(async (u, c) => {
+        await u.click(c);
+        await u.paste(pegado);
+      });
+      expect(campo).toHaveValue(esperado);
+      expect(campo).toBeValid();
+    });
+
+    it("borrar el dígito verificador vuelve a armar el RUT con el número anterior", async () => {
+      const campo = await rutTras(async (u, c) => {
+        await u.type(c, "123456785");
+        await u.type(c, "{Backspace}");
+      });
+      expect(campo).toHaveValue("1.234.567-8");
+    });
+
+    it("un RUT a medias no pasa la validación del navegador", async () => {
+      const campo = await rutTras((u, c) => u.type(c, "1234"));
+      expect(campo).toHaveValue("123-4");
+      expect(campo).not.toBeValid();
+    });
+  });
 
   it("presenta la casilla con enlace directo a la Política de Privacidad", () => {
     render(<FormularioContratacion plan={plan} />);
@@ -86,7 +206,7 @@ describe("CU-75: formulario de contratación", () => {
       nombre_completo: "Juan Pérez Soto",
       rut: "11.111.111-1",
       email: "juan@ejemplo.cl",
-      telefono: "+56 9 1234 5678",
+      telefono: "+56912345678",
       direccion_completa: "Av. Siempre Viva 742",
       comuna: "La Pintana",
       acepta_politica_privacidad: true,

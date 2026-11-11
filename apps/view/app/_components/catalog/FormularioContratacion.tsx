@@ -9,6 +9,7 @@ import {
   MENSAJE_POLITICA_REQUERIDA,
   POLITICA_PRIVACIDAD_VERSION,
 } from "../../_lib/legal";
+import { cleanTelefono, formatRut, formatTelefono } from "../../utils/login-schema";
 
 type FormularioContratacionProps = {
   plan: PlanBackend;
@@ -34,6 +35,9 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
   const [errorMessage, setErrorMessage] = useState("");
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
   const [errorPolitica, setErrorPolitica] = useState("");
+  const [rut, setRut] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [telefono, setTelefono] = useState("");
   const casillaRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -57,7 +61,8 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
       nombre_completo: campo("nombreCompleto"),
       rut: campo("rut"),
       email: campo("correoElectronico"),
-      telefono: campo("telefonoMovil") || null,
+      // Sin espacios y con el +56, igual que el teléfono del perfil.
+      telefono: `+56${cleanTelefono(campo("telefonoMovil"))}`,
       direccion_completa: campo("calleNumero"),
       comuna: campo("comuna"),
       acepta_politica_privacidad: true,
@@ -118,9 +123,11 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
           id="nombreCompleto"
           name="nombreCompleto"
           required
-          placeholder="Nombre1 Nombre2 Ap1 Ap2"
-          pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){1,3}"
-          title="Nombre1 Nombre2 Ap1 Ap2. Respetar tildes. Max 4 palabras visibles."
+          maxLength={120}
+          autoComplete="name"
+          placeholder="Nombre y apellidos"
+          pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-]+(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ'\-]+)+"
+          title="Tu nombre y al menos un apellido, con tildes si las llevan. Ej: María José de la Fuente"
           className="border border-border bg-background p-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary"
         />
       </label>
@@ -131,9 +138,12 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
           id="rut"
           name="rut"
           required
-          placeholder="XX.XXX.XXX-X"
+          maxLength={12}
+          placeholder="12.345.678-9"
           pattern="[0-9]{1,2}\.[0-9]{3}\.[0-9]{3}-[0-9K]"
-          title="XX.XXX.XXX-X"
+          title="RUT con dígito verificador, por ejemplo 12.345.678-9"
+          value={rut}
+          onChange={(e) => setRut(formatRut(e.target.value))}
           className="border border-border bg-background p-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary"
         />
       </label>
@@ -145,26 +155,41 @@ export default function FormularioContratacion({ plan }: FormularioContratacionP
           name="correoElectronico"
           type="email"
           required
+          autoComplete="email"
           placeholder="usuario@dominio.cl"
           pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}"
-          title="usuario@dominio.cl, siempre en minusculas"
+          title="usuario@dominio.cl"
+          value={correo}
+          onChange={(e) => setCorreo(e.target.value.toLowerCase().replace(/\s/g, ""))}
           className="border border-border bg-background p-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary"
         />
       </label>
 
-      <label className="grid gap-1" htmlFor="telefonoMovil">
-        Telefono movil
-        <input
-          id="telefonoMovil"
-          name="telefonoMovil"
-          type="tel"
-          required
-          placeholder="+56 9 XXXX XXXX"
-          pattern="\+56 9 [0-9]{4} [0-9]{4}"
-          title="+56 9 XXXX XXXX"
-          className="border border-border bg-background p-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary"
-        />
-      </label>
+      <div className="grid gap-1">
+        <label htmlFor="telefonoMovil">Telefono movil</label>
+        <div className="flex">
+          <span
+            aria-hidden
+            className="flex items-center rounded-l-md border border-r-0 border-border bg-surface px-3 text-muted"
+          >
+            +56
+          </span>
+          <input
+            id="telefonoMovil"
+            name="telefonoMovil"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
+            required
+            placeholder="9 1234 5678"
+            pattern="9 [0-9]{4} [0-9]{4}"
+            title="Celular de 9 dígitos que empieza con 9, por ejemplo 9 1234 5678"
+            value={telefono}
+            onChange={(e) => setTelefono(formatTelefono(e.target.value))}
+            className="min-w-0 flex-1 border border-border bg-background p-2 rounded-r-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary"
+          />
+        </div>
+      </div>
 
       <fieldset className="grid gap-4 border border-border p-4 rounded-md">
         <legend className="px-1 text-sm">Direccion de instalacion</legend>

@@ -8,6 +8,7 @@ import {
   fechaHoraCliente,
   pesos,
 } from './formato.js';
+import { LOGO_CORREO } from './logo-correo.js';
 import { comprobante, plantillaCorreo } from './plantilla-correo.js';
 import { formatRut } from '../common/utils/rut.js';
 import { leerSmtpEmpresas } from './smtp-empresas.js';
@@ -67,7 +68,10 @@ export class MailService {
     }
   }
 
-  /** Sale por la cuenta de la empresa del cliente; si no tiene, por la general. */
+  /**
+   * Sale por la cuenta de la empresa del cliente; si no tiene, por la general.
+   * Todos llevan el logo adjunto: la plantilla lo muestra por su Content-ID.
+   */
   private async enviar(
     idEmpresa: number | null | undefined,
     correo: Omit<SendMailOptions, 'from'>,
@@ -78,6 +82,7 @@ export class MailService {
         : this.porEmpresa.get(idEmpresa);
     await (cuenta?.transporter ?? this.transporter).sendMail({
       ...correo,
+      attachments: [...(correo.attachments ?? []), LOGO_CORREO],
       from:
         cuenta?.from ??
         (this.configService.get<string>('MAIL_FROM') ||
@@ -259,7 +264,7 @@ export class MailService {
           ['Vence el', fechaCliente(fechaLimite)],
         ]) +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</p>',
-      sitio: this.sitio(),
+      logoCid: LOGO_CORREO.cid,
     });
   }
 
@@ -282,7 +287,7 @@ export class MailService {
         ]) +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</p>',
       boton: { texto: 'Pagar mi deuda', enlace: enlacePago },
-      sitio: this.sitio(),
+      logoCid: LOGO_CORREO.cid,
     });
   }
 
@@ -303,7 +308,7 @@ export class MailService {
           ['Fecha', fechaHoraCliente(fecha)],
           ['Código de autorización', codigoAutorizacion],
         ]),
-      sitio: this.sitio(),
+      logoCid: LOGO_CORREO.cid,
     });
   }
 
@@ -328,7 +333,7 @@ export class MailService {
         ]) +
         `<p style="margin:16px 0 0;font-size:14px;"><strong>Motivo:</strong> ${escaparHtml(e.motivo ?? 'El asistente no indico un motivo.')}</p>` +
         `<p style="margin:24px 0 0;font-size:14px;color:#6D797D;">Historial de la conversacion (el RUT aparece como [RUT]):</p>${turnos}`,
-      sitio: this.sitio(),
+      logoCid: LOGO_CORREO.cid,
     });
   }
 
@@ -348,13 +353,8 @@ export class MailService {
           ['Código de seguimiento', codigoSeguimiento],
           ['Categoría', categoria],
         ]),
-      sitio: this.sitio(),
+      logoCid: LOGO_CORREO.cid,
     });
-  }
-
-  /** Para el logo de los correos. Sin la URL del sitio va el nombre en texto. */
-  private sitio(): string | undefined {
-    return this.configService.get<string>('FRONTEND_URL') || undefined;
   }
 
   /** CU-03: el enlace de un solo uso para crear una contraseña nueva (RNF-04.1). */
@@ -368,7 +368,7 @@ export class MailService {
         `Hola ${escaparHtml(nombre)}: recibimos una solicitud para restablecer tu contraseña del Portal Clientes. Usa el botón para crear una nueva.` +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Este enlace expira en 30 minutos y sirve una sola vez. Si no solicitaste este cambio, ignora este mensaje.</p>',
       boton: { texto: 'Restablecer contraseña', enlace: link },
-      sitio: this.sitio(),
+      logoCid: LOGO_CORREO.cid,
     });
   }
 
@@ -383,7 +383,7 @@ export class MailService {
         `Hola ${escaparHtml(nombre)}: recibimos una solicitud para crear tu cuenta del Portal Clientes. Usa el botón para crear tu contraseña.` +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Este enlace expira en 30 minutos y sirve una sola vez. Si no lo pediste, ignora este mensaje.</p>',
       boton: { texto: 'Crear mi contraseña', enlace: link },
-      sitio: this.sitio(),
+      logoCid: LOGO_CORREO.cid,
     });
   }
 
@@ -396,7 +396,7 @@ export class MailService {
       cuerpo:
         `Hola ${escaparHtml(nombre)}: tu contraseña ha sido actualizada exitosamente.` +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si no realizaste este cambio, contacta a soporte de inmediato.</p>',
-      sitio: this.sitio(),
+      logoCid: LOGO_CORREO.cid,
     });
   }
 }

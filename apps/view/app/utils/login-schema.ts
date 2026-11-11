@@ -8,6 +8,33 @@ export function cleanTelefono(telefono: string) {
   return telefono.replace(/\s/g, "");
 }
 
+/** 12.345.678-9 mientras se escribe; la k del dígito verificador sale en mayúscula. */
+export function formatRut(value: string) {
+  const digits = cleanRut(value).slice(0, 10);
+  if (digits.length <= 1) return digits;
+  const body = digits.slice(0, -1);
+  const dv = digits.slice(-1);
+  const dotted = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${dotted}-${dv}`;
+}
+
+/**
+ * Los 9 dígitos de un celular sin el +56, como "9 1234 5678". El +56 va fuera
+ * del campo: si estuviera adentro, al seguir escribiendo no se sabría si un 56
+ * es el código del país o parte del número.
+ */
+export function formatTelefono(value: string) {
+  // Ningún número de 9 dígitos empieza con 0: los ceros de adelante son del
+  // 0056 internacional o del 09 antiguo.
+  let digits = value.replace(/\D/g, "").replace(/^0+/, "");
+  // Si lo pegan con el código del país (+56 9 1234 5678 o 56912345678).
+  if (digits.length > 9 && digits.startsWith("56")) digits = digits.slice(2);
+  digits = digits.slice(0, 9);
+  return [digits.slice(0, 1), digits.slice(1, 5), digits.slice(5)]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function validateRut(rut: string) {
   const cleaned = cleanRut(rut);
   if (cleaned.length < 3) return false;

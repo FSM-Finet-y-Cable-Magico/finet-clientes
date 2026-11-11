@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "../../../_lib/auth";
+import PagaTuCuentaButton from "./PagaTuCuentaButton";
 import PortalClienteButton from "./PortalClienteButton";
 import UserMenu from "./UserMenu";
 
@@ -9,5 +10,12 @@ export default function NavbarAuthArea() {
 
   if (isLoading) return null;
 
-  return isAuthenticated ? <UserMenu /> : <PortalClienteButton />;
+  if (isAuthenticated) return <UserMenu />;
+
+  return (
+    <>
+      <PagaTuCuentaButton />
+      <PortalClienteButton />
+    </>
+  );
 }
