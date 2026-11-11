@@ -20,6 +20,7 @@ export const PASSWORDS_SIN_REPETIR = 5;
 /** Lo que devuelve el perfil (CU-07) y cada cambio (CU-08 y 09). */
 const SELECT_PERFIL = {
   id_cliente: true,
+  id_empresa: true,
   nombre_completo: true,
   rut: true,
   email: true,
@@ -234,6 +235,7 @@ export class PerfilService {
 
   private mapearPerfil(c: {
     id_cliente: number;
+    id_empresa: number | null;
     nombre_completo: string;
     rut: string | null;
     email: string | null;
@@ -242,6 +244,7 @@ export class PerfilService {
   }): PerfilResponseDto {
     return {
       id_cliente: c.id_cliente,
+      id_empresa: c.id_empresa,
       nombre_completo: c.nombre_completo,
       rut: c.rut,
       email: c.email,

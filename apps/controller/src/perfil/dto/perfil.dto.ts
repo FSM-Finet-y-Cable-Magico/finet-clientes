@@ -41,6 +41,8 @@ export type CambiarPasswordDto = z.infer<typeof CambiarPasswordDto>;
 // ─── CU-07: Respuesta del perfil ──────────────────────────────────────────────
 export interface PerfilResponseDto {
   id_cliente: number;
+  /** Su empresa (Finet o Cable Mágico): la vista usa su marca. */
+  id_empresa: number | null;
   nombre_completo: string;
   rut: string | null;
   email: string | null;

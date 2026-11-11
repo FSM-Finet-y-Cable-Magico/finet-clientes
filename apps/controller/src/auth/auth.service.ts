@@ -646,6 +646,7 @@ export class AuthService {
       access_token: token,
       cliente: {
         id: cliente.id_cliente,
+        id_empresa: cliente.id_empresa,
         rut: cliente.rut,
         nombre_completo: cliente.nombre_completo,
         email: cliente.email,

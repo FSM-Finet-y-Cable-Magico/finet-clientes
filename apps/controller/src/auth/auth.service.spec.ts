@@ -121,6 +121,19 @@ describe('AuthService', () => {
       });
     });
 
+    it('la respuesta del login dice de qué empresa es el cliente', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      porRut.mockResolvedValue({ ...mockCliente, id_empresa: 2 });
+
+      const result = await authService.login(
+        '123456785',
+        'password',
+        '127.0.0.1',
+      );
+
+      expect(result.cliente.id_empresa).toBe(2);
+    });
+
     it('encuentra al cliente aunque su RUT esté guardado con guion (G3, 29-09)', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       porRut.mockResolvedValue({ ...mockCliente, rut: '12345678-5' });
