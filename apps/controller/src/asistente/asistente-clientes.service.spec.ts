@@ -213,11 +213,26 @@ describe('AsistenteClientesService', () => {
       const { select } = findFirst.mock.calls[0][0] as {
         select: Record<string, unknown>;
       };
+      // id_empresa sí va: el asistente habla como la empresa del cliente.
       expect(Object.keys(select).sort()).toEqual([
         'contrato',
         'id_cliente',
+        'id_empresa',
         'nombre_completo',
       ]);
+    });
+
+    it('dice de qué empresa es el cliente, para que el asistente hable como ella', async () => {
+      findFirst.mockResolvedValue({
+        id_cliente: 7,
+        id_empresa: 2,
+        nombre_completo: 'Juan Pérez',
+        contrato: [],
+      } as never);
+
+      const r = await service.identificar('12.345.678-5');
+
+      expect(r.cliente?.id_empresa).toBe(2);
     });
   });
 
