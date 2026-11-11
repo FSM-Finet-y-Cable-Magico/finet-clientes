@@ -8,8 +8,13 @@ import {
   fechaHoraCliente,
   pesos,
 } from './formato.js';
-import { LOGO_CORREO } from './logo-correo.js';
-import { comprobante, plantillaCorreo } from './plantilla-correo.js';
+import { logoCorreoDe } from './logo-correo.js';
+import {
+  comprobante,
+  marcaCorreoDe,
+  plantillaCorreo,
+  type MarcaCorreo,
+} from './plantilla-correo.js';
 import { formatRut } from '../common/utils/rut.js';
 import { leerSmtpEmpresas } from './smtp-empresas.js';
 
@@ -82,7 +87,10 @@ export class MailService {
         : this.porEmpresa.get(idEmpresa);
     await (cuenta?.transporter ?? this.transporter).sendMail({
       ...correo,
-      attachments: [...(correo.attachments ?? []), LOGO_CORREO],
+      attachments: [
+        ...(correo.attachments ?? []),
+        logoCorreoDe(idEmpresa).adjunto,
+      ],
       from:
         cuenta?.from ??
         (this.configService.get<string>('MAIL_FROM') ||
@@ -96,7 +104,7 @@ export class MailService {
     link: string,
     idEmpresa?: number | null,
   ) {
-    const html = this.resetTemplate(nombre, link);
+    const html = this.resetTemplate(nombre, link, marcaCorreoDe(idEmpresa));
 
     await this.enviar(idEmpresa, {
       to: email,
@@ -120,7 +128,7 @@ export class MailService {
     await this.enviar(idEmpresa, {
       to: email,
       subject: 'Crea tu cuenta - Portal Clientes',
-      html: this.registroCuentaTemplate(nombre, link),
+      html: this.registroCuentaTemplate(nombre, link, marcaCorreoDe(idEmpresa)),
     });
 
     this.logger.log('Account registration email sent');
@@ -131,7 +139,7 @@ export class MailService {
     nombre: string,
     idEmpresa?: number | null,
   ) {
-    const html = this.changedTemplate(nombre);
+    const html = this.changedTemplate(nombre, marcaCorreoDe(idEmpresa));
 
     await this.enviar(idEmpresa, {
       to: email,
@@ -157,7 +165,12 @@ export class MailService {
     await this.enviar(idEmpresa, {
       to: email,
       subject: 'Tu factura vence en 3 días - Portal Clientes',
-      html: this.recordatorioPagoTemplate(nombre, monto, fechaLimite),
+      html: this.recordatorioPagoTemplate(
+        nombre,
+        monto,
+        fechaLimite,
+        marcaCorreoDe(idEmpresa),
+      ),
     });
 
     this.logger.log('Payment reminder email sent');
@@ -180,7 +193,13 @@ export class MailService {
     await this.enviar(idEmpresa, {
       to: email,
       subject: 'Aviso de corte de servicio - Portal Clientes',
-      html: this.avisoCorteTemplate(nombre, deuda, vencimiento, enlacePago),
+      html: this.avisoCorteTemplate(
+        nombre,
+        deuda,
+        vencimiento,
+        enlacePago,
+        marcaCorreoDe(idEmpresa),
+      ),
     });
 
     this.logger.log('Service cut notice email sent');
@@ -207,6 +226,7 @@ export class MailService {
         monto,
         fecha,
         codigoAutorizacion,
+        marcaCorreoDe(idEmpresa),
       ),
     });
 
@@ -223,7 +243,12 @@ export class MailService {
     await this.enviar(idEmpresa, {
       to: email,
       subject: `Solicitud de soporte ${codigoSeguimiento}`,
-      html: this.ticketCreadoTemplate(nombre, codigoSeguimiento, categoria),
+      html: this.ticketCreadoTemplate(
+        nombre,
+        codigoSeguimiento,
+        categoria,
+        marcaCorreoDe(idEmpresa),
+      ),
     });
 
     this.logger.log('Ticket created email sent');
@@ -241,7 +266,10 @@ export class MailService {
     await this.enviar(undefined, {
       to: destinatarios,
       subject: `Asistente virtual: derivacion sin ticket (RUT ${formatRut(escalamiento.rut)})`,
-      html: this.escalamientoSinTicketTemplate(escalamiento),
+      html: this.escalamientoSinTicketTemplate(
+        escalamiento,
+        marcaCorreoDe(undefined),
+      ),
     });
 
     this.logger.log('Escalation without ticket email sent');
@@ -251,6 +279,7 @@ export class MailService {
     nombre: string,
     monto: number,
     fechaLimite: Date,
+    marca: MarcaCorreo,
   ): string {
     return plantillaCorreo({
       resumen: `Tu factura de ${pesos(monto)} vence el ${fechaCliente(fechaLimite)}.`,
@@ -264,7 +293,7 @@ export class MailService {
           ['Vence el', fechaCliente(fechaLimite)],
         ]) +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</p>',
-      logoCid: LOGO_CORREO.cid,
+      marca,
     });
   }
 
@@ -273,6 +302,7 @@ export class MailService {
     deuda: number,
     vencimiento: Date,
     enlacePago: string,
+    marca: MarcaCorreo,
   ): string {
     return plantillaCorreo({
       resumen: `Tienes una deuda vencida de ${pesos(deuda)}. Tu servicio puede ser cortado.`,
@@ -287,7 +317,7 @@ export class MailService {
         ]) +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si ya pagaste, puedes ignorar este mensaje.</p>',
       boton: { texto: 'Pagar mi deuda', enlace: enlacePago },
-      logoCid: LOGO_CORREO.cid,
+      marca,
     });
   }
 
@@ -296,6 +326,7 @@ export class MailService {
     monto: number,
     fecha: Date,
     codigoAutorizacion: string,
+    marca: MarcaCorreo,
   ): string {
     return plantillaCorreo({
       resumen: `Registramos tu pago de ${pesos(monto)}.`,
@@ -308,11 +339,14 @@ export class MailService {
           ['Fecha', fechaHoraCliente(fecha)],
           ['Código de autorización', codigoAutorizacion],
         ]),
-      logoCid: LOGO_CORREO.cid,
+      marca,
     });
   }
 
-  private escalamientoSinTicketTemplate(e: EscalamientoSinTicket): string {
+  private escalamientoSinTicketTemplate(
+    e: EscalamientoSinTicket,
+    marca: MarcaCorreo,
+  ): string {
     const turnos = e.historial
       .map(
         (turno) =>
@@ -333,7 +367,7 @@ export class MailService {
         ]) +
         `<p style="margin:16px 0 0;font-size:14px;"><strong>Motivo:</strong> ${escaparHtml(e.motivo ?? 'El asistente no indico un motivo.')}</p>` +
         `<p style="margin:24px 0 0;font-size:14px;color:#6D797D;">Historial de la conversacion (el RUT aparece como [RUT]):</p>${turnos}`,
-      logoCid: LOGO_CORREO.cid,
+      marca,
     });
   }
 
@@ -342,6 +376,7 @@ export class MailService {
     nombre: string,
     codigoSeguimiento: string,
     categoria: string,
+    marca: MarcaCorreo,
   ): string {
     return plantillaCorreo({
       resumen: `Registramos tu solicitud ${codigoSeguimiento}.`,
@@ -353,12 +388,16 @@ export class MailService {
           ['Código de seguimiento', codigoSeguimiento],
           ['Categoría', categoria],
         ]),
-      logoCid: LOGO_CORREO.cid,
+      marca,
     });
   }
 
   /** CU-03: el enlace de un solo uso para crear una contraseña nueva (RNF-04.1). */
-  private resetTemplate(nombre: string, link: string): string {
+  private resetTemplate(
+    nombre: string,
+    link: string,
+    marca: MarcaCorreo,
+  ): string {
     return plantillaCorreo({
       resumen:
         'Usa el enlace para crear una contraseña nueva. Expira en 30 minutos.',
@@ -368,12 +407,16 @@ export class MailService {
         `Hola ${escaparHtml(nombre)}: recibimos una solicitud para restablecer tu contraseña del Portal Clientes. Usa el botón para crear una nueva.` +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Este enlace expira en 30 minutos y sirve una sola vez. Si no solicitaste este cambio, ignora este mensaje.</p>',
       boton: { texto: 'Restablecer contraseña', enlace: link },
-      logoCid: LOGO_CORREO.cid,
+      marca,
     });
   }
 
   /** CU-04: el enlace para crear la contraseña de una cuenta nueva. */
-  private registroCuentaTemplate(nombre: string, link: string): string {
+  private registroCuentaTemplate(
+    nombre: string,
+    link: string,
+    marca: MarcaCorreo,
+  ): string {
     return plantillaCorreo({
       resumen:
         'Usa el enlace para crear la contraseña de tu cuenta. Expira en 30 minutos.',
@@ -383,12 +426,12 @@ export class MailService {
         `Hola ${escaparHtml(nombre)}: recibimos una solicitud para crear tu cuenta del Portal Clientes. Usa el botón para crear tu contraseña.` +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Este enlace expira en 30 minutos y sirve una sola vez. Si no lo pediste, ignora este mensaje.</p>',
       boton: { texto: 'Crear mi contraseña', enlace: link },
-      logoCid: LOGO_CORREO.cid,
+      marca,
     });
   }
 
   /** CU-03: el aviso de que la contraseña cambió. */
-  private changedTemplate(nombre: string): string {
+  private changedTemplate(nombre: string, marca: MarcaCorreo): string {
     return plantillaCorreo({
       resumen: 'La contraseña de tu cuenta del Portal Clientes cambió.',
       etiqueta: { texto: 'Contraseña actualizada', tono: 'exito' },
@@ -396,7 +439,7 @@ export class MailService {
       cuerpo:
         `Hola ${escaparHtml(nombre)}: tu contraseña ha sido actualizada exitosamente.` +
         '<p style="margin:16px 0 0;font-size:14px;color:#6D797D;">Si no realizaste este cambio, contacta a soporte de inmediato.</p>',
-      logoCid: LOGO_CORREO.cid,
+      marca,
     });
   }
 }
