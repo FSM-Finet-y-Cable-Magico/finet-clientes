@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import PrivacidadPage from "@/app/[marca]/(legal)/privacidad/page";
 import TerminosPage from "@/app/[marca]/(legal)/terminos/page";
 import LegalError from "@/app/[marca]/(legal)/error";
+
+const conMarca = (marca: string) => ({ params: Promise.resolve({ marca }) });
 import { Correo, Dato } from "@/app/_components/legal/Pendiente";
 import { legalLinks } from "@/app/_components/layout/footer/footer.config";
 
@@ -21,8 +23,8 @@ describe("CU-73: acceso desde el pie de pagina", () => {
 });
 
 describe("CU-73: Terminos y Condiciones", () => {
-  it("presenta el documento con su indice", () => {
-    render(<TerminosPage />);
+  it("presenta el documento con su indice", async () => {
+    render(await TerminosPage(conMarca("finet")));
 
     expect(
       screen.getByRole("heading", { level: 1, name: /Términos y Condiciones/ }),
@@ -33,15 +35,15 @@ describe("CU-73: Terminos y Condiciones", () => {
   // Los enlaces del footer y las redirecciones de /legal/* apuntan a estas anclas.
   it.each(["planes", "neutralidad", "termino", "reclamos"])(
     "tiene la seccion #%s",
-    (id) => {
-      const { container } = render(<TerminosPage />);
+    async (id) => {
+      const { container } = render(await TerminosPage(conMarca("finet")));
 
       expect(container.querySelector(`section#${id}`)).not.toBeNull();
     },
   );
 
-  it("remite el tratamiento de datos a la Politica de Privacidad", () => {
-    const { container } = render(<TerminosPage />);
+  it("remite el tratamiento de datos a la Politica de Privacidad", async () => {
+    const { container } = render(await TerminosPage(conMarca("finet")));
     const seccion = container.querySelector<HTMLElement>("section#datos-personales")!;
 
     expect(
@@ -51,8 +53,8 @@ describe("CU-73: Terminos y Condiciones", () => {
 });
 
 describe("CU-73: Politica de Privacidad", () => {
-  it("presenta el detalle del tratamiento de datos personales", () => {
-    const { container } = render(<PrivacidadPage />);
+  it("presenta el detalle del tratamiento de datos personales", async () => {
+    const { container } = render(await PrivacidadPage(conMarca("finet")));
 
     expect(
       screen.getByRole("heading", { level: 1, name: /Política de Privacidad/ }),
@@ -64,8 +66,8 @@ describe("CU-73: Politica de Privacidad", () => {
 
   // Lo declarado tiene que coincidir con lo que el sitio hace: una sola
   // cookie propia y el tema en almacenamiento local.
-  it("declara solo los elementos de sesion que el sitio usa", () => {
-    render(<PrivacidadPage />);
+  it("declara solo los elementos de sesion que el sitio usa", async () => {
+    render(await PrivacidadPage(conMarca("finet")));
     const tabla = screen.getByRole("table", { name: "Cookies y almacenamiento del navegador" });
 
     expect(within(tabla).getAllByRole("row")).toHaveLength(3);
@@ -120,5 +122,32 @@ describe("CU-73, Excepcion 1: la pagina no se puede recuperar", () => {
     await userEvent.click(screen.getByRole("button", { name: "Reintentar" }));
 
     expect(reintentar).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** Las páginas legales de Cable Mágico llevan sus datos (entregados el 11-11). */
+describe("CU-73: páginas legales de Cable Mágico", () => {
+  it("los Términos dicen su razón social, RUT, domicilio y correo", async () => {
+    const { container } = render(await TerminosPage(conMarca("cable-magico")));
+
+    const texto = container.textContent ?? "";
+    expect(texto).toContain("Cable Magico Estelar S.A.");
+    expect(texto).toContain("76.620.850-9");
+    expect(texto).toContain("Avenida Peñablanca 525");
+    expect(texto).toContain("pagos@cablemagico.cl");
+    expect(texto).not.toContain("Fibernet");
+    const seccion = container.querySelector<HTMLElement>("section#datos-personales")!;
+    expect(
+      within(seccion).getByRole("link", { name: "Política de Privacidad" }),
+    ).toHaveAttribute("href", "/cable-magico/privacidad");
+  });
+
+  it("la Política de Privacidad nombra a Cable Mágico como responsable", async () => {
+    const { container } = render(await PrivacidadPage(conMarca("cable-magico")));
+
+    const texto = container.textContent ?? "";
+    expect(texto).toContain("Cable Magico Estelar S.A.");
+    expect(texto).toContain("76.620.850-9");
+    expect(texto).not.toContain("Fibernet");
   });
 });
