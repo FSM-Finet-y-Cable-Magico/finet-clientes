@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import { metadataSeccion } from "../../_lib/seo";
 import FastSpeedTest from "../../_components/FastSpeedTest";
+import { marcaPorSlug } from "../../_lib/company";
 
-export const metadata: Metadata = metadataSeccion({
-  path: "/velocidad",
-  title: "Test de velocidad",
-  description:
-    "Mide la velocidad de bajada, subida y latencia de tu conexión a internet.",
-});
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  return metadataSeccion({
+    path: "/velocidad",
+    title: "Test de velocidad",
+    description:
+      "Mide la velocidad de bajada, subida y latencia de tu conexión a internet.",
+  }, marca);
+}
 
 export default function VelocidadPage() {
   return (

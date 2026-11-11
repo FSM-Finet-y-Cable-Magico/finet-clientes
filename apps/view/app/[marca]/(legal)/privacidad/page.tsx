@@ -20,6 +20,7 @@ import {
   PROVEEDORES,
 } from "../../../_lib/legal";
 import { metadataSeccion } from "../../../_lib/seo";
+import { marcaPorSlug } from "../../../_lib/company";
 
 /**
  * RNF-56.1: ISR explícito. El contenido son constantes de `_lib/legal.ts` y
@@ -30,12 +31,19 @@ import { metadataSeccion } from "../../../_lib/seo";
  */
 export const revalidate = 86400;
 
-export const metadata: Metadata = metadataSeccion({
-  path: "/privacidad",
-  title: "Política de privacidad",
-  description:
-    "Cómo Finet trata tus datos personales: qué datos usamos y para qué, cookies, plazos de conservación, con quién los compartimos y cómo ejercer tus derechos.",
-});
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  return metadataSeccion({
+    path: "/privacidad",
+    title: "Política de privacidad",
+    description:
+      `Cómo ${marca.nombre} trata tus datos personales: qué datos usamos y para qué, cookies, plazos de conservación, con quién los compartimos y cómo ejercer tus derechos.`,
+  }, marca);
+}
 
 const domicilio = (
   <>

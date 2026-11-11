@@ -4,15 +4,22 @@ import PlanCard from "../../_components/catalog/PlanCard";
 import { getLandingPlanes, ordenarPorPrecio } from "../../_lib/api";
 import { marcaPorSlug } from "../../_lib/company";
 
-export const metadata: Metadata = metadataSeccion({
-  path: "/empresas",
-  title: "Planes Empresa",
-  description:
-    "Soluciones de Internet fibra optica y conectividad para empresas y pymes en La Pintana, Puente Alto, La Florida y La Granja. Facturacion empresa y soporte comercial.",
-  shareTitle: "Planes Empresa — Finet Fibra Optica",
-  shareDescription:
-    "Internet fibra optica corporativa para empresas en la zona sur de Santiago.",
-});
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  return metadataSeccion({
+    path: "/empresas",
+    title: "Planes Empresa",
+    description:
+      `Soluciones de Internet fibra optica y conectividad para empresas y pymes en ${marca.zonaTexto}. Facturacion empresa y soporte comercial.`,
+    shareTitle: `Planes Empresa — ${marca.nombre} Fibra Optica`,
+    shareDescription:
+      `Internet fibra optica corporativa para empresas en ${marca.zonaRegion}.`,
+  }, marca);
+}
 
 export default async function EmpresasPage({
   params,

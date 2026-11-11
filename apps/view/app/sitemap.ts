@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { fetchLandingPlanes, type PlanBackend } from "./_lib/api";
-import { BASE_URL } from "./_lib/consts";
+import { MARCAS, type Marca } from "./_lib/company";
+import { urlDelSitio } from "./_lib/jsonld";
 import { RUTA_PLAN, RUTAS_PUBLICAS } from "./_lib/rutas-publicas";
 
 /**
@@ -12,15 +13,23 @@ import { RUTA_PLAN, RUTAS_PUBLICAS } from "./_lib/rutas-publicas";
  * generacion le diria a los buscadores que todo cambio en cada regeneracion.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const planes = await planesPublicados();
+  // Las rutas de los dos sitios: Finet en la raíz y Cable Mágico bajo su prefijo.
+  const porMarca = await Promise.all(
+    Object.values(MARCAS).map(async (marca) =>
+      rutasDe(marca, await planesPublicados(marca)),
+    ),
+  );
+  return porMarca.flat();
+}
 
+function rutasDe(marca: Marca, planes: PlanBackend[]): MetadataRoute.Sitemap {
   return RUTAS_PUBLICAS.flatMap((ruta) => {
     if (!ruta.indexable) return [];
     const { changeFrequency, priority } = ruta;
 
     if (ruta.path === RUTA_PLAN) {
       return planes.map((plan) => ({
-        url: `${BASE_URL}/contratar/${plan.id_plan}`,
+        url: urlDelSitio(marca, `/contratar/${plan.id_plan}`),
         changeFrequency,
         priority,
       }));
@@ -28,7 +37,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     return [
       {
-        url: ruta.path === "/" ? BASE_URL : `${BASE_URL}${ruta.path}`,
+        url: urlDelSitio(marca, ruta.path as `/${string}`),
         changeFrequency,
         priority,
       },
@@ -42,9 +51,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
  * valida, y en el build lo hace fallar para que el deploy anterior siga en
  * pie con sus archivos (sin el controller corriendo no compila).
  */
-async function planesPublicados(): Promise<PlanBackend[]> {
+async function planesPublicados(marca: Marca): Promise<PlanBackend[]> {
   try {
-    return await fetchLandingPlanes();
+    return await fetchLandingPlanes(undefined, marca.idEmpresa);
   } catch (error) {
     console.error(
       "[CU-74] sitemap.xml: no se pudo leer el catalogo de planes; se conserva la ultima version valida.",

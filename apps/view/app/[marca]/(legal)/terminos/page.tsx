@@ -21,6 +21,7 @@ import {
   LEGAL_ACTUALIZACION,
 } from "../../../_lib/legal";
 import { metadataSeccion } from "../../../_lib/seo";
+import { marcaPorSlug } from "../../../_lib/company";
 
 /**
  * RNF-56.1: ISR explícito. El contenido son constantes de `_lib/legal.ts` y
@@ -31,12 +32,19 @@ import { metadataSeccion } from "../../../_lib/seo";
  */
 export const revalidate = 86400;
 
-export const metadata: Metadata = metadataSeccion({
-  path: "/terminos",
-  title: "Términos y condiciones",
-  description:
-    "Términos de uso del sitio y del servicio de Internet de Finet: planes y precios, neutralidad de red, cómo terminar tu contrato y cómo presentar un reclamo.",
-});
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  return metadataSeccion({
+    path: "/terminos",
+    title: "Términos y condiciones",
+    description:
+      `Términos de uso del sitio y del servicio de Internet de ${marca.nombre}: planes y precios, neutralidad de red, cómo terminar tu contrato y cómo presentar un reclamo.`,
+  }, marca);
+}
 
 const telefono = <a href={`tel:${COMPANY_PHONE_TEL}`}>{COMPANY_PHONE_DISPLAY}</a>;
 const whatsapp = (

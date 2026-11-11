@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import { metadataSeccion } from "../../_lib/seo";
 import PortalDePagos, { type Identificador } from "./_components/PortalDePagos";
+import { marcaPorSlug } from "../../_lib/company";
 
-export const metadata: Metadata = metadataSeccion({
-  path: "/pagar",
-  title: "Pagar mi cuenta",
-  description:
-    "Paga las facturas de tu servicio Finet con Webpay, con tu RUT.",
-});
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  return metadataSeccion({
+    path: "/pagar",
+    title: "Pagar mi cuenta",
+    description:
+      `Paga las facturas de tu servicio ${marca.nombre} con Webpay, con tu RUT.`,
+  }, marca);
+}
 
 type Props = {
   searchParams: Promise<{ rut?: string; t?: string }>;

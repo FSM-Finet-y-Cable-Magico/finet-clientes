@@ -4,8 +4,7 @@ import { redirect } from "next/navigation";
 import FormularioContratacion from "../../../_components/catalog/FormularioContratacion";
 import { getLandingPlanes, getPlanById } from "../../../_lib/api";
 import { formatPrecio } from "../../../_lib/formato";
-import { productJsonLd, breadcrumbJsonLd } from "../../../_lib/jsonld";
-import { BASE_URL } from "../../../_lib/consts";
+import { productJsonLd, breadcrumbJsonLd, urlDelSitio } from "../../../_lib/jsonld";
 import { metadataPlan } from "../../../_lib/seo";
 import { marcaPorEmpresa, marcaPorSlug, rutaMarca } from "../../../_lib/company";
 
@@ -32,9 +31,9 @@ export async function generateStaticParams({
 export async function generateMetadata({
   params,
 }: ContratarPlanPageProps): Promise<Metadata> {
-  const { planId } = await params;
+  const { marca, planId } = await params;
   const plan = await getPlanById(Number(planId));
-  return metadataPlan(plan, `/contratar/${planId}`);
+  return metadataPlan(plan, `/contratar/${planId}`, marcaPorSlug(marca));
 }
 
 export default async function ContratarPlanPage({ params }: ContratarPlanPageProps) {
@@ -57,16 +56,19 @@ export default async function ContratarPlanPage({ params }: ContratarPlanPagePro
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: productJsonLd(plan),
+          __html: productJsonLd(plan, marca),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: breadcrumbJsonLd([
-            { name: "Inicio", url: BASE_URL },
-            { name: "Planes", url: `${BASE_URL}/planes` },
-            { name: plan.nombre_comercial, url: `${BASE_URL}/contratar/${plan.id_plan}` },
+            { name: "Inicio", url: urlDelSitio(marca, "/") },
+            { name: "Planes", url: urlDelSitio(marca, "/planes") },
+            {
+              name: plan.nombre_comercial,
+              url: urlDelSitio(marca, `/contratar/${plan.id_plan}`),
+            },
           ]),
         }}
       />

@@ -5,8 +5,13 @@ import { itemListJsonLd } from "../../_lib/jsonld";
 import PlanesClient from "../../_components/catalog/PlanesClient";
 import { marcaPorSlug } from "../../_lib/company";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const resumen = resumenPlanes(await getLandingPlanes());
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  const resumen = resumenPlanes(await getLandingPlanes(undefined, marca.idEmpresa));
   // Cantidad y precio en vez de los nombres: la lista puede crecer y la
   // descripcion no pasa de ~160 caracteres.
   const planes = resumen
@@ -18,10 +23,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return metadataSeccion({
     path: "/planes",
     title: "Planes de Internet Fibra Optica",
-    description: `Descubre ${resumen?.cantidad === 1 ? "nuestro" : "nuestros"} ${planes} en La Pintana, Puente Alto, La Florida y La Granja. Contrata hoy.`,
-    shareDescription:
-      "Planes con fibra optica simetrica en La Pintana, Puente Alto, La Florida y La Granja.",
-  });
+    description: `Descubre ${resumen?.cantidad === 1 ? "nuestro" : "nuestros"} ${planes} en ${marca.zonaTexto}. Contrata hoy.`,
+    shareDescription: `Planes con fibra optica simetrica en ${marca.zonaTexto}.`,
+  }, marca);
 }
 
 export default async function PlanesPage({
@@ -38,7 +42,7 @@ export default async function PlanesPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: itemListJsonLd(sorted),
+          __html: itemListJsonLd(sorted, marca),
         }}
       />
       <div className="mx-auto grid max-w-7xl gap-6">

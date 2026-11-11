@@ -3,13 +3,21 @@ import { metadataSeccion } from "../../_lib/seo";
 import { MapPinOff } from "lucide-react";
 import VisorCobertura from "../../_components/cobertura/VisorCobertura";
 import { getPuntosCobertura, getVisorCoberturaConfig } from "../../_lib/api";
+import { marcaPorSlug } from "../../_lib/company";
 
-export const metadata: Metadata = metadataSeccion({
-  path: "/cobertura",
-  title: "Consulta de cobertura",
-  description:
-    "Explora el mapa de cobertura de fibra optica de Finet en La Pintana y Puente Alto.",
-});
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  return metadataSeccion({
+    path: "/cobertura",
+    title: "Consulta de cobertura",
+    description:
+      `Explora el mapa de cobertura de fibra optica de ${marca.nombre} en ${marca.zonaCorta}.`,
+  }, marca);
+}
 
 export default async function CoberturaPage() {
   const [config, puntos] = await Promise.all([

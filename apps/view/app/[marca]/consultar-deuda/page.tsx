@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import { metadataSeccion } from "../../_lib/seo";
 import DeudaLookupForm from "../../components/DeudaLookupForm";
+import { marcaPorSlug } from "../../_lib/company";
 
-export const metadata: Metadata = metadataSeccion({
-  path: "/consultar-deuda",
-  title: "Consultar deuda",
-  description:
-    "Verifica si tu servicio Finet tiene deudas pendientes sin necesidad de iniciar sesión.",
-});
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  return metadataSeccion({
+    path: "/consultar-deuda",
+    title: "Consultar deuda",
+    description:
+      `Verifica si tu servicio ${marca.nombre} tiene deudas pendientes sin necesidad de iniciar sesión.`,
+  }, marca);
+}
 
 export default function ConsultarDeudaPage() {
   return (

@@ -3,12 +3,19 @@ import { metadataSeccion } from "../../_lib/seo";
 import { faqJsonLd } from "../../_lib/jsonld";
 import { marcaPorSlug, type Marca } from "../../_lib/company";
 
-export const metadata: Metadata = metadataSeccion({
-  path: "/ayuda",
-  title: "Ayuda y Preguntas Frecuentes",
-  description:
-    "Resuelve tus dudas sobre contratacion, instalacion, cobertura, pagos y soporte de Finet. Preguntas frecuentes de Internet fibra optica en La Pintana y Puente Alto.",
-});
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  return metadataSeccion({
+    path: "/ayuda",
+    title: "Ayuda y Preguntas Frecuentes",
+    description:
+      `Resuelve tus dudas sobre contratacion, instalacion, cobertura, pagos y soporte de ${marca.nombre}. Preguntas frecuentes de Internet fibra optica en ${marca.zonaCorta}.`,
+  }, marca);
+}
 
 /** Las mismas preguntas para cada empresa, con su zona. */
 const faqsDe = (marca: Marca) => [

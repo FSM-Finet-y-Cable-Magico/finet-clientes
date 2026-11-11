@@ -3,39 +3,19 @@ import { Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import { themeScript } from "./_components/layout/theme/theme-script";
 import { BASE_URL } from "./_lib/consts";
-import {
-  COMPANY_ADDRESS,
-  COMPANY_BRAND,
-  COMPANY_LEGAL_NAME,
-  COMPANY_PHONE_DISPLAY,
-} from "./_lib/company";
 import { AuthProvider } from "./_lib/auth";
-import { BASE_SHARE_METADATA, SEO_DEFAULTS } from "./_lib/seo";
 
 const hanken = Hanken_Grotesk({
   variable: "--font-hanken",
   subsets: ["latin"],
 });
 
+/**
+ * Lo común a los dos sitios. El título, la descripción, la imagen para
+ * compartir y los datos de la empresa los pone app/[marca]/layout.tsx.
+ */
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
-  title: {
-    template: "%s | Finet — Fibra Optica en La Pintana",
-    default: SEO_DEFAULTS.title,
-  },
-  description: SEO_DEFAULTS.description,
-  keywords: [
-    "internet fibra optica",
-    "La Pintana",
-    "Puente Alto",
-    "TV digital",
-    "planes internet hogar",
-    "fibra optica sur de Santiago",
-    "Finet",
-  ],
-  authors: [{ name: COMPANY_LEGAL_NAME }],
-  creator: COMPANY_LEGAL_NAME,
-  publisher: COMPANY_LEGAL_NAME,
   robots: {
     index: true,
     follow: true,
@@ -44,35 +24,8 @@ export const metadata: Metadata = {
   },
   // Sin `alternates.canonical` aca: lo heredaria cada pagina y todas se
   // declararian copia de la home. El canonical lo pone `metadataSeccion`.
-  ...BASE_SHARE_METADATA,
   icons: {
     icon: "/favicon.ico",
-  },
-};
-
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: COMPANY_LEGAL_NAME,
-  alternateName: COMPANY_BRAND,
-  url: BASE_URL,
-  logo: `${BASE_URL}/brand/FinetLogo.png`,
-  contactPoint: {
-    "@type": "ContactPoint",
-    telephone: COMPANY_PHONE_DISPLAY,
-    contactType: "customer service",
-    areaServed: [COMPANY_ADDRESS.country],
-    availableLanguage: ["Spanish"],
-  },
-  areaServed: {
-    "@type": "City",
-    name: COMPANY_ADDRESS.locality,
-  },
-  address: {
-    "@type": "PostalAddress",
-    addressLocality: COMPANY_ADDRESS.locality,
-    addressRegion: COMPANY_ADDRESS.region,
-    addressCountry: COMPANY_ADDRESS.country,
   },
 };
 
@@ -88,12 +41,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <meta name="apple-mobile-web-app-title" content="Finet" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
       </head>
       <body className="min-h-full flex flex-col">
         {/* Skip-to-content link for keyboard users */}

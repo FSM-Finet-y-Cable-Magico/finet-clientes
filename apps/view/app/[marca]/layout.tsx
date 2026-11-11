@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import MarcaShell from "../_components/layout/MarcaShell";
-import { esSlugMarca, SLUGS_MARCA } from "../_lib/company";
+import { esSlugMarca, marcaPorSlug, SLUGS_MARCA } from "../_lib/company";
+import { metadataCompartir, seoDe } from "../_lib/seo";
+import { organizacionJsonLd } from "../_lib/jsonld";
+
+type Props = {
+  children: ReactNode;
+  params: Promise<{ marca: string }>;
+};
 
 /**
  * El sitio de cada empresa (Documento 0, §6.6): las mismas páginas, una vez
@@ -13,15 +21,45 @@ export function generateStaticParams() {
   return SLUGS_MARCA.map((marca) => ({ marca }));
 }
 
-export default async function MarcaLayout({
-  children,
+/** Título, descripción, autor e imagen para compartir de cada empresa (CU-72). */
+export async function generateMetadata({
   params,
-}: {
-  children: ReactNode;
-  params: Promise<{ marca: string }>;
-}) {
+}: Pick<Props, "params">): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  const seo = seoDe(marca);
+  return {
+    title: {
+      template: `%s | ${marca.nombre} — Fibra Optica en ${marca.comunaSoporte}`,
+      default: seo.title,
+    },
+    description: seo.description,
+    keywords: [
+      "internet fibra optica",
+      ...marca.comunas,
+      "TV digital",
+      "planes internet hogar",
+      `fibra optica ${marca.zonaRegion.replace(/^(la|el) /, "")}`,
+      marca.nombre,
+    ],
+    authors: [{ name: marca.razonSocial }],
+    creator: marca.razonSocial,
+    publisher: marca.razonSocial,
+    appleWebApp: { title: marca.nombre },
+    ...metadataCompartir(marca),
+  };
+}
+
+export default async function MarcaLayout({ children, params }: Props) {
   const { marca } = await params;
   if (!esSlugMarca(marca)) notFound();
 
-  return <MarcaShell slug={marca}>{children}</MarcaShell>;
+  return (
+    <MarcaShell slug={marca}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: organizacionJsonLd(marcaPorSlug(marca)) }}
+      />
+      {children}
+    </MarcaShell>
+  );
 }

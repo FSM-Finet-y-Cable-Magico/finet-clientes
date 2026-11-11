@@ -15,18 +15,23 @@ import {
   MapPinned,
 } from "lucide-react";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const resumen = resumenPlanes(await getLandingPlanes());
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}): Promise<Metadata> {
+  const marca = marcaPorSlug((await params).marca);
+  const resumen = resumenPlanes(await getLandingPlanes(undefined, marca.idEmpresa));
   const desdeMbps = resumen?.mbpsDesde ? ` desde ${resumen.mbpsDesde} Mbps` : "";
   const desdePrecio = resumen ? ` desde ${resumen.precioDesde}` : "";
 
   return metadataSeccion({
     path: "/",
-    title: "Internet Fibra Optica en La Pintana y Puente Alto | Finet",
-    description: `Internet de fibra optica simetrica${desdeMbps}. Sin limites de datos, instalacion incluida. Planes hogar y empresa en La Pintana, Puente Alto, La Florida y La Granja.`,
-    shareTitle: "Finet — Internet Fibra Optica | La Pintana y Puente Alto",
-    shareDescription: `Fibra optica simetrica de alta velocidad. Planes${desdePrecio} en la zona sur de Santiago.`,
-  });
+    title: `Internet Fibra Optica en ${marca.zonaCorta} | ${marca.nombre}`,
+    description: `Internet de fibra optica simetrica${desdeMbps}. Sin limites de datos, instalacion incluida. Planes hogar y empresa en ${marca.zonaTexto}.`,
+    shareTitle: `${marca.nombre} — Internet Fibra Optica | ${marca.zonaCorta}`,
+    shareDescription: `Fibra optica simetrica de alta velocidad. Planes${desdePrecio} en ${marca.zonaRegion}.`,
+  }, marca);
 }
 
 const beneficiosDe = (marca: Marca) => [
