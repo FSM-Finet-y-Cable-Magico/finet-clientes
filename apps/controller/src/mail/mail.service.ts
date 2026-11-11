@@ -64,8 +64,14 @@ export class MailService {
         transporter: nodemailer.createTransport({
           host: cuenta.host,
           port: cuenta.port,
-          secure: cuenta.port === 465,
+          secure: cuenta.secure,
+          requireTLS: cuenta.requireTLS,
+          tls: { rejectUnauthorized: cuenta.rejectUnauthorized },
           auth: { user: cuenta.user, pass: cuenta.pass },
+          ...(cuenta.timeoutMs !== null && {
+            connectionTimeout: cuenta.timeoutMs,
+            socketTimeout: cuenta.timeoutMs,
+          }),
         }),
         from: cuenta.from,
       });
