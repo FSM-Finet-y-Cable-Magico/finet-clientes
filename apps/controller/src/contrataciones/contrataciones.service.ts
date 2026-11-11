@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
 import { variantesRut } from '../common/utils/rut.js';
+import { empresaDe } from '../common/constants/empresas.js';
 import {
   ContratacionDto,
   ContratacionResponseDto,
@@ -19,9 +20,6 @@ import {
  * §11.10 del Documento 0 dice `NUEVO`, pero con ese valor G8 no lo encuentra.
  */
 const ETAPA_PIPELINE_INICIAL = 'Prospecto Nuevo';
-
-/** El portal vende en las comunas de FiNet, todas de esta región (literal de G8). */
-const REGION_FINET = 'Metropolitana de Santiago';
 
 /** `prospecto.direccion` es VARCHAR(200). La dirección completa queda también en la auditoría. */
 const LARGO_DIRECCION = 200;
@@ -61,7 +59,7 @@ export class ContratacionesService {
 
         const plan = await tx.plan.findFirst({
           where: { id_plan: dto.id_plan, activo: true },
-          select: { id_plan: true },
+          select: { id_plan: true, id_empresa: true },
         });
         if (!plan) {
           throw new NotFoundException(
@@ -69,16 +67,20 @@ export class ContratacionesService {
           );
         }
 
+        // El prospecto es de la empresa del plan, con su región (literal de
+        // G8): uno de Cable Mágico entra a su pipeline, no al de Finet. G8 lo
+        // aprobó el 11-11 ("la info se almacena en la empresa correspondiente").
+        const empresa = empresaDe(plan.id_empresa);
         const prospecto = await tx.prospecto.create({
           data: {
-            id_empresa: 1,
+            id_empresa: empresa.idEmpresa,
             rut: dto.rut,
             nombre_completo: dto.nombre_completo,
             email: dto.email,
             telefono: dto.telefono ?? null,
             direccion: dto.direccion_completa.slice(0, LARGO_DIRECCION),
             comuna: dto.comuna,
-            region: REGION_FINET,
+            region: empresa.region,
             id_plan_interes: dto.id_plan,
             estado_pipeline: ETAPA_PIPELINE_INICIAL,
             fecha_creacion: hoy,
