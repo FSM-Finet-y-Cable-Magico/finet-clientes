@@ -67,9 +67,21 @@ describe('MailService — correos del Incremento 3', () => {
       );
     });
 
-    it('sin la URL del sitio, el logo va en texto: no queda una imagen rota', () => {
-      expect(html()).not.toContain('<img');
-      expect(html()).toContain('>FI<');
+    it('el logo va adjunto al correo y la plantilla lo muestra por su Content-ID', () => {
+      expect(html()).toContain('src="cid:logo@finet"');
+      const { attachments } = sendMail.mock.calls[0]![0] as {
+        attachments: { cid: string; contentType: string; content: Buffer }[];
+      };
+      expect(attachments).toEqual([
+        expect.objectContaining({
+          cid: 'logo@finet',
+          contentType: 'image/png',
+        }),
+      ]);
+      // La firma de un PNG: el adjunto es la imagen y no un texto cualquiera.
+      expect(attachments[0]!.content.subarray(0, 8)).toEqual(
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      );
     });
 
     it('no interpreta como HTML lo que escribió el cliente', () => {
@@ -100,7 +112,7 @@ describe('MailService — correos del Incremento 3', () => {
     it('usa el mismo molde que el aviso de corte y la confirmación de pago', () => {
       expect(html()).toContain('Recordatorio de pago');
       expect(html()).toContain('Tu factura vence en 3 días');
-      expect(html()).toContain('>FI<');
+      expect(html()).toContain('src="cid:logo@finet"');
     });
 
     it('dice el monto y el vencimiento en DD/MM/AAAA (§11.4)', () => {
@@ -150,10 +162,10 @@ describe('MailService — correos del Incremento 3', () => {
     });
   });
 
-  it('con la URL del sitio, el logo es el del portal', async () => {
+  it('el logo no se descarga del portal: Gmail no llega a una URL privada', async () => {
     const conSitio = new MailService({
       get: (k: string, porDefecto?: unknown) =>
-        k === 'FRONTEND_URL' ? 'https://portal.finet.cl' : porDefecto,
+        k === 'FRONTEND_URL' ? 'http://localhost:18200' : porDefecto,
     } as unknown as ConfigService);
     (conSitio as unknown as { transporter: unknown }).transporter = {
       sendMail,
@@ -167,8 +179,27 @@ describe('MailService — correos del Incremento 3', () => {
       'https://x/pagar?t=1',
     );
 
-    expect(html()).toContain(
-      'src="https://portal.finet.cl/brand/FinetLogo.png"',
+    expect(html()).not.toContain('FinetLogo.png');
+    expect(html()).toContain('src="cid:logo@finet"');
+  });
+
+  it('el correo que sale por la cuenta de otra empresa también lleva el logo', async () => {
+    const sendMailEmpresa = jest.fn().mockResolvedValue({});
+    (mail as unknown as { porEmpresa: Map<number, unknown> }).porEmpresa.set(
+      2,
+      {
+        transporter: { sendMail: sendMailEmpresa },
+        from: '"Cable Mágico" <no-reply@cable.invalid>',
+      },
+    );
+
+    await mail.sendTicketCreated('a@b.cl', 'Ana', 'FIN-1', 'Sin internet', 2);
+
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(sendMailEmpresa).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [expect.objectContaining({ cid: 'logo@finet' })],
+      }),
     );
   });
 });
@@ -241,7 +272,7 @@ describe('MailService — correos del CU-03 y del CU-71', () => {
 
     describe('lo que cambia', () => {
       it('usa el molde de los correos del portal', () => {
-        expect(contenido()).toContain('>FI<');
+        expect(contenido()).toContain('src="cid:logo@finet"');
         expect(contenido()).toContain('Recuperar contraseña');
       });
 
@@ -275,7 +306,7 @@ describe('MailService — correos del CU-03 y del CU-71', () => {
 
     describe('lo que cambia', () => {
       it('usa el molde de los correos del portal', () => {
-        expect(contenido()).toContain('>FI<');
+        expect(contenido()).toContain('src="cid:logo@finet"');
         expect(contenido()).toContain('Contraseña actualizada');
       });
 
@@ -312,7 +343,7 @@ describe('MailService — correos del CU-03 y del CU-71', () => {
 
     describe('lo que cambia', () => {
       it('usa el molde de los correos del portal', () => {
-        expect(enviado().html).toContain('>FI<');
+        expect(enviado().html).toContain('src="cid:logo@finet"');
         expect(enviado().html).toContain('Solicitud de soporte');
       });
 
@@ -369,7 +400,7 @@ describe('MailService — correo del CU-04 (crear la cuenta)', () => {
   });
 
   it('usa el molde del portal y no interpreta como HTML el nombre', () => {
-    expect(enviado().html).toContain('>FI<');
+    expect(enviado().html).toContain('src="cid:logo@finet"');
     expect(enviado().html).toContain('Ana &lt;b&gt;');
     expect(enviado().html).not.toContain('Ana <b>');
   });

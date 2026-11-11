@@ -37,14 +37,14 @@ export type Correo = {
   /** HTML ya escapado: lo arma quien llama. */
   cuerpo: string;
   boton?: { texto: string; enlace: string };
-  /** URL del sitio, para el logo. Sin ella va el nombre en texto. */
-  sitio?: string;
+  /** Content-ID del logo adjunto al correo. Sin él va el nombre en texto. */
+  logoCid?: string;
 };
 
 export function plantillaCorreo(c: Correo): string {
   const tono = TONOS[c.etiqueta.tono];
-  const logo = c.sitio
-    ? `<img src="${escaparHtml(`${c.sitio}/brand/FinetLogo.png`)}" width="96" height="60" alt="Finet" style="display:block;border:0;height:auto;color:#E3E446;font:700 24px ${FUENTE};">`
+  const logo = c.logoCid
+    ? `<img src="cid:${escaparHtml(c.logoCid)}" width="96" height="63" alt="Finet" style="display:block;border:0;height:auto;color:#E3E446;font:700 24px ${FUENTE};">`
     : `<span style="font:800 26px ${FUENTE};letter-spacing:1px;"><span style="color:#2FAEC9;">FI</span><span style="color:#E3E446;">NET</span></span>`;
 
   const boton = c.boton
