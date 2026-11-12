@@ -7,6 +7,7 @@ import type { ApiError } from "../utils/api";
 import RutInput from "./RutInput";
 import { MensajeError } from "./MensajesFormulario";
 import { errorDeCampo, validarCampo } from "../utils/errores-formulario";
+import { useMarca } from "../_lib/marca";
 
 /**
  * El RUT con su validación y su envío. Lo piden la recuperación de contraseña
@@ -25,6 +26,7 @@ export default function SolicitudPorRut<T>({
   errorPorDefecto: string;
   onRespuesta: (respuesta: T) => void;
 }) {
+  const marca = useMarca();
   const [rut, setRut] = useState("");
   const [error, setError] = useState("");
   const [serverError, setServerError] = useState("");
@@ -50,6 +52,9 @@ export default function SolicitudPorRut<T>({
     try {
       const respuesta = await api.post<T>(endpoint, {
         rut: cleanRut(result.data.rut),
+        // El RUT se busca entre los clientes de la empresa de este sitio: la
+        // misma persona puede ser cliente de las dos.
+        id_empresa: marca.idEmpresa,
       });
       onRespuesta(respuesta);
     } catch (err) {
