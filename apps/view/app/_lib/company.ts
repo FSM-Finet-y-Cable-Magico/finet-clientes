@@ -35,6 +35,8 @@ export type Marca = {
   readonly nombre: string;
   readonly razonSocial: string;
   readonly rut: string | null;
+  /** DS 6/2021 (comercio electrónico), art. 7 N° 6, y Ley 19.628, art. 14 ter b) según la Ley 21.719. */
+  readonly representanteLegal: string | null;
   readonly logo: {
     readonly webp: string;
     readonly png: string;
@@ -47,7 +49,11 @@ export type Marca = {
   readonly telefono: Telefono;
   readonly whatsappUrl: string;
   readonly instagramUrl: string;
-  /** Contacto general: reclamos, término de contrato, accesos indebidos. */
+  /**
+   * Contacto general: reclamos, término de contrato, accesos indebidos. Si no
+   * lo hay, no se pide: basta el teléfono (DS 6/2021, art. 7 N° 4; DS 194,
+   * art. 5, donde el correo es opcional).
+   */
   readonly correoContacto: string | null;
   /** Para ejercer los derechos sobre datos personales. */
   readonly correoPrivacidad: string | null;
@@ -98,6 +104,7 @@ export const MARCAS = {
     nombre: "Finet",
     razonSocial: "Fibernet Limitada",
     rut: null,
+    representanteLegal: null,
     logo: {
       webp: "/brand/FinetLogo.webp",
       png: "/brand/FinetLogo.png",
@@ -134,6 +141,7 @@ export const MARCAS = {
     nombre: "Cable Mágico",
     razonSocial: "Cable Magico Estelar S.A.",
     rut: "76.620.850-9",
+    representanteLegal: null,
     logo: {
       webp: "/brand/CableMagicoLogo.webp",
       png: "/brand/CableMagicoLogo.png",

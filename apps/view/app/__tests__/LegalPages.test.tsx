@@ -52,6 +52,82 @@ describe("CU-73: Terminos y Condiciones", () => {
   });
 });
 
+/** Solo lo que exige una norma; lo que ninguna pide no se publica (Emilio, 12-11). */
+describe("CU-73: Terminos con respaldo normativo", () => {
+  it("no publica lo que ninguna norma exige: direccionamiento IP ni tribunales", async () => {
+    const { container } = render(await TerminosPage(conMarca("finet")));
+
+    expect(container.textContent).not.toMatch(/Direccionamiento IP|tribunales/);
+  });
+
+  it("identifica al representante legal (DS 6/2021, art. 7 N° 6)", async () => {
+    render(await TerminosPage(conMarca("finet")));
+
+    expect(screen.getByText(/Representante legal/)).toBeInTheDocument();
+  });
+
+  it("publica lo que el Decreto 368 pide de cada plan, con su norma", async () => {
+    render(await TerminosPage(conMarca("finet")));
+    const tabla = screen.getByRole("table", { name: "Características del servicio" });
+
+    for (const fila of [/Límite de descarga/, /Tasa de agregación o sobreventa/, /nacional e internacional/]) {
+      expect(within(tabla).getAllByRole("rowheader", { name: fila }).length).toBeGreaterThan(0);
+    }
+    expect(within(tabla).getByText("Ley N° 18.168, art. 24 K")).toBeInTheDocument();
+  });
+
+  it("los indicadores trimestrales son los del Decreto 368, art. 5 letras c y d", async () => {
+    render(await TerminosPage(conMarca("finet")));
+    const tabla = screen.getByRole("table", { name: "Indicadores de calidad medidos por trimestre" });
+
+    expect(within(tabla).getAllByRole("row")).toHaveLength(8);
+    expect(within(tabla).getByRole("rowheader", { name: /login/ })).toBeInTheDocument();
+    expect(within(tabla).getByRole("rowheader", { name: /tiempo objetivo/ })).toBeInTheDocument();
+  });
+
+  it("publica la gestión de tráfico y el control parental (Decreto 368, arts. 5 f y 9)", async () => {
+    const { container } = render(await TerminosPage(conMarca("finet")));
+
+    expect(container.querySelector("h3#gestion-trafico")).not.toBeNull();
+    expect(container.querySelector("h3#control-parental")).not.toBeNull();
+  });
+
+  it("la compensación por interrupciones es la del art. 27 de la Ley 18.168", async () => {
+    const { container } = render(await TerminosPage(conMarca("finet")));
+    const seccion = container.querySelector<HTMLElement>("section#interrupciones")!;
+
+    expect(seccion).toHaveTextContent(/un día por cada 24 horas/);
+    expect(seccion).toHaveTextContent(/triple de la tarifa diaria/);
+    expect(within(seccion).queryByText("dato pendiente")).toBeNull();
+  });
+
+  // DS 6/2021, art. 7 N° 4 y DS 194, art. 5: basta el teléfono; el correo es opcional.
+  it("sin correo de contacto no deja huecos donde basta el teléfono", async () => {
+    const { container } = render(await TerminosPage(conMarca("finet")));
+
+    for (const id of ["uso", "termino"]) {
+      const seccion = container.querySelector<HTMLElement>(`section#${id}`)!;
+      expect(within(seccion).queryByText("dato pendiente")).toBeNull();
+    }
+    expect(container.querySelector("section#uso")).toHaveTextContent(/WhatsApp o al \+56 9 4500 2319\./);
+  });
+
+  it("reclamos: los plazos de Subtel y el texto del reglamento (DS 194, arts. 14, 16 y 33)", async () => {
+    const { container } = render(await TerminosPage(conMarca("finet")));
+    const seccion = container.querySelector<HTMLElement>("section#reclamos")!;
+
+    expect(seccion).toHaveTextContent(/30 días hábiles/);
+    expect(seccion).toHaveTextContent(/15 días hábiles/);
+    expect(within(seccion).getByRole("link", { name: /Decreto N° 194/ })).toHaveAttribute(
+      "href",
+      "https://www.bcn.cl/leychile/navegar?idNorma=1048887",
+    );
+    expect(
+      within(seccion).getByRole("table", { name: /línea telefónica de reclamos/ }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("CU-73: Politica de Privacidad", () => {
   it("presenta el detalle del tratamiento de datos personales", async () => {
     const { container } = render(await PrivacidadPage(conMarca("finet")));

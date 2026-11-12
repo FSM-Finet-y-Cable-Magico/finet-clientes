@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment, type ReactNode } from "react";
 import DocumentoLegal, {
   type SeccionLegal,
 } from "../../../_components/legal/DocumentoLegal";
-import { Correo, Dato } from "../../../_components/legal/Pendiente";
+import { Correo, Dato, Pendiente } from "../../../_components/legal/Pendiente";
 import TablaLegal from "../../../_components/legal/TablaLegal";
-import {
-  CALIDAD_SERVICIO,
-  CONDICIONES_CONTRATO,
-  LEGAL_ACTUALIZACION,
-} from "../../../_lib/legal";
+import { LEGAL_ACTUALIZACION, legalesDe } from "../../../_lib/legal";
 import { metadataSeccion } from "../../../_lib/seo";
 import { marcaPorSlug, rutaMarca, type Marca } from "../../../_lib/company";
 
@@ -36,14 +33,29 @@ export async function generateMetadata({
   }, marca);
 }
 
+/** "A, B o C": los canales que la empresa tiene, sin los que le faltan. */
+function unoDe(...canales: ReactNode[]): ReactNode {
+  const hay = canales.filter(Boolean);
+  return hay.map((canal, i) => (
+    <Fragment key={i}>
+      {i === 0 ? "" : i === hay.length - 1 ? " o " : ", "}
+      {canal}
+    </Fragment>
+  ));
+}
+
 /** Las secciones con los datos de la empresa del sitio. */
 function seccionesDe(marca: Marca): SeccionLegal[] {
+  const legal = legalesDe(marca);
   const telefono = <a href={`tel:${marca.telefono.tel}`}>{marca.telefono.display}</a>;
   const whatsapp = (
     <a href={marca.whatsappUrl} target="_blank" rel="noopener noreferrer">
       WhatsApp
     </a>
   );
+  // Un canal más, si la empresa lo tiene: basta el teléfono (DS 6/2021,
+  // art. 7 N° 4; DS 194, art. 5).
+  const correo = marca.correoContacto && <Correo valor={marca.correoContacto} />;
 
   return [
     {
@@ -69,8 +81,8 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             El Portal está disponible solo para clientes con servicio
             contratado. Eres responsable de mantener la confidencialidad de tu
             contraseña y de las acciones realizadas desde tu sesión. Si detectas
-            un acceso no autorizado, avísanos de inmediato por {whatsapp}, al{" "}
-            {telefono} o a <Correo valor={marca.correoContacto} />.
+            un acceso no autorizado, avísanos de inmediato{" "}
+            {unoDe(<>por {whatsapp}</>, <>al {telefono}</>, correo && <>a {correo}</>)}.
           </p>
           <p>
             A través del Portal puedes consultar tu plan y el estado de tus
@@ -133,50 +145,53 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             legales y no dañen la red ni la calidad del servicio.
           </p>
 
-          <h3 id="gestion-trafico">Gestión de tráfico</h3>
+          <h3 id="gestion-trafico">Gestión de tráfico y administración de red</h3>
           <p>
-            No aplicamos herramientas de administración o gestión de tráfico que
-            prioricen, degraden o limiten aplicaciones o servicios específicos.
-            Las medidas de seguridad que aplicamos se limitan a{" "}
-            <Dato valor={CALIDAD_SERVICIO.medidasSeguridadRed} />, y su único fin
-            es preservar la integridad y la seguridad de la red y de sus
-            usuarios.
+            Medidas que aplicamos, con sus características y sus efectos en el
+            servicio (Decreto 368, art. 5 letra f):{" "}
+            <Dato valor={legal.gestionTrafico} />.
+          </p>
+
+          <h3 id="control-parental">Control parental</h3>
+          <p>
+            Ponemos a disposición de quien lo solicite un servicio de control
+            parental que bloquea contenidos que atenten contra la ley, la moral o
+            las buenas costumbres (Decreto 368, art. 9). Cómo funciona, cómo
+            usarlo y su costo: <Dato valor={legal.controlParental} />.
           </p>
 
           <h3 id="caracteristicas">Características del servicio</h3>
           <TablaLegal
             titulo="Características del servicio"
-            columnas={["Parámetro", "Detalle"]}
+            columnas={["Parámetro", "Detalle", "Norma"]}
             filas={[
-              ["Tecnología de acceso", "Fibra óptica (GPON)"],
+              ["Tecnología de acceso", "Fibra óptica (GPON)", "Ley N° 18.168, art. 24 H letra d"],
               [
                 "Velocidades comerciales disponibles",
                 <Link key="planes" href={rutaMarca(marca, "/planes")}>
                   Ver planes
                 </Link>,
+                "Decreto 368, art. 5 letra a",
               ],
               [
-                "Velocidad mínima garantizada",
-                <>
-                  <Dato valor={CALIDAD_SERVICIO.velocidadMinimaGarantizada} /> de
-                  la velocidad contratada
-                </>,
+                "Velocidad garantizada: porcentaje de la velocidad promedio, en horario de mayor y menor congestión, nacional e internacional",
+                <Dato key="garantizada" valor={legal.velocidadGarantizada} />,
+                "Ley N° 18.168, art. 24 K",
               ],
               [
-                "Nivel de agregación o sobreventa del enlace",
-                <Dato key="sobreventa" valor={CALIDAD_SERVICIO.sobreventa} />,
+                "Límite de descarga",
+                <Dato key="descarga" valor={legal.limiteDescarga} />,
+                "Decreto 368, art. 5 letra a",
               ],
               [
-                "Disponibilidad del enlace",
-                <Dato key="disponibilidad" valor={CALIDAD_SERVICIO.disponibilidad} />,
+                "Tasa de agregación o sobreventa (1:XX)",
+                <Dato key="sobreventa" valor={legal.sobreventa} />,
+                "Decreto 368, art. 5 letra b",
               ],
               [
-                "Latencia y pérdida de paquetes",
-                <Dato key="latencia" valor={CALIDAD_SERVICIO.latenciaYPerdida} />,
-              ],
-              [
-                "Direccionamiento IP",
-                <Dato key="ip" valor={CALIDAD_SERVICIO.direccionamientoIp} />,
+                "Calidad y disponibilidad del enlace, nacional e internacional",
+                <Dato key="enlace" valor={legal.calidadEnlace} />,
+                "Decreto 368, art. 5 letra e",
               ],
             ]}
           />
@@ -184,22 +199,51 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
           <h3 id="indicadores">Indicadores medidos</h3>
           <p>
             El Decreto 368 exige a los proveedores de Internet medir
-            trimestralmente el tiempo de reposición del servicio, entendido como
-            el período entre el momento en que un usuario reporta una falla y el
-            momento en que el servicio se restablece, y mantener publicada y
-            actualizada esa información.
+            trimestralmente los indicadores técnicos de calidad de servicio y el
+            tiempo de reposición del servicio, entendido como el período entre
+            el momento en que un usuario reporta una falla y el momento en que
+            el servicio se restablece, y mantener publicada y actualizada esa
+            información (arts. 3, 4 y 5). Trimestre medido:{" "}
+            <Dato valor={legal.trimestre} />.
           </p>
           <TablaLegal
             titulo="Indicadores de calidad medidos por trimestre"
-            columnas={["Trimestre", "Tiempo promedio de reposición", "Disponibilidad del enlace"]}
+            columnas={["Indicador", "Resultado", "Norma"]}
             filas={[
               [
-                <>
-                  Primera medición:{" "}
-                  <Dato valor={CALIDAD_SERVICIO.primeraMedicionReposicion} />
-                </>,
-                "—",
-                "—",
+                "Tiempo de acceso de usuario (login): percentiles 80 y 95",
+                <Dato key="login" valor={legal.tiempoLogin} />,
+                "Art. 5 letra c, N° 1",
+              ],
+              [
+                "Velocidad de transmisión de datos conseguida: máxima, mínima, promedio y desviación estándar, de subida y de bajada",
+                <Dato key="velocidad" valor={legal.velocidadConseguida} />,
+                "Art. 5 letra c, N° 2",
+              ],
+              [
+                "Transmisiones de datos fallidas (%)",
+                <Dato key="fallidas" valor={legal.transmisionesFallidas} />,
+                "Art. 5 letra c, N° 3",
+              ],
+              [
+                "Accesos de usuario con éxito (%)",
+                <Dato key="exitosos" valor={legal.accesosExitosos} />,
+                "Art. 5 letra c, N° 4",
+              ],
+              [
+                "Retardo: promedio y desviación estándar, en milisegundos",
+                <Dato key="retardo" valor={legal.retardo} />,
+                "Art. 5 letra c, N° 5",
+              ],
+              [
+                "Tiempo de reposición del servicio: percentiles 80 y 95",
+                <Dato key="reposicion" valor={legal.tiempoReposicion} />,
+                "Art. 5 letra d, N° 1",
+              ],
+              [
+                "Fallas reparadas dentro de nuestro tiempo objetivo (%), y ese tiempo",
+                <Dato key="objetivo" valor={legal.reparadasEnTiempoObjetivo} />,
+                "Art. 5 letra d, N° 2",
               ],
             ]}
           />
@@ -231,10 +275,14 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             contrataste por la web, puedes terminarlo por la web.
           </p>
           <p>
-            Cómo hacerlo: escríbenos por {whatsapp}, llámanos al {telefono} o
-            escribe a <Correo valor={marca.correoContacto} />, indicando tu
-            nombre, RUT y número de cliente. Solo el titular del contrato puede
-            solicitarlo.
+            Cómo hacerlo:{" "}
+            {unoDe(
+              <>escríbenos por {whatsapp}</>,
+              <>llámanos al {telefono}</>,
+              correo && <>escribe a {correo}</>,
+            )}
+            , indicando tu nombre, RUT y número de cliente. Solo el titular del
+            contrato puede solicitarlo.
           </p>
           <p>
             Condiciones que <strong>no</strong> te podemos exigir para dar
@@ -262,21 +310,23 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
           </p>
           <p>
             <strong>Primera instancia — con nosotros.</strong> Presenta tu
-            reclamo por teléfono al {telefono}, por {whatsapp} o a{" "}
-            <Correo valor={marca.correoContacto} />. Te entregaremos un{" "}
-            <strong>número de folio</strong> como comprobante. Conforme al
-            Decreto N° 194 de 2013, tenemos un plazo máximo de{" "}
+            reclamo{" "}
+            {unoDe(<>por teléfono al {telefono}</>, <>por {whatsapp}</>, correo && <>a {correo}</>)}
+            . Horario de atención: <Dato valor={marca.horario} />. Te
+            entregaremos un <strong>número de folio</strong> como comprobante.
+            Conforme al Decreto N° 194 de 2013, tenemos un plazo máximo de{" "}
             <strong>5 días hábiles</strong> para responderte.
           </p>
           <p>
-            <strong>Segunda instancia — Subtel.</strong> Si no respondemos dentro
-            del plazo o la respuesta no te satisface, puedes insistir ante la
-            Subsecretaría de Telecomunicaciones en{" "}
+            <strong>Segunda instancia — Subtel.</strong> Si no estás conforme con
+            nuestra respuesta, puedes insistir ante la Subsecretaría de
+            Telecomunicaciones en{" "}
             <a href="https://tramites.subtel.gob.cl" target="_blank" rel="noopener noreferrer">
               tramites.subtel.gob.cl
-            </a>
-            . Subtel resuelve en un plazo aproximado de 30 días desde que recibe
-            los antecedentes.
+            </a>{" "}
+            dentro de los 30 días hábiles siguientes a su notificación. Subtel
+            resuelve dentro de 15 días hábiles desde que recibe nuestro informe
+            (Decreto N° 194, arts. 14 y 16).
           </p>
           <p>
             En materias de consumo también puedes acudir al{" "}
@@ -286,6 +336,52 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             </a>
             ).
           </p>
+          <p>
+            Puedes leer el{" "}
+            <a
+              href="https://www.bcn.cl/leychile/navegar?idNorma=1048887"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Reglamento de reclamos (Decreto N° 194)
+            </a>{" "}
+            y el informativo de Subtel con los principales derechos de los
+            usuarios:{" "}
+            {legal.informativoSubtel ? (
+              <a href={legal.informativoSubtel} target="_blank" rel="noopener noreferrer">
+                informativo de derechos
+              </a>
+            ) : (
+              <Pendiente />
+            )}{" "}
+            (art. 33).
+          </p>
+
+          <h3 id="atencion-reclamos">Atención telefónica de reclamos</h3>
+          <p>
+            Mes informado: <Dato valor={legal.mesReclamos} />.
+          </p>
+          <TablaLegal
+            titulo="Indicadores de la línea telefónica de reclamos"
+            columnas={["Indicador", "Resultado", "Norma"]}
+            filas={[
+              [
+                "Llamadas que entraron al servicio de reclamos, sobre el total de llamadas (%)",
+                <Dato key="atendidas" valor={legal.llamadasAtendidas} />,
+                "Decreto N° 194, art. 6 N° 1",
+              ],
+              [
+                "Tiempo de espera hasta ser atendido: promedio y desviación estándar",
+                <Dato key="espera" valor={legal.tiempoEspera} />,
+                "Decreto N° 194, art. 6 N° 2",
+              ],
+              [
+                "Llamadas en que el usuario cuelga sin ser atendido, sobre las entrantes (%)",
+                <Dato key="abandonadas" valor={legal.llamadasAbandonadas} />,
+                "Decreto N° 194, art. 6 N° 3",
+              ],
+            ]}
+          />
         </>
       ),
     },
@@ -294,11 +390,15 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
       titulo: "Interrupciones del servicio",
       contenido: (
         <p>
-          Ante una falla, repondremos el servicio en el menor plazo posible. Los
-          descuentos o compensaciones por interrupciones se aplican conforme a la
-          normativa vigente y a lo pactado en el contrato de servicio. Mecanismo
-          de compensación:{" "}
-          <Dato valor={CONDICIONES_CONTRATO.mecanismoCompensacion} />.
+          Ante una falla, repondremos el servicio en el menor plazo posible. Si
+          el servicio se suspende, interrumpe o altera por una causa que no te
+          sea imputable por más de 6 horas en un día, o de 12 horas continuas o
+          discontinuas en el mes, lo descontamos de tu tarifa mensual a razón de
+          un día por cada 24 horas o fracción superior a 6 horas. Si supera las
+          48 horas continuas o discontinuas en el mes y no se debe a fuerza mayor
+          o hecho fortuito, además te indemnizamos con el triple de la tarifa
+          diaria por cada día. Los descuentos e indemnizaciones se aplican en tu
+          cuenta mensual más próxima (Ley N° 18.168, art. 27).
         </p>
       ),
     },
@@ -330,10 +430,8 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
         <p>
           Podemos actualizar estos Términos; la versión vigente será siempre la
           publicada en esta página con su fecha de actualización. Estos Términos
-          se rigen por la ley chilena. Para cualquier controversia son
-          competentes los tribunales ordinarios de{" "}
-          <Dato valor={CONDICIONES_CONTRATO.comunaTribunales} />, sin perjuicio
-          del derecho del consumidor a recurrir ante SERNAC o Subtel.
+          se rigen por la ley chilena, sin perjuicio del derecho del consumidor
+          a recurrir ante SERNAC o Subtel.
         </p>
       ),
     },
@@ -354,7 +452,9 @@ export default async function TerminosPage({
         <p>
           {marca.razonSocial} · RUT <Dato valor={marca.rut} /> ·{" "}
           <Dato valor={marca.direccion.calle} />, {marca.direccion.comuna},{" "}
-          {marca.direccion.region} · Última actualización: {LEGAL_ACTUALIZACION}
+          {marca.direccion.region} · Representante legal:{" "}
+          <Dato valor={marca.representanteLegal} /> · Última actualización:{" "}
+          {LEGAL_ACTUALIZACION}
         </p>
       }
       secciones={secciones}
