@@ -113,6 +113,17 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             por cualquiera de nuestros canales de atención.
           </p>
           <p>
+            El contrato de cada servicio:{" "}
+            {legal.contrato ? (
+              <a href={legal.contrato} target="_blank" rel="noopener noreferrer">
+                ver contrato
+              </a>
+            ) : (
+              <Pendiente />
+            )}{" "}
+            (Decreto N° 18 de 2014, art. 12).
+          </p>
+          <p>
             Los precios se expresan en pesos chilenos e incluyen IVA. Cualquier
             modificación de las condiciones contratadas te será informada
             previamente en los términos que exige la ley.
@@ -292,6 +303,17 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             Plazo: damos término al contrato dentro de{" "}
             <strong>1 día hábil</strong> desde tu solicitud, y te enviamos una
             confirmación por escrito con el número de folio.
+          </p>
+          <p>
+            Puedes leer el{" "}
+            <a
+              href="https://www.bcn.cl/leychile/navegar?idNorma=1059429"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Reglamento de Servicios de Telecomunicaciones (Decreto N° 18 de 2014)
+            </a>
+            , que regula la contratación y el término de estos servicios (art. 70).
           </p>
         </>
       ),

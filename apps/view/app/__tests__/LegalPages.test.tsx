@@ -137,6 +137,19 @@ describe("CU-73: Terminos con respaldo normativo", () => {
     expect(seccion).not.toHaveTextContent(/contrataste por la web/);
   });
 
+  // El contrato de cada servicio va en el sitio, junto a sus precios (art. 12),
+  // y el texto del reglamento también (art. 70).
+  it("publica el contrato y el Reglamento de Servicios de Telecomunicaciones (Decreto 18 de 2014)", async () => {
+    const { container } = render(await TerminosPage(conMarca("finet")));
+
+    expect(container.querySelector("section#planes")).toHaveTextContent(/Decreto N° 18 de 2014, art\. 12/);
+    expect(
+      within(container.querySelector<HTMLElement>("section#termino")!).getByRole("link", {
+        name: /Decreto N° 18 de 2014/,
+      }),
+    ).toHaveAttribute("href", "https://www.bcn.cl/leychile/navegar?idNorma=1059429");
+  });
+
   it("reclamos: los plazos de Subtel y el texto del reglamento (DS 194, arts. 14, 16 y 33)", async () => {
     const { container } = render(await TerminosPage(conMarca("finet")));
     const seccion = container.querySelector<HTMLElement>("section#reclamos")!;

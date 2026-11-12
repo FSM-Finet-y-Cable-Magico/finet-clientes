@@ -25,6 +25,12 @@ export const MENSAJE_POLITICA_REQUERIDA =
 
 /** Lo que cada empresa publica como proveedor de Internet. */
 export type DatosLegales = {
+  /**
+   * Términos §3, Decreto 18 de 2014, art. 12: la dirección del contrato de
+   * cada servicio. Lo firma el equipo en terreno.
+   */
+  readonly contrato: Dato;
+
   // Términos §4, lo que se ofrece en cada plan.
   /**
    * Ley 18.168, art. 24 K: el porcentaje garantizado de las velocidades
@@ -84,6 +90,7 @@ export type DatosLegales = {
 export const PASARELA_PAGO = "Transbank (Webpay)";
 
 const SIN_DATOS: DatosLegales = {
+  contrato: null,
   velocidadGarantizada: null,
   sobreventa: null,
   calidadEnlace: null,
