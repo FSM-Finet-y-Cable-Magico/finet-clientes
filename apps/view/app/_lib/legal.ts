@@ -41,7 +41,7 @@ export type DatosLegales = {
    * horarias o semanales y si son para tráfico nacional o internacional.
    */
   readonly gestionTrafico: Dato;
-  /** Decreto 368, art. 9, y Ley 18.168, art. 24 H c): cómo funciona, cómo se usa y su costo. */
+  /** Decreto 368, art. 9: sus características operativas y cómo se usa. Su costo no lo pide ninguna norma. */
   readonly controlParental: Dato;
 
   // Términos §4, lo medido cada trimestre (Decreto 368, arts. 3, 4 y 5 c y d).

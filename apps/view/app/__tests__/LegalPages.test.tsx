@@ -103,6 +103,8 @@ describe("CU-73: Terminos con respaldo normativo", () => {
 
     expect(container.querySelector("h3#gestion-trafico")).not.toBeNull();
     expect(container.querySelector("h3#control-parental")).not.toBeNull();
+    // El art. 9 pide sus características y cómo se usa; su costo, ninguna norma.
+    expect(container.querySelector("h3#control-parental + p")).not.toHaveTextContent(/costo/);
   });
 
   it("la compensación por interrupciones es la del art. 27 de la Ley 18.168", async () => {

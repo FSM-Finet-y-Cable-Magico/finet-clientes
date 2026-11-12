@@ -155,8 +155,8 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
           <p>
             Ponemos a disposición de quien lo solicite un servicio de control
             parental que bloquea contenidos que atenten contra la ley, la moral o
-            las buenas costumbres (Decreto 368, art. 9). Cómo funciona, cómo
-            usarlo y su costo: <Dato valor={legal.controlParental} />.
+            las buenas costumbres (Decreto 368, art. 9). Cómo funciona y cómo
+            usarlo: <Dato valor={legal.controlParental} />.
           </p>
 
           <h3 id="caracteristicas">Características del servicio</h3>
