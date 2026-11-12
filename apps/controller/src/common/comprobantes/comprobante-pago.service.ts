@@ -4,13 +4,15 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '../../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { nombreMedioPago } from '../../pagos/pagos.constantes.js';
 import { formatPeriodo } from '../utils/periodo.js';
-import { urlDelSitio } from '../constants/empresas.js';
 import { COMPROBANTE_EN_PAGO } from '../pendientes.js';
+import {
+  PREFIJO_PDF_GUARDADO,
+  TOPE_PDF_BYTES,
+} from './comprobante-pago.constantes.js';
 import {
   generarComprobantePdf,
   contenidoComprobante,
@@ -45,6 +47,7 @@ const SELECT_PAGO = {
   pasarela: true,
   codigo_transaccion: true,
   codigo_autorizacion: true,
+  comprobante_pdf_url: true,
   factura: { select: { periodo_mes: true, periodo_anio: true } },
 } satisfies Prisma.pagoSelect;
 
@@ -61,18 +64,15 @@ type ClienteLeido = Prisma.clienteGetPayload<{
 
 /**
  * CU-52 / RF-38: el comprobante de un pago en PDF, con la marca de la empresa
- * del cliente. Se genera cada vez desde `pago`, que no cambia: el portal solo
- * puede leer esa tabla, y no hay almacenamiento en la nube (RNF-38.2 queda
- * pendiente).
+ * del cliente. Se genera la primera vez y, con el permiso de G8, queda guardado
+ * en `pago.comprobante_pdf_url` (el PDF entero); desde ahí se entrega siempre
+ * el mismo. Mientras no haya permiso, se genera cada vez desde `pago`.
  */
 @Injectable()
 export class ComprobantePagoService {
   private readonly logger = new Logger(ComprobantePagoService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * La descarga desde el portal. Un pago de otro cliente responde 404, igual
@@ -151,6 +151,12 @@ export class ComprobantePagoService {
       generado: new Date(),
     };
 
+    const { nombreArchivo } = contenidoComprobante(datos);
+
+    // El que ya está guardado en pago es el comprobante: el mismo cada vez.
+    const guardado = pdfGuardado(pago.comprobante_pdf_url);
+    if (guardado) return { archivo: guardado, nombreArchivo };
+
     let archivo: Buffer;
     try {
       archivo = await this.pdf(datos);
@@ -161,23 +167,17 @@ export class ComprobantePagoService {
       return null;
     }
 
-    await this.marcarEnPago(pago.id_pago, cliente.id_empresa);
-    return {
-      archivo,
-      nombreArchivo: contenidoComprobante(datos).nombreArchivo,
-    };
+    await this.guardarEnPago(pago.id_pago, archivo);
+    return { archivo, nombreArchivo };
   }
 
   /**
-   * Con el permiso de G8, el pago queda con la URL de su comprobante y en
-   * GENERADO. Solo esas dos columnas de `pago` (Emilio, 12-11), y solo si nadie
-   * lo había marcado: nunca pisa lo que ponga G8. Si la base lo rechaza, se
-   * registra y el comprobante se entrega igual.
+   * Con el permiso de G8, el PDF queda guardado en `pago.comprobante_pdf_url`
+   * y el pago en GENERADO. Solo esas dos columnas (Emilio, 12-11), y solo si
+   * nadie lo había guardado: nunca pisa lo que ponga G8. Si la base lo
+   * rechaza, se registra y el comprobante se entrega igual.
    */
-  private async marcarEnPago(
-    idPago: number,
-    idEmpresa: number | null,
-  ): Promise<void> {
+  private async guardarEnPago(idPago: number, archivo: Buffer): Promise<void> {
     if (!this.marcaEnPago()) return;
     try {
       await this.prisma.pago.updateMany({
@@ -187,17 +187,13 @@ export class ComprobantePagoService {
           comprobante_pdf_url: null,
         },
         data: {
-          comprobante_pdf_url: urlDelSitio(
-            idEmpresa,
-            `/api/portal/pagos/${idPago}/comprobante`,
-            this.config.getOrThrow<string>('FRONTEND_URL'),
-          ),
+          comprobante_pdf_url: `${PREFIJO_PDF_GUARDADO}${archivo.toString('base64')}`,
           comprobante_estado: 'GENERADO',
         },
       });
     } catch (error) {
       this.logger.warn(
-        `[CU-52] no se pudo marcar el comprobante del pago ${idPago} en pago: ${mensaje(error)}`,
+        `[CU-52] no se pudo guardar el comprobante del pago ${idPago} en pago: ${mensaje(error)}`,
       );
     }
   }
@@ -215,4 +211,20 @@ export class ComprobantePagoService {
 
 function mensaje(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * El PDF guardado en `pago.comprobante_pdf_url`, si es uno de verdad. Otra URL
+ * no se sigue (sería pedirle al servidor que descargue lo que alguien escribió
+ * en la base) y otro tipo de archivo no se entrega: en esos casos, `null`, y el
+ * comprobante se rehace.
+ */
+function pdfGuardado(valor: string | null | undefined): Buffer | null {
+  if (!valor?.startsWith(PREFIJO_PDF_GUARDADO)) return null;
+  const base64 = valor.slice(PREFIJO_PDF_GUARDADO.length);
+  // Cuatro caracteres de base64 son tres bytes: se descarta antes de decodificar.
+  if ((base64.length * 3) / 4 > TOPE_PDF_BYTES) return null;
+  const archivo = Buffer.from(base64, 'base64');
+  const esPdf = archivo.subarray(0, 5).toString('latin1') === '%PDF-';
+  return esPdf && archivo.length <= TOPE_PDF_BYTES ? archivo : null;
 }

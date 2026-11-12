@@ -59,13 +59,14 @@ export const SALDO_CLIENTE_DEFINIDO = true;
 export const TICKET_WIFI_DEFINIDO = true;
 
 /**
- * Marcar el comprobante en `pago` (CU-52): al generarlo, el portal escribe su
- * URL y `comprobante_estado = 'GENERADO'`, solo en esas dos columnas. Emilio lo
- * pidió el 12-11 y G8 avisó que dio el permiso, pero en la base `g2_app` todavía
- * no puede hacer UPDATE en ninguna columna de `pago` (has_column_privilege, 12-11).
- * Se prende cuando G8 corra
+ * Guardar el comprobante en `pago` (CU-52): al generarlo, el portal escribe el
+ * PDF entero en `comprobante_pdf_url` (data URL) y `comprobante_estado =
+ * 'GENERADO'`, solo esas dos columnas. Emilio lo pidió el 12-11 y G8 avisó que
+ * dio el permiso, pero en `finet_global_validacion` `g2_app` sigue con solo
+ * lectura en `pago` (relacl `g2_app=r`, 12-11 23:56). Se prende cuando G8 corra
  * `GRANT UPDATE (comprobante_pdf_url, comprobante_estado) ON public.pago TO g2_app`
- * y la misma consulta dé true. Mientras tanto el comprobante se descarga igual.
+ * y has_column_privilege dé true. Mientras tanto el comprobante se descarga y
+ * se adjunta igual, generado cada vez.
  */
 export const COMPROBANTE_EN_PAGO = false;
 
@@ -102,9 +103,9 @@ export const PENDIENTES: readonly Pendiente[] = [
     estaVacio: () => !TICKET_WIFI_DEFINIDO,
   },
   {
-    dato: 'Permiso para marcar el comprobante en pago (UPDATE de comprobante_pdf_url y comprobante_estado)',
+    dato: 'Permiso para guardar el comprobante en pago (UPDATE de comprobante_pdf_url y comprobante_estado)',
     quien: 'Grupo 8',
-    destraba: 'CU-52 (pago en GENERADO con su URL)',
+    destraba: 'CU-52 (el PDF guardado en pago y en GENERADO)',
     estaVacio: () => !COMPROBANTE_EN_PAGO,
   },
 ];

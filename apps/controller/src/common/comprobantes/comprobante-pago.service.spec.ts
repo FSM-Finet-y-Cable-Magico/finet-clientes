@@ -1,13 +1,5 @@
-import {
-  jest,
-  afterEach,
-  beforeEach,
-  describe,
-  it,
-  expect,
-} from '@jest/globals';
+import { jest, beforeEach, describe, it, expect } from '@jest/globals';
 import { Test } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
@@ -39,7 +31,6 @@ describe('ComprobantePagoService', () => {
   };
 
   beforeEach(async () => {
-    process.env.FRONTEND_URL_CABLE_MAGICO = 'https://cable.test';
     prisma = {
       pago: {
         findFirst: jest.fn(),
@@ -51,17 +42,9 @@ describe('ComprobantePagoService', () => {
       providers: [
         ComprobantePagoService,
         { provide: PrismaService, useValue: prisma },
-        {
-          provide: ConfigService,
-          useValue: { getOrThrow: () => 'https://finet.test' },
-        },
       ],
     }).compile();
     service = module.get(ComprobantePagoService);
-  });
-
-  afterEach(() => {
-    delete process.env.FRONTEND_URL_CABLE_MAGICO;
   });
 
   /** El interruptor de G8 (COMPROBANTE_EN_PAGO), prendido para la prueba. */
@@ -174,24 +157,29 @@ describe('ComprobantePagoService', () => {
       expect(prisma.pago.updateMany).not.toHaveBeenCalled();
     });
 
-    it('con el permiso, escribe solo la URL y GENERADO, sobre un pago pendiente sin URL', async () => {
+    it('con el permiso, guarda el PDF en comprobante_pdf_url y GENERADO, sobre un pago pendiente sin comprobante', async () => {
       conPermisoDeG8();
 
-      await service.delCliente(2, 5);
+      const r = await service.delCliente(2, 5);
 
       expect(prisma.pago.updateMany).toHaveBeenCalledTimes(1);
-      expect(prisma.pago.updateMany).toHaveBeenCalledWith({
-        where: {
-          id_pago: 5,
-          comprobante_estado: 'PENDIENTE',
-          comprobante_pdf_url: null,
-        },
-        data: {
-          comprobante_pdf_url:
-            'https://cable.test/api/portal/pagos/5/comprobante',
-          comprobante_estado: 'GENERADO',
-        },
+      const [args] = prisma.pago.updateMany.mock.calls[0] as [
+        { where: unknown; data: Record<string, string> },
+      ];
+      expect(args.where).toEqual({
+        id_pago: 5,
+        comprobante_estado: 'PENDIENTE',
+        comprobante_pdf_url: null,
       });
+      // Solo esas dos columnas: el PDF entero y el estado.
+      expect(Object.keys(args.data).sort()).toEqual([
+        'comprobante_estado',
+        'comprobante_pdf_url',
+      ]);
+      expect(args.data.comprobante_estado).toBe('GENERADO');
+      expect(args.data.comprobante_pdf_url).toBe(
+        `data:application/pdf;base64,${r.archivo.toString('base64')}`,
+      );
     });
 
     it('si el PDF falla, no marca nada: queda PENDIENTE (Excepción 2)', async () => {
@@ -214,6 +202,75 @@ describe('ComprobantePagoService', () => {
 
       const r = await service.delCliente(2, 5);
       expect(r.archivo.subarray(0, 5).toString()).toBe('%PDF-');
+    });
+  });
+
+  /**
+   * El comprobante guardado en pago es el que se entrega: el mismo PDF cada
+   * vez. Solo se acepta un PDF de verdad y de menos de 500 KB (RNF-38.1); lo
+   * demás (otra URL, otro tipo) no se sigue ni se entrega: se rehace.
+   */
+  describe('el comprobante guardado en pago', () => {
+    const GUARDADO = Buffer.from('%PDF-1.4 el guardado');
+    const conValor = (valor: string) =>
+      prisma.pago.findFirst.mockResolvedValue({
+        ...PAGO,
+        comprobante_pdf_url: valor,
+      } as never);
+    let rehecho: ReturnType<typeof jest.spyOn>;
+
+    beforeEach(() => {
+      prisma.cliente.findUnique.mockResolvedValue(CLIENTE_CABLE as never);
+      rehecho = jest.spyOn(
+        service as unknown as { pdf: () => Promise<Buffer> },
+        'pdf',
+      );
+    });
+
+    it('se entrega tal cual, sin rehacerlo', async () => {
+      conValor(`data:application/pdf;base64,${GUARDADO.toString('base64')}`);
+
+      const r = await service.delCliente(2, 5);
+
+      expect(r.archivo.equals(GUARDADO)).toBe(true);
+      expect(r.nombreArchivo).toBe('comprobante-cable-magico-5.pdf');
+      expect(rehecho).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['una URL de otro sitio', 'https://otro.example/boleta.pdf'],
+      [
+        'otro tipo de archivo',
+        `data:text/html;base64,${Buffer.from('<script>').toString('base64')}`,
+      ],
+      [
+        'algo que no es un PDF',
+        `data:application/pdf;base64,${Buffer.from('<html>').toString('base64')}`,
+      ],
+      [
+        'un archivo de más de 500 KB',
+        `data:application/pdf;base64,${Buffer.concat([GUARDADO, Buffer.alloc(600 * 1024)]).toString('base64')}`,
+      ],
+    ])('%s no se entrega: se rehace el comprobante', async (_caso, valor) => {
+      conValor(valor);
+
+      const r = await service.delCliente(2, 5);
+
+      expect(rehecho).toHaveBeenCalledTimes(1);
+      expect(r.archivo.subarray(0, 5).toString()).toBe('%PDF-');
+      expect(r.archivo.equals(GUARDADO)).toBe(false);
+    });
+
+    it('el correo de confirmación adjunta el mismo PDF guardado', async () => {
+      prisma.pago.findFirst.mockResolvedValue({
+        ...PAGO,
+        comprobante_pdf_url: `data:application/pdf;base64,${GUARDADO.toString('base64')}`,
+        cliente: CLIENTE_CABLE,
+      } as never);
+
+      const r = await service.delPago(5);
+
+      expect(r?.archivo.equals(GUARDADO)).toBe(true);
     });
   });
 });
