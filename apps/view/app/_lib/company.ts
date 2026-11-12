@@ -34,8 +34,12 @@ export type Marca = {
   /** Nombre comercial. */
   readonly nombre: string;
   readonly razonSocial: string;
+  /**
+   * Se muestra si la empresa lo entregó: ninguna norma que aplique al Portal lo
+   * exige. El DS 6/2021 no, porque aquí no se contrata (art. 3 N° 4).
+   */
   readonly rut: string | null;
-  /** DS 6/2021 (comercio electrónico), art. 7 N° 6, y Ley 19.628, art. 14 ter b) según la Ley 21.719. */
+  /** Ley 19.628, art. 14 ter b), según la Ley 21.719: va en la Política de Privacidad. */
   readonly representanteLegal: string | null;
   readonly logo: {
     readonly webp: string;
@@ -51,8 +55,7 @@ export type Marca = {
   readonly instagramUrl: string;
   /**
    * Contacto general: reclamos, término de contrato, accesos indebidos. Si no
-   * lo hay, no se pide: basta el teléfono (DS 6/2021, art. 7 N° 4; DS 194,
-   * art. 5, donde el correo es opcional).
+   * lo hay, no se pide: en el DS 194, art. 5, el correo es opcional.
    */
   readonly correoContacto: string | null;
   /** Para ejercer los derechos sobre datos personales. */

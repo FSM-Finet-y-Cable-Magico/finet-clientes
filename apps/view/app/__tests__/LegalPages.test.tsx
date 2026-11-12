@@ -60,10 +60,14 @@ describe("CU-73: Terminos con respaldo normativo", () => {
     expect(container.textContent).not.toMatch(/Direccionamiento IP|tribunales/);
   });
 
-  it("identifica al representante legal (DS 6/2021, art. 7 N° 6)", async () => {
+  // El DS 6/2021 no aplica: en el Portal no se contrata, se deja una solicitud
+  // (art. 3 N° 4). El representante legal va en la Política de Privacidad.
+  it("el encabezado no deja huecos de RUT ni de representante legal", async () => {
     render(await TerminosPage(conMarca("finet")));
+    const encabezado = screen.getByRole("heading", { level: 1 }).closest("header")!;
 
-    expect(screen.getByText(/Representante legal/)).toBeInTheDocument();
+    expect(encabezado).not.toHaveTextContent(/RUT|Representante legal/);
+    expect(within(encabezado).queryByText("dato pendiente")).toBeNull();
   });
 
   it("publica lo que el Decreto 368 pide de cada plan, con su norma", async () => {
@@ -158,6 +162,13 @@ describe("CU-73: Politica de Privacidad con respaldo normativo", () => {
     const tabla = screen.getByRole("table", { name: "Responsable del tratamiento de datos" });
 
     expect(within(tabla).getByRole("rowheader", { name: "Representante legal" })).toBeInTheDocument();
+  });
+
+  it("el RUT va solo si la empresa lo entregó: ninguna norma que aplique al Portal lo exige", async () => {
+    render(await PrivacidadPage(conMarca("finet")));
+    const tabla = screen.getByRole("table", { name: "Responsable del tratamiento de datos" });
+
+    expect(within(tabla).queryByRole("rowheader", { name: "RUT" })).toBeNull();
   });
 
   it("nombra a los proveedores reales: Transbank, y ya no Railway (letra d)", async () => {

@@ -56,7 +56,7 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
           columnas={["Campo", "Dato"]}
           filas={[
             ["Responsable del tratamiento", marca.razonSocial],
-            ["RUT", <Dato key="rut" valor={marca.rut} />],
+            ...(marca.rut ? [["RUT", marca.rut]] : []),
             ["Representante legal", <Dato key="representante" valor={marca.representanteLegal} />],
             ["Domicilio", domicilio],
             ["Contacto de privacidad", <Correo key="correo" valor={marca.correoPrivacidad} />],

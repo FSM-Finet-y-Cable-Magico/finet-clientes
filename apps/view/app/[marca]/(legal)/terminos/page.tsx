@@ -53,8 +53,7 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
       WhatsApp
     </a>
   );
-  // Un canal más, si la empresa lo tiene: basta el teléfono (DS 6/2021,
-  // art. 7 N° 4; DS 194, art. 5).
+  // Un canal más, si la empresa lo tiene: el correo es opcional (DS 194, art. 5).
   const correo = marca.correoContacto && <Correo valor={marca.correoContacto} />;
 
   return [
@@ -450,11 +449,10 @@ export default async function TerminosPage({
       titulo="Términos y Condiciones de Uso y Servicio"
       encabezado={
         <p>
-          {marca.razonSocial} · RUT <Dato valor={marca.rut} /> ·{" "}
+          {marca.razonSocial}
+          {marca.rut && <> · RUT {marca.rut}</>} ·{" "}
           <Dato valor={marca.direccion.calle} />, {marca.direccion.comuna},{" "}
-          {marca.direccion.region} · Representante legal:{" "}
-          <Dato valor={marca.representanteLegal} /> · Última actualización:{" "}
-          {LEGAL_ACTUALIZACION}
+          {marca.direccion.region} · Última actualización: {LEGAL_ACTUALIZACION}
         </p>
       }
       secciones={secciones}
