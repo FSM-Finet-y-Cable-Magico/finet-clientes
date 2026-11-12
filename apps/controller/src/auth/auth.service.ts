@@ -14,6 +14,10 @@ import { MailService } from '../mail/mail.service.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
 import { urlDelSitio } from '../common/constants/empresas.js';
+import {
+  esPasswordReciente,
+  MENSAJE_PASSWORD_REPETIDA,
+} from './password-reciente.js';
 
 /**
  * CU-05: "se registra el evento en la bitácora de auditoría". Y es lo que deja el
@@ -601,6 +605,20 @@ export class AuthService {
     const { password_portal_hash: hashAnterior, ...datos } = encontrado;
     const cliente = { ...datos, id_cliente: payload.sub };
 
+    // RNF-08.2, igual que el cambio desde el perfil: restablecer no sirve
+    // para volver a una de las últimas contraseñas. El registro no tiene.
+    if (
+      hashAnterior &&
+      (await esPasswordReciente(
+        this.prisma,
+        payload.sub,
+        hashAnterior,
+        password,
+      ))
+    ) {
+      throw new BadRequestException(MENSAJE_PASSWORD_REPETIDA);
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     await this.prisma.$transaction(async (tx) => {
@@ -613,6 +631,12 @@ export class AuthService {
       });
       if (count === 0) {
         throw new BadRequestException(MENSAJE_ENLACE_USADO[tipo]);
+      }
+      // La que se reemplaza pasa al historial, como en el perfil (CU-10).
+      if (hashAnterior) {
+        await tx.historial_password_portal.create({
+          data: { id_cliente: payload.sub, password_hash: hashAnterior },
+        });
       }
       await enTransaccion?.(tx, cliente);
     });

@@ -50,6 +50,10 @@ describe('AuthService', () => {
               findUnique: jest.fn(),
               updateMany: jest.fn(),
             },
+            historial_password_portal: {
+              findMany: jest.fn().mockResolvedValue([]),
+              create: jest.fn(),
+            },
             sesion_portal: {
               create: jest.fn(),
               updateMany: jest.fn(),
@@ -221,7 +225,31 @@ describe('AuthService', () => {
 
     beforeEach(() => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      // La nueva no es ninguna de las recientes, salvo que el test diga otra cosa.
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
       (prisma.cliente.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    });
+
+    it('RNF-08.2: no deja volver a la contraseña actual ni a una reciente', async () => {
+      await pedirEnlace('hashedpassword');
+      hashEnBase('hashedpassword');
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await expect(
+        authService.restablecerPassword('reset-token', 'NewPass1'),
+      ).rejects.toThrow('últimas 5 contraseñas');
+      expect(prisma.cliente.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('la contraseña que se reemplaza pasa al historial', async () => {
+      await pedirEnlace('hashedpassword');
+      hashEnBase('hashedpassword');
+
+      await authService.restablecerPassword('reset-token', 'NewPass1');
+
+      expect(prisma.historial_password_portal.create).toHaveBeenCalledWith({
+        data: { id_cliente: 1, password_hash: 'hashedpassword' },
+      });
     });
 
     it('update password and invalidate sessions on valid token', async () => {
