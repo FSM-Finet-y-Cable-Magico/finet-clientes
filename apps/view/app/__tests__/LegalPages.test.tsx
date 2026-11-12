@@ -80,6 +80,15 @@ describe("CU-73: Terminos con respaldo normativo", () => {
     expect(within(tabla).getByText("Ley N° 18.168, art. 24 K")).toBeInTheDocument();
   });
 
+  // Lo mismo que dice cada plan del catálogo: "Datos ilimitados".
+  it("el límite de descarga es el de los planes: sin límite (Decreto 368, art. 5 letra a)", async () => {
+    render(await TerminosPage(conMarca("finet")));
+    const tabla = screen.getByRole("table", { name: "Características del servicio" });
+    const fila = within(tabla).getByRole("rowheader", { name: "Límite de descarga" }).closest("tr")!;
+
+    expect(fila).toHaveTextContent(/Sin límite/);
+  });
+
   it("los indicadores trimestrales son los del Decreto 368, art. 5 letras c y d", async () => {
     render(await TerminosPage(conMarca("finet")));
     const tabla = screen.getByRole("table", { name: "Indicadores de calidad medidos por trimestre" });

@@ -31,8 +31,6 @@ export type DatosLegales = {
    * promedio, en horario de mayor y menor congestión, nacional e internacional.
    */
   readonly velocidadGarantizada: Dato;
-  /** Decreto 368, art. 5 a). */
-  readonly limiteDescarga: Dato;
   /** Decreto 368, art. 5 b): expresada como 1:XX. */
   readonly sobreventa: Dato;
   /** Decreto 368, art. 5 e): nacional e internacional. */
@@ -87,7 +85,6 @@ export const PASARELA_PAGO = "Transbank (Webpay)";
 
 const SIN_DATOS: DatosLegales = {
   velocidadGarantizada: null,
-  limiteDescarga: null,
   sobreventa: null,
   calidadEnlace: null,
   gestionTrafico: null,

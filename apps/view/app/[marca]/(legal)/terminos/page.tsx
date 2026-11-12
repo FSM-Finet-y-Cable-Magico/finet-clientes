@@ -177,9 +177,10 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
                 <Dato key="garantizada" valor={legal.velocidadGarantizada} />,
                 "Ley N° 18.168, art. 24 K",
               ],
+              // Lo que dice cada plan del catálogo: "Datos ilimitados".
               [
                 "Límite de descarga",
-                <Dato key="descarga" valor={legal.limiteDescarga} />,
+                "Sin límite: datos ilimitados en todos los planes",
                 "Decreto 368, art. 5 letra a",
               ],
               [
