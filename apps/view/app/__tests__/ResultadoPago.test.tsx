@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 
-import ResultadoPago from '@/app/pagar/_components/ResultadoPago';
-import { WHATSAPP_URL } from '@/app/_lib/company';
+import ResultadoPago from '@/app/[marca]/pagar/_components/ResultadoPago';
+import { MARCAS } from '@/app/_lib/company';
 
 process.env.TZ = 'America/Santiago';
 
@@ -57,7 +57,7 @@ describe('ResultadoPago', () => {
     expect(screen.getByText(/todavía no se refleja en tu cuenta/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /whatsapp/i })).toHaveAttribute(
       'href',
-      WHATSAPP_URL,
+      MARCAS.finet.whatsappUrl,
     );
   });
 

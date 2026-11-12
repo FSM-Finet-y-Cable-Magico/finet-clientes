@@ -1,5 +1,6 @@
 import type { SocialLink } from './social.config';
-import { socialLinks } from './social.config';
+import { redesDe } from './social.config';
+import type { Marca } from '../../../_lib/company';
 
 function InstagramIcon({ size = 18 }: { size?: number }) {
   return (
@@ -40,10 +41,10 @@ const iconMap: Record<SocialLink['platform'], React.ReactNode> = {
   whatsapp: <WhatsAppIcon size={18} />,
 };
 
-export default function SocialLinks() {
+export default function SocialLinks({ marca }: { marca: Marca }) {
   return (
     <ul className="flex items-center gap-3">
-      {socialLinks.map((social) => (
+      {redesDe(marca).map((social) => (
         <li key={social.platform}>
           <a
             href={social.href}

@@ -66,6 +66,8 @@ describe("URL del backend desde el navegador (NEXT_PUBLIC_API_URL)", () => {
 
   it("sesión: perfil y cierre", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 401 });
+    // Con el aviso del proxy de que hay sesión: sin él no pregunta.
+    document.cookie = "hay_sesion=1; path=/";
     const { fireEvent, render, screen, waitFor } = await cargarTestingLibrary();
     const { AuthProvider, useAuth } = await import("@/app/_lib/auth");
     function Cerrar() {
@@ -145,7 +147,7 @@ describe("URL del backend desde el servidor de Next (API_URL)", () => {
 
   it("cambio de clave WiFi", async () => {
     const { changeWifiPassword } = await import(
-      "@/app/portal/_lib/portal-actions"
+      "@/app/[marca]/portal/_lib/portal-actions"
     );
     await expect(changeWifiPassword(1, "MiRed2026")).resolves.toEqual({
       success: true,
@@ -156,7 +158,7 @@ describe("URL del backend desde el servidor de Next (API_URL)", () => {
   it("cambio de clave WiFi sin API_URL: no llama y avisa", async () => {
     delete process.env.API_URL;
     const { changeWifiPassword } = await import(
-      "@/app/portal/_lib/portal-actions"
+      "@/app/[marca]/portal/_lib/portal-actions"
     );
     const r = await changeWifiPassword(1, "MiRed2026");
     expect(r.success).toBe(false);

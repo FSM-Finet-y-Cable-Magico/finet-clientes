@@ -360,12 +360,41 @@ describe('PagosService', () => {
       });
       expect(confirmacion.confirmar).toHaveBeenCalledTimes(1);
       expect(confirmacion.confirmar).toHaveBeenCalledWith({
+        // El id que devuelve G8: con él se arma el comprobante adjunto.
+        idPago: 9001,
         idCliente: 10,
         monto: 14990,
         fecha: new Date('2026-10-29T16:41:21.063Z'),
         codigoAutorizacion: '1213',
       });
       expect(url).toBe(`${RESULTADO}?resultado=aprobado&token_ws=${TOKEN}`);
+    });
+
+    it('un cliente de Cable Mágico vuelve a la pantalla de resultado de su sitio', async () => {
+      enlaces.verificarSesionPago.mockReturnValue({ ...SESION, idEmpresa: 2 });
+
+      const url = await service.retorno({ token_ws: TOKEN }, ENCENDIDOS);
+
+      expect(url).toBe(
+        `https://portal.test/cable-magico/pagar/resultado?resultado=aprobado&token_ws=${TOKEN}`,
+      );
+    });
+
+    it('un cliente de Cable Mágico que anula en Webpay también vuelve a su sitio', async () => {
+      enlaces.verificarSesionPago.mockReturnValue({ ...SESION, idEmpresa: 2 });
+
+      const url = await service.retorno(
+        {
+          TBK_TOKEN: TOKEN,
+          TBK_ORDEN_COMPRA: 'F101-x',
+          TBK_ID_SESION: 's.firmada',
+        },
+        ENCENDIDOS,
+      );
+
+      expect(url).toBe(
+        'https://portal.test/cable-magico/pagar/resultado?resultado=cancelado',
+      );
     });
 
     it('si G8 ya lo tenía (duplicado), no se confirma de nuevo', async () => {

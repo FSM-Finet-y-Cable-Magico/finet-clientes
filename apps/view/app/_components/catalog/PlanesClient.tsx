@@ -8,6 +8,7 @@ import {
 } from "../../_lib/api";
 import PlanCard from "./PlanCard";
 import SegmentFilter from "./SegmentFilter";
+import { useMarca } from "../../_lib/marca";
 
 type Segmento = "todos" | "RESIDENCIAL" | "EMPRESARIAL";
 
@@ -16,6 +17,7 @@ type PlanesClientProps = {
 };
 
 export default function PlanesClient({ planes }: PlanesClientProps) {
+  const marca = useMarca();
   const [segmento, setSegmento] = useState<Segmento>("RESIDENCIAL");
 
   const filtered =
@@ -46,6 +48,7 @@ export default function PlanesClient({ planes }: PlanesClientProps) {
         <div className="grid gap-6 md:grid-cols-3">
           {sorted.map((plan) => (
             <PlanCard
+              marca={marca}
               key={plan.id_plan}
               plan={plan}
               featured={plan.id_plan === featuredId}

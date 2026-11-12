@@ -5,13 +5,17 @@ import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import type { NavItem } from "./nav.config";
+import { useMarca } from "../../../_lib/marca";
+import { hrefMarca, separarMarca } from "../../../_lib/company";
 
 type DesktopNavItemProps = {
   item: NavItem;
 };
 
 export default function DesktopNavItem({ item }: DesktopNavItemProps) {
-  const pathname = usePathname();
+  const marca = useMarca();
+  // Sin el prefijo de la empresa: /cable-magico/planes es /planes.
+  const { ruta: pathname } = separarMarca(usePathname());
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLLIElement>(null);
   const hasChildren = Boolean(item.children?.length);
@@ -69,7 +73,7 @@ export default function DesktopNavItem({ item }: DesktopNavItemProps) {
               {item.children!.map((child) => (
                 <li key={child.href} role="none">
                   <Link
-                    href={child.href}
+                    href={hrefMarca(marca, child.href)}
                     role="menuitem"
                     onClick={() => setIsOpen(false)}
                     className={`block rounded-md px-3 py-2 text-sm transition-colors ${
@@ -87,7 +91,7 @@ export default function DesktopNavItem({ item }: DesktopNavItemProps) {
         </>
       ) : (
         <Link
-          href={item.href}
+          href={hrefMarca(marca, item.href)}
           aria-current={isActive ? "page" : undefined}
           className={`text-sm transition-colors ${
             isActive

@@ -84,6 +84,7 @@ export class AuthController {
       body.rut,
       body.password,
       req.ip ?? '0.0.0.0',
+      body.id_empresa,
     );
     this.ponerCookieSesion(res, result.access_token);
     return result;
@@ -117,7 +118,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(solicitudRegistroSchema))
     body: SolicitudRegistroDto,
   ) {
-    return this.authService.solicitarRegistro(body.rut);
+    return this.authService.solicitarRegistro(body.rut, body.id_empresa);
   }
 
   /**
@@ -188,7 +189,11 @@ export class AuthController {
     body: RecuperarPasswordDto,
     @Req() req: Request,
   ) {
-    return this.authService.recuperarPassword(body.rut, req.ip);
+    return this.authService.recuperarPassword(
+      body.rut,
+      req.ip,
+      body.id_empresa,
+    );
   }
 
   /**

@@ -107,4 +107,45 @@ describe('JwtStrategy', () => {
       );
     });
   });
+
+  /** Un token por empresa, como G8 (11-11): la empresa del token es la del cliente. */
+  describe('empresa del token', () => {
+    const clienteCable = { ...mockCliente, id_empresa: 2 };
+
+    beforeEach(() => {
+      (prisma.sesion_portal.findFirst as jest.Mock).mockResolvedValue({
+        id_sesion: 10,
+        token: 'test-token',
+      });
+      (prisma.sesion_portal.updateMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(clienteCable);
+    });
+
+    it('la sesión trae la empresa del cliente, leída de la base', async () => {
+      const result = await strategy.validate(mockReq, {
+        ...mockPayload,
+        id_empresa: 2,
+      });
+
+      expect(result).toEqual(clienteCable);
+      expect(prisma.cliente.findUnique).toHaveBeenCalledWith({
+        where: { id_cliente: 1 },
+        select: expect.objectContaining({ id_empresa: true }),
+      });
+    });
+
+    it('un token con otra empresa no sirve', async () => {
+      await expect(
+        strategy.validate(mockReq, { ...mockPayload, id_empresa: 1 }),
+      ).rejects.toThrow('Token de empresa invalido');
+    });
+
+    it('un token anterior, sin la empresa, sigue sirviendo con la de la base', async () => {
+      const result = await strategy.validate(mockReq, mockPayload);
+
+      expect(result).toEqual(clienteCable);
+    });
+  });
 });

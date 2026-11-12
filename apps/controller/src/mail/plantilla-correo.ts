@@ -1,19 +1,76 @@
 import { escaparHtml } from './formato.js';
+import { logoCorreoDe } from './logo-correo.js';
+import {
+  empresaDe,
+  esEmpresaConocida,
+  ID_EMPRESA_POR_DEFECTO,
+  type IdEmpresa,
+} from '../common/constants/empresas.js';
 
 /**
- * Molde común de los correos del Incremento 3 (CU-67, CU-68 y CU-69), con los colores
- * del portal (`apps/view/app/globals.css`).
+ * Molde común de los correos del portal, con los colores del portal
+ * (`apps/view/app/globals.css`) y la marca de la empresa del cliente: lo que
+ * le llega a Cable Mágico es de Cable Mágico (Emilio, 11-11).
  *
  * Es HTML de correo, no de página: tablas para el layout y estilos en línea,
  * porque Gmail y Outlook ignoran las hojas de estilo y el flex/grid.
  */
 
-const COLOR = {
-  marca: '#0B1C30', // --color-foreground: cabecera, donde el logo (cian y amarillo) se lee
-  // DESIGN.md: "Pagar / Checkout" va en Finet Lime con texto Deep Slate (13:1).
-  boton: '#E3E446',
-  textoBoton: '#0F172A',
-  enlace: '#00687A', // --color-primary-bright: el cian sobre blanco no llega a 3:1
+/** Lo que cambia por empresa: la cabecera, el botón y los enlaces. */
+type TemaCorreo = {
+  readonly cabecera: string;
+  /** Franja bajo la cabecera, para separarla cuando es blanca. */
+  readonly franja: string | null;
+  /** El nombre, si el logo no carga. */
+  readonly textoCabecera: string;
+  readonly boton: string;
+  readonly textoBoton: string;
+  readonly enlace: string;
+};
+
+const TEMAS: Record<IdEmpresa, TemaCorreo> = {
+  1: {
+    cabecera: '#0B1C30', // --color-foreground: el logo (cian y amarillo) se lee
+    franja: null,
+    textoCabecera: '#E3E446',
+    // DESIGN.md: "Pagar / Checkout" va en Finet Lime con texto Deep Slate (13:1).
+    boton: '#E3E446',
+    textoBoton: '#0F172A',
+    enlace: '#00687A', // --color-primary-bright: el cian sobre blanco no llega a 3:1
+  },
+  2: {
+    // El logo de Cable Mágico tiene fondo blanco: cabecera blanca con su rojo.
+    cabecera: '#FFFFFF',
+    franja: '#D7141A',
+    textoCabecera: '#B5121B',
+    boton: '#D7141A', // el rojo del logo; el blanco encima llega a 5,2:1
+    textoBoton: '#FFFFFF',
+    enlace: '#B5121B', // 6,9:1 sobre blanco
+  },
+};
+
+/** La marca con que sale un correo: la de la empresa del cliente. */
+export type MarcaCorreo = {
+  readonly nombre: string;
+  readonly logo: { cid: string; ancho: number; alto: number };
+  readonly tema: TemaCorreo;
+};
+
+/** La marca de una empresa; si no es conocida, la de Finet. */
+export function marcaCorreoDe(
+  idEmpresa: number | null | undefined,
+): MarcaCorreo {
+  const id = esEmpresaConocida(idEmpresa) ? idEmpresa : ID_EMPRESA_POR_DEFECTO;
+  const { adjunto, ancho, alto } = logoCorreoDe(id);
+  return {
+    nombre: empresaDe(id).nombre,
+    logo: { cid: adjunto.cid, ancho, alto },
+    tema: TEMAS[id],
+  };
+}
+
+/** Colores del molde, compartidos con el comprobante en PDF. */
+export const COLOR = {
   fondo: '#EFF4FF', // --color-surface
   texto: '#0B1C30',
   suave: '#6D797D', // --color-muted
@@ -37,24 +94,24 @@ export type Correo = {
   /** HTML ya escapado: lo arma quien llama. */
   cuerpo: string;
   boton?: { texto: string; enlace: string };
-  /** Content-ID del logo adjunto al correo. Sin él va el nombre en texto. */
-  logoCid?: string;
+  marca: MarcaCorreo;
 };
 
 export function plantillaCorreo(c: Correo): string {
   const tono = TONOS[c.etiqueta.tono];
-  const logo = c.logoCid
-    ? `<img src="cid:${escaparHtml(c.logoCid)}" width="96" height="63" alt="Finet" style="display:block;border:0;height:auto;color:#E3E446;font:700 24px ${FUENTE};">`
-    : `<span style="font:800 26px ${FUENTE};letter-spacing:1px;"><span style="color:#2FAEC9;">FI</span><span style="color:#E3E446;">NET</span></span>`;
+  const { nombre, logo: l, tema } = c.marca;
+  // Si el cliente bloquea las imágenes, el texto alternativo dice la marca.
+  const logo = `<img src="cid:${escaparHtml(l.cid)}" width="${l.ancho}" height="${l.alto}" alt="${escaparHtml(nombre)}" style="display:block;border:0;height:auto;color:${tema.textoCabecera};font:700 24px ${FUENTE};">`;
+  const franja = tema.franja ? `border-bottom:4px solid ${tema.franja};` : '';
 
   const boton = c.boton
     ? `
           <tr><td style="padding:8px 0 4px;">
-            <a href="${escaparHtml(c.boton.enlace)}" style="display:block;background:${COLOR.boton};color:${COLOR.textoBoton};text-align:center;text-decoration:none;font:700 17px ${FUENTE};padding:16px 24px;border-radius:12px;">${escaparHtml(c.boton.texto)}</a>
+            <a href="${escaparHtml(c.boton.enlace)}" style="display:block;background:${tema.boton};color:${tema.textoBoton};text-align:center;text-decoration:none;font:700 17px ${FUENTE};padding:16px 24px;border-radius:12px;">${escaparHtml(c.boton.texto)}</a>
           </td></tr>
           <tr><td style="padding:12px 0 0;font:13px/1.5 ${FUENTE};color:${COLOR.suave};">
             ¿No funciona el botón? Copia este enlace en tu navegador:<br>
-            <a href="${escaparHtml(c.boton.enlace)}" style="color:${COLOR.enlace};word-break:break-all;">${escaparHtml(c.boton.enlace)}</a>
+            <a href="${escaparHtml(c.boton.enlace)}" style="color:${tema.enlace};word-break:break-all;">${escaparHtml(c.boton.enlace)}</a>
           </td></tr>`
     : '';
 
@@ -70,7 +127,7 @@ export function plantillaCorreo(c: Correo): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLOR.fondo};">
   <tr><td align="center" style="padding:24px 12px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid ${COLOR.borde};">
-      <tr><td style="background:${COLOR.marca};padding:20px 28px;">${logo}</td></tr>
+      <tr><td style="background:${tema.cabecera};padding:20px 28px;${franja}">${logo}</td></tr>
       <tr><td style="padding:32px 28px 28px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr><td style="padding-bottom:16px;">
@@ -81,7 +138,7 @@ export function plantillaCorreo(c: Correo): string {
         </table>
       </td></tr>
       <tr><td style="padding:18px 28px;border-top:1px solid ${COLOR.borde};font:12px/1.5 ${FUENTE};color:${COLOR.suave};">
-        Este es un aviso automático de Finet. No respondas a este correo.
+        Este es un aviso automático de ${escaparHtml(nombre)}. No respondas a este correo.
       </td></tr>
     </table>
   </td></tr>

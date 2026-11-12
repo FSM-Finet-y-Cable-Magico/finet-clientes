@@ -75,6 +75,19 @@ describe('AsistenteController', () => {
       expect(result.success).toBe(false);
     });
 
+    it('acepta la empresa del sitio (Finet o Cable Mágico) y rechaza otra', () => {
+      const base = { id_sesion: SESION, mensaje: 'hola' };
+      expect(
+        MensajeAsistenteDto.parse({ ...base, id_empresa: 2 }).id_empresa,
+      ).toBe(2);
+      expect(
+        MensajeAsistenteDto.safeParse({ ...base, id_empresa: 3 }).success,
+      ).toBe(false);
+      expect(
+        MensajeAsistenteDto.safeParse({ ...base, id_empresa: '2' }).success,
+      ).toBe(false);
+    });
+
     it('rechaza un mensaje demasiado largo', () => {
       const result = MensajeAsistenteDto.safeParse({
         id_sesion: SESION,

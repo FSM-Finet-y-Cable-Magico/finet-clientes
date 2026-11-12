@@ -15,13 +15,19 @@ import RutInput from "./RutInput";
 import PasswordInput from "./PasswordInput";
 import { MensajeError } from "./MensajesFormulario";
 import { erroresPorCampo, validarCampo } from "../utils/errores-formulario";
+import { useMarca } from "../_lib/marca";
+import { marcaPorEmpresa, rutaMarca, urlMarca, type Marca } from "../_lib/company";
+import { destinoInterno } from "../_lib/enrutar-marca";
 
 export default function LoginForm() {
+  const marca = useMarca();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
   const expired = searchParams.get("expired") === "1";
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, logout, isAuthenticated, isLoading } = useAuth();
+  // La empresa del cliente, si su sitio está en otro host.
+  const [otroSitio, setOtroSitio] = useState<Marca | null>(null);
   const [rut, setRut] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -42,6 +48,7 @@ export default function LoginForm() {
   async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     setServerError("");
+    setOtroSitio(null);
 
     const result = loginSchema.safeParse({ rut, password });
     if (!result.success) {
@@ -55,10 +62,25 @@ export default function LoginForm() {
     try {
       const data = await api.post<{ access_token: string; cliente: Cliente }>(
         "/auth/login",
-        { rut: cleanRut(result.data.rut), password: result.data.password }
+        {
+          rut: cleanRut(result.data.rut),
+          password: result.data.password,
+          // El RUT se busca entre los clientes de la empresa de este sitio.
+          id_empresa: marca.idEmpresa,
+        }
       );
+      // Con un host por empresa, la sesión queda en el host donde se inicia:
+      // un cliente de la otra empresa tiene que entrar en su sitio (proxy.ts
+      // no le daría sesión aquí). Se cierra y se le muestra a dónde ir.
+      const suya = marcaPorEmpresa(data.cliente.id_empresa);
+      if (suya.url !== marca.url) {
+        await logout();
+        setOtroSitio(suya);
+        return;
+      }
       login(data.cliente);
-      router.push(redirect ?? "/portal");
+      // Solo a una página del portal; por defecto, el de su empresa.
+      router.push(destinoInterno(redirect, rutaMarca(marca, "/portal")));
     } catch (err) {
       const error = err as ApiError;
       securityLogger.loginFailed(result.data.rut, error.message ?? "Error desconocido");
@@ -80,6 +102,19 @@ export default function LoginForm() {
 
       {serverError && (
         <MensajeError margen="mb-5">{serverError}</MensajeError>
+      )}
+
+      {otroSitio && (
+        <MensajeError margen="mb-5">
+          Tu cuenta es de {otroSitio.nombre}.{" "}
+          <a
+            href={urlMarca(otroSitio, "/inicio-sesion")}
+            className="font-semibold underline"
+          >
+            Ingresa desde su sitio
+          </a>
+          .
+        </MensajeError>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -111,7 +146,7 @@ export default function LoginForm() {
             Recordarme
           </label>
           <Link
-            href="/recuperar-password"
+            href={rutaMarca(marca, "/recuperar-password")}
             className="text-primary transition-colors hover:opacity-80"
           >
             ¿Olvidaste tu contraseña?
@@ -129,9 +164,12 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-xs text-muted">
         Al ingresar aceptas nuestros{" "}
-        <a href="/terminos" className="text-primary underline hover:opacity-80">
+        <Link
+          href={rutaMarca(marca, "/terminos")}
+          className="text-primary underline hover:opacity-80"
+        >
           Términos y Condiciones
-        </a>
+        </Link>
       </p>
     </div>
   );

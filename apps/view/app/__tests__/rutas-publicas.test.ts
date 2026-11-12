@@ -17,10 +17,15 @@ function rutasDeApp(): string[] {
       const segmentos = relative(APP, join(APP, archivo))
         .split(sep)
         .slice(0, -1)
-        // Los grupos `(nombre)` no aparecen en la URL.
-        .filter((segmento) => !/^\(.*\)$/.test(segmento));
+        // Los grupos `(nombre)` no aparecen en la URL, ni `[marca]`: las
+        // mismas páginas sirven a Finet en la raíz y a Cable Mágico bajo su
+        // prefijo (proxy.ts).
+        .filter((segmento) => !/^\(.*\)$/.test(segmento))
+        .filter((segmento) => segmento !== "[marca]");
       return `/${segmentos.join("/")}`;
-    });
+    })
+    // El catch-all solo responde 404 dentro del sitio de cada empresa.
+    .filter((ruta) => ruta !== "/[...resto]");
 }
 
 const esPrivada = (ruta: string) =>

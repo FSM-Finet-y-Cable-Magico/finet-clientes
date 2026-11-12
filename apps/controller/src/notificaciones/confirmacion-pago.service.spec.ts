@@ -6,10 +6,16 @@ import {
 } from './confirmacion-pago.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { ComprobantePagoService } from '../common/comprobantes/comprobante-pago.service.js';
 import { CANAL_CORREO, ESTADO_ENVIO } from './recordatorio-pago.constantes.js';
 
 const AHORA = new Date('2026-10-05T13:05:00.000Z');
+const COMPROBANTE = {
+  archivo: Buffer.from('%PDF-1.3 prueba'),
+  nombreArchivo: 'comprobante-cable-magico-5.pdf',
+};
 const PAGO: PagoRegistrado = {
+  idPago: 5,
   idCliente: 10,
   monto: 57980,
   fecha: new Date('2026-10-05T13:04:30.000Z'),
@@ -23,6 +29,7 @@ describe('ConfirmacionPagoService', () => {
   let service: ConfirmacionPagoService;
   let prisma: jest.Mocked<PrismaService>;
   let mail: jest.Mocked<MailService>;
+  let comprobantes: { delPago: jest.Mock };
 
   beforeEach(async () => {
     const mockPrisma = {
@@ -48,11 +55,16 @@ describe('ConfirmacionPagoService', () => {
         ConfirmacionPagoService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: MailService, useValue: { sendConfirmacionPago: jest.fn() } },
+        {
+          provide: ComprobantePagoService,
+          useValue: { delPago: jest.fn().mockResolvedValue(COMPROBANTE) },
+        },
       ],
     }).compile();
     service = module.get(ConfirmacionPagoService);
     prisma = module.get(PrismaService);
     mail = module.get(MailService);
+    comprobantes = module.get(ComprobantePagoService);
   });
 
   // ─── Descripción y poscondición ──────────────────────────────────────────
@@ -76,6 +88,30 @@ describe('ConfirmacionPagoService', () => {
       PAGO.fecha,
       'AUT-123456',
       2,
+      COMPROBANTE,
+    );
+    expect(estado).toBe('enviado');
+  });
+
+  // CU-53: el comprobante va adjunto a esta misma confirmación.
+  it('adjunta el comprobante del pago registrado', async () => {
+    await service.confirmar(PAGO, AHORA);
+    expect(comprobantes.delPago).toHaveBeenCalledWith(5);
+  });
+
+  it('CU-53 Excepción 3: sin comprobante, la confirmación sale igual, sin adjunto', async () => {
+    comprobantes.delPago.mockRejectedValue(new Error('base caída') as never);
+
+    const estado = await service.confirmar(PAGO, AHORA);
+
+    expect(mail.sendConfirmacionPago).toHaveBeenCalledWith(
+      'ana@b.cl',
+      'Ana',
+      57980,
+      PAGO.fecha,
+      'AUT-123456',
+      2,
+      null,
     );
     expect(estado).toBe('enviado');
   });

@@ -4,9 +4,10 @@ import { render, screen } from "@testing-library/react";
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push: jest.fn() }) }));
 jest.mock("@/app/_lib/auth", () => ({ useAuth: () => ({ cliente: null }) }));
 
-import PortalPage from "@/app/portal/page";
-import PerfilPage from "@/app/perfil/page";
+import PortalPage from "@/app/[marca]/portal/page";
+import PerfilPage from "@/app/[marca]/perfil/page";
 import PagosAnteriores from "@/app/_components/portal/PagosAnteriores";
+import { MARCAS } from "@/app/_lib/company";
 import PlanCard from "@/app/_components/catalog/PlanCard";
 
 // Fija cómo muestra cada pantalla los montos (§11.5) y las fechas (§11.4) para
@@ -128,6 +129,7 @@ describe("formato de montos y fechas en las pantallas", () => {
           precio_mensual: 25990,
           descripcion: null,
         }}
+        marca={MARCAS.finet}
       />,
     );
 

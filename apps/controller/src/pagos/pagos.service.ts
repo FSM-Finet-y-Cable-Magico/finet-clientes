@@ -46,6 +46,7 @@ import {
   type ResultadoWebpayRespuestaDto,
   type ResumenPagoDto,
 } from './dto/pagos.dto.js';
+import { urlDelSitio } from '../common/constants/empresas.js';
 
 type Pagador = Cuenta & {
   nombre: string;
@@ -203,8 +204,12 @@ export class PagosService {
         : token
           ? 'error_formulario'
           : 'anulado';
-      await this.noCompletado(orden ?? null, sesionAnulada ?? null, motivo);
-      return this.urlResultado('cancelado');
+      const anulada = await this.noCompletado(
+        orden ?? null,
+        sesionAnulada ?? null,
+        motivo,
+      );
+      return this.urlResultado('cancelado', undefined, anulada?.idEmpresa);
     }
 
     const tx = await this.transaccionDe(token);
@@ -218,10 +223,13 @@ export class PagosService {
     }
 
     const resultado = resultadoDe(tx);
-    if (resultado !== 'aprobado') return this.urlResultado(resultado, token);
+    if (resultado !== 'aprobado') {
+      return this.urlResultado(resultado, token, sesion.idEmpresa);
+    }
     return this.urlResultado(
       await this.registrar(tx, sesion, token, interruptores.registro),
       token,
+      sesion.idEmpresa,
     );
   }
 
@@ -286,11 +294,12 @@ export class PagosService {
     }
 
     try {
-      const { duplicado } = await this.g8.registrarPago(pago);
+      const { duplicado, idPago } = await this.g8.registrarPago(pago);
       if (!duplicado) {
         // RNF-51.1: "inmediatamente". No se espera: el CU-69 no lanza, y lo
         // que pase queda en log_notificacion.
         void this.confirmacion.confirmar({
+          idPago,
           idCliente: sesion.idCliente,
           monto: pago.monto,
           fecha: new Date(pago.fechaPago),
@@ -351,23 +360,25 @@ export class PagosService {
   }
 
   /** Excepción 2: "registra el intento como no completado". */
+  /** Devuelve la sesión del pago, si es del portal: dice a qué sitio volver. */
   private async noCompletado(
     orden: string | null,
     sesionTexto: string | null,
     motivo: string,
-  ): Promise<void> {
+  ): Promise<SesionPago | null> {
     const sesion = sesionTexto ? this.sesionDe(sesionTexto) : null;
     if (!sesion) {
       this.logger.warn(
         `Pago no completado (${motivo}) sin una sesión del portal, orden ${orden ?? 'sin orden'}`,
       );
-      return;
+      return null;
     }
     await this.auditar('PAGO_NO_COMPLETADO', sesion.idCliente, {
       orden,
       id_factura: sesion.idFactura,
       motivo,
     });
+    return sesion;
   }
 
   private sesionDe(texto: string): SesionPago | null {
@@ -402,10 +413,18 @@ export class PagosService {
     }
   }
 
-  private urlResultado(resultado: ResultadoPago, token?: string): string {
+  /** La pantalla de resultado del sitio de la empresa del cliente. */
+  private urlResultado(
+    resultado: ResultadoPago,
+    token?: string,
+    idEmpresa?: number | null,
+  ): string {
     const url = new URL(
-      '/pagar/resultado',
-      this.config.getOrThrow<string>('FRONTEND_URL'),
+      urlDelSitio(
+        idEmpresa,
+        '/pagar/resultado',
+        this.config.getOrThrow<string>('FRONTEND_URL'),
+      ),
     );
     url.searchParams.set('resultado', resultado);
     if (token) url.searchParams.set('token_ws', token);

@@ -1,8 +1,9 @@
-import { WHATSAPP_URL } from '../../../_lib/company';
+import type { Marca } from '../../../_lib/company';
 
 export type SocialLink = { platform: 'instagram' | 'whatsapp'; href: string; label: string };
 
-export const socialLinks: SocialLink[] = [
-  { platform: 'instagram', href: 'https://www.instagram.com/finettcl/', label: 'Síguenos en Instagram' },
-  { platform: 'whatsapp', href: WHATSAPP_URL, label: 'Escríbenos por WhatsApp' },
+/** Las redes de la empresa del sitio. */
+export const redesDe = (marca: Marca): SocialLink[] => [
+  { platform: 'instagram', href: marca.instagramUrl, label: 'Síguenos en Instagram' },
+  { platform: 'whatsapp', href: marca.whatsappUrl, label: 'Escríbenos por WhatsApp' },
 ];

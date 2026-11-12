@@ -11,6 +11,8 @@ interface JwtPayload {
   type?: string;
   aud?: string;
   iss?: string;
+  /** La empresa del cliente. Los tokens anteriores al 11-11 no la traen. */
+  id_empresa?: number | null;
 }
 
 const cookieExtractor = (req: Request): string | null => {
@@ -87,6 +89,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { id_cliente: payload.sub },
       select: {
         id_cliente: true,
+        id_empresa: true,
         rut: true,
         nombre_completo: true,
         email: true,
@@ -97,6 +100,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!cliente) {
       throw new UnauthorizedException('Cliente no encontrado');
+    }
+
+    // Un token por empresa (como G8): la del token tiene que ser la del
+    // cliente. Un token sin empresa es anterior a este cambio y vale la de la
+    // base, para no cerrar las sesiones abiertas al desplegar.
+    if (
+      payload.id_empresa !== undefined &&
+      payload.id_empresa !== cliente.id_empresa
+    ) {
+      this.logger.warn(
+        `JWT rejected: id_empresa=${payload.id_empresa} no es la del cliente, sub=${payload.sub}`,
+      );
+      throw new UnauthorizedException('Token de empresa invalido');
     }
 
     return cliente;

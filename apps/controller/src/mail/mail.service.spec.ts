@@ -162,6 +162,56 @@ describe('MailService — correos del Incremento 3', () => {
     });
   });
 
+  // CU-53: el comprobante del pago va adjunto a la misma confirmación.
+  describe('confirmación con el comprobante adjunto', () => {
+    const PDF = Buffer.from('%PDF-1.3 prueba');
+    const adjuntos = () =>
+      (sendMail.mock.calls[0]![0] as { attachments: unknown[] }).attachments;
+
+    it('adjunta el PDF y lo dice en el cuerpo', async () => {
+      await mail.sendConfirmacionPago(
+        'ana@b.cl',
+        'Ana',
+        57980,
+        new Date(),
+        'AUT-1',
+        2,
+        {
+          archivo: PDF,
+          nombreArchivo: 'comprobante-cable-magico-5.pdf',
+        },
+      );
+
+      expect(adjuntos()).toEqual(
+        expect.arrayContaining([
+          {
+            filename: 'comprobante-cable-magico-5.pdf',
+            content: PDF,
+            contentType: 'application/pdf',
+          },
+        ]),
+      );
+      expect(html()).toContain(
+        'Adjuntamos el comprobante de este pago en PDF.',
+      );
+    });
+
+    it('sin comprobante, sale igual: solo con el logo', async () => {
+      await mail.sendConfirmacionPago(
+        'ana@b.cl',
+        'Ana',
+        57980,
+        new Date(),
+        'AUT-1',
+        2,
+        null,
+      );
+
+      expect(adjuntos()).toHaveLength(1);
+      expect(html()).not.toContain('Adjuntamos el comprobante');
+    });
+  });
+
   it('el logo no se descarga del portal: Gmail no llega a una URL privada', async () => {
     const conSitio = new MailService({
       get: (k: string, porDefecto?: unknown) =>
@@ -183,7 +233,7 @@ describe('MailService — correos del Incremento 3', () => {
     expect(html()).toContain('src="cid:logo@finet"');
   });
 
-  it('el correo que sale por la cuenta de otra empresa también lleva el logo', async () => {
+  it('el correo que sale por la cuenta de Cable Mágico lleva el logo de Cable Mágico', async () => {
     const sendMailEmpresa = jest.fn().mockResolvedValue({});
     (mail as unknown as { porEmpresa: Map<number, unknown> }).porEmpresa.set(
       2,
@@ -198,9 +248,73 @@ describe('MailService — correos del Incremento 3', () => {
     expect(sendMail).not.toHaveBeenCalled();
     expect(sendMailEmpresa).toHaveBeenCalledWith(
       expect.objectContaining({
-        attachments: [expect.objectContaining({ cid: 'logo@finet' })],
+        attachments: [
+          expect.objectContaining({
+            cid: 'logo@cable-magico',
+            contentType: 'image/jpeg',
+          }),
+        ],
       }),
     );
+  });
+});
+
+/**
+ * Lo que le llega a Cable Mágico tiene que ser de Cable Mágico (Emilio, 11-11):
+ * mismo molde que Finet, con su logo, su rojo y su nombre.
+ */
+describe('MailService — marca de cada empresa', () => {
+  let mail: MailService;
+  let sendMail: jest.Mock;
+
+  function enviado(): { html: string; attachments: { cid: string }[] } {
+    return sendMail.mock.calls[0]![0] as {
+      html: string;
+      attachments: { cid: string }[];
+    };
+  }
+
+  beforeEach(() => {
+    mail = new MailService({
+      get: (_k: string, porDefecto?: unknown) => porDefecto,
+    } as unknown as ConfigService);
+    sendMail = jest.fn().mockResolvedValue({});
+    (mail as unknown as { transporter: unknown }).transporter = { sendMail };
+  });
+
+  it('Cable Mágico: su logo, su rojo en el botón y su nombre en el pie', async () => {
+    await mail.sendPasswordReset('a@b.cl', 'Ana', 'https://x/r#t', 2);
+
+    const { html, attachments } = enviado();
+    expect(html).toContain('src="cid:logo@cable-magico"');
+    expect(html).toContain('background:#D7141A');
+    expect(html).toContain('Este es un aviso automático de Cable Mágico.');
+    expect(attachments.map((a) => a.cid)).toEqual(['logo@cable-magico']);
+  });
+
+  it('Cable Mágico: nada de Finet en el correo', async () => {
+    await mail.sendConfirmacionPago('a@b.cl', 'Ana', 1000, new Date(), '1', 2);
+
+    expect(enviado().html).not.toMatch(/finet/i);
+  });
+
+  it('Finet sigue igual: su logo, su botón lima y su nombre en el pie', async () => {
+    await mail.sendPasswordReset('a@b.cl', 'Ana', 'https://x/r#t', 1);
+
+    const { html, attachments } = enviado();
+    expect(html).toContain('src="cid:logo@finet"');
+    expect(html).toContain('background:#E3E446');
+    expect(html).toContain('Este es un aviso automático de Finet.');
+    expect(attachments.map((a) => a.cid)).toEqual(['logo@finet']);
+  });
+
+  it('una empresa desconocida o ninguna sale con la marca de Finet', async () => {
+    await mail.sendTicketCreated('a@b.cl', 'Ana', 'FIN-1', 'Sin internet', 9);
+    await mail.sendTicketCreated('a@b.cl', 'Ana', 'FIN-1', 'Sin internet');
+
+    for (const [correo] of sendMail.mock.calls) {
+      expect((correo as { html: string }).html).toContain('cid:logo@finet');
+    }
   });
 });
 

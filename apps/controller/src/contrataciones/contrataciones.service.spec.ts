@@ -113,6 +113,29 @@ describe('ContratacionesService', () => {
       });
     });
 
+    it('el prospecto es de la empresa del plan: uno de Cable Mágico llega a G8 como empresa 2, en Valparaíso', async () => {
+      mockTransaccionExitosa();
+      (tx.plan.findFirst as jest.Mock).mockResolvedValue({
+        id_plan: 2,
+        id_empresa: 2,
+      });
+
+      await service.crear({ ...DTO_MOCK, id_plan: 2 }, IP);
+
+      expect(tx.plan.findFirst).toHaveBeenCalledWith({
+        where: { id_plan: 2, activo: true },
+        select: { id_plan: true, id_empresa: true },
+      });
+      expect(tx.prospecto.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          id_empresa: 2,
+          region: 'Valparaíso',
+          id_plan_interes: 2,
+        }),
+        select: { id_prospecto: true },
+      });
+    });
+
     it('no crea cliente, dirección, contrato ni orden de trabajo (acuerdo v2.0 §14.1)', async () => {
       mockTransaccionExitosa();
 

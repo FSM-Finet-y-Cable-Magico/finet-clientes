@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { validateRut } from '../../common/utils/rut.js';
+import { empresaSchema } from '../../common/utils/validaciones.js';
 
 /**
  * Largo maximo de un mensaje del visitante. Cada mensaje se cobra en tokens
@@ -24,6 +25,12 @@ export const MensajeAsistenteDto = z.object({
       MAX_LARGO_MENSAJE,
       `El mensaje no puede superar ${MAX_LARGO_MENSAJE} caracteres`,
     ),
+  /**
+   * La empresa del sitio desde donde escribe (Finet o Cable Mágico), para que
+   * el asistente hable como ella. Solo elige marca y contenido público: los
+   * datos del cliente siguen pidiendo su RUT y su sesión.
+   */
+  id_empresa: empresaSchema.optional(),
 });
 export type MensajeAsistenteDto = z.infer<typeof MensajeAsistenteDto>;
 
@@ -107,6 +114,8 @@ export interface ClienteIdentificadoDto {
   encontrado: boolean;
   cliente: {
     nombre_completo: string;
+    /** Su empresa: el asistente habla como ella. */
+    id_empresa: number | null;
     /** `null` sin la sesion del portal de ese mismo cliente. */
     planes: PlanClienteAsistenteDto[] | null;
   } | null;

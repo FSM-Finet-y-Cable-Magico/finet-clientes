@@ -2,7 +2,7 @@
 
 import { useId, useState, useTransition } from "react";
 import { Wifi, CheckCircle2, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { changeWifiPassword } from "@/app/portal/_lib/portal-actions";
+import { changeWifiPassword } from "@/app/[marca]/portal/_lib/portal-actions";
 import { esContratoActivo } from "@/app/_lib/estado-contrato";
 import {
   CLAVE_WIFI_MAX,

@@ -142,8 +142,8 @@ todavía, no que no exista.
 > una por una, está en `CAMBIOS-BD-Y-SOLICITUDES.md`, enviado a G8 el 12-09-2026.
 
 > **Datos del bloque Mapa:** la capa de calor se genera desde el KML de planta externa que
-> entrega Finet (NAPs, MUFAs y trazado de fibra de la red FTTH) y vive como archivo estático
-> en el backend. Los cuatro CU son de lectura, así que el bloque no necesita administración:
+> entrega cada empresa (Finet: NAPs, MUFAs y trazado de fibra de la red FTTH; Cable Mágico:
+> cajas y empalmes de Tomodat) y vive como un archivo estático por empresa en el backend. Los cuatro CU son de lectura, así que el bloque no necesita administración:
 > el editor y las tablas que lo sostenían se eliminaron. Actualizar la cobertura significa
 > regenerar el archivo con un KML nuevo y desplegar.
 > Ver [`apps/controller/docs/cobertura.md`](../apps/controller/docs/cobertura.md).
@@ -374,7 +374,7 @@ Las páginas están publicadas con el contenido de `legales-isp-v2.md`. Donde fa
 | Dato | Dónde se ve | Dónde se completa | Quién lo entrega |
 |---|---|---|---|
 | RUT de la razón social | Encabezado de Términos, Privacidad §1 | `company.ts` → `COMPANY_RUT` | Administración |
-| Calle y número del domicilio | Encabezado de Términos, Privacidad §1 y §14 | `company.ts` → `COMPANY_STREET_ADDRESS` | Administración |
+| ~~Calle y número del domicilio~~ ✅ Avenida Santa Rosa 12980, La Pintana (12-11) | Encabezado de Términos, Privacidad §1 y §14 | `company.ts` → `MARCAS.finet.direccion.calle` | Administración |
 | Correo de contacto general | Términos §2, §5 y §6 | `company.ts` → `COMPANY_CONTACT_EMAIL` | Administración |
 | Correo de privacidad | Privacidad §1, §12 y §14 | `company.ts` → `COMPANY_PRIVACY_EMAIL` | Administración |
 | Velocidad mínima garantizada, sobreventa, disponibilidad, latencia y pérdida, direccionamiento IP | Términos §4, tabla de características | `legal.ts` → `CALIDAD_SERVICIO` | Área técnica |

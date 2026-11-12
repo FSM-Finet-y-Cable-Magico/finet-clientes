@@ -1,5 +1,5 @@
-import { revalidate as revalidatePrivacidad } from "@/app/(legal)/privacidad/page";
-import { revalidate as revalidateTerminos } from "@/app/(legal)/terminos/page";
+import { revalidate as revalidatePrivacidad } from "@/app/[marca]/(legal)/privacidad/page";
+import { revalidate as revalidateTerminos } from "@/app/[marca]/(legal)/terminos/page";
 
 /**
  * RNF-56.1: el contenido legal se sirve estático mediante ISR. Sin este test,

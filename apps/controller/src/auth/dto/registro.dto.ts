@@ -1,9 +1,17 @@
 import { z } from 'zod';
-import { passwordSchema, rutSchema } from '../../common/utils/validaciones.js';
+import {
+  empresaSchema,
+  passwordSchema,
+  rutSchema,
+} from '../../common/utils/validaciones.js';
 import { aceptacionPoliticaShape } from '../../common/politica-privacidad.js';
 
 /** CU-04, paso 1: el RUT del cliente que quiere crear su cuenta. */
-export const solicitudRegistroSchema = z.object({ rut: rutSchema });
+export const solicitudRegistroSchema = z.object({
+  rut: rutSchema,
+  /** La empresa del sitio: el RUT se busca entre sus clientes. */
+  id_empresa: empresaSchema.optional(),
+});
 export type SolicitudRegistroDto = z.infer<typeof solicitudRegistroSchema>;
 
 /**

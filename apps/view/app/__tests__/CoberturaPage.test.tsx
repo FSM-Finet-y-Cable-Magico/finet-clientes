@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import CoberturaPage from '@/app/cobertura/page';
+import CoberturaPage from '@/app/[marca]/cobertura/page';
 import type {
   PuntoCobertura,
   VisorCoberturaConfig,
@@ -45,6 +45,8 @@ const puntos: PuntoCobertura[] = [
   },
 ];
 
+const conMarca = (marca: string) => ({ params: Promise.resolve({ marca }) });
+
 /** La pagina dispara config y puntos en paralelo, en ese orden. */
 function mockRespuestas(
   configRes: unknown | null,
@@ -73,7 +75,7 @@ describe('CoberturaPage (CU-59 a CU-62)', () => {
   it('CU-59: despliega el visor con el encuadre entregado por el backend', async () => {
     mockRespuestas(config, puntos);
 
-    render(await CoberturaPage());
+    render(await CoberturaPage(conMarca('finet')));
 
     const visor = screen.getByTestId('visor-cobertura');
     expect(visor).toBeInTheDocument();
@@ -83,7 +85,7 @@ describe('CoberturaPage (CU-59 a CU-62)', () => {
   it('CU-60: pasa al visor los puntos de la capa de calor', async () => {
     mockRespuestas(config, puntos);
 
-    render(await CoberturaPage());
+    render(await CoberturaPage(conMarca('finet')));
 
     expect(screen.getByTestId('visor-cobertura')).toHaveAttribute(
       'data-total-puntos',
@@ -97,7 +99,7 @@ describe('CoberturaPage (CU-59 a CU-62)', () => {
   it('CU-59 Excepcion 2: informa que el visor no esta disponible si falla la config', async () => {
     mockRespuestas(null, puntos);
 
-    render(await CoberturaPage());
+    render(await CoberturaPage(conMarca('finet')));
 
     expect(
       screen.getByText(/el visor no esta disponible temporalmente/i)
@@ -105,10 +107,21 @@ describe('CoberturaPage (CU-59 a CU-62)', () => {
     expect(screen.queryByTestId('visor-cobertura')).not.toBeInTheDocument();
   });
 
+  it('cada sitio pide el visor y la capa de su empresa', async () => {
+    mockRespuestas(config, puntos);
+    render(await CoberturaPage(conMarca('cable-magico')));
+
+    const pedidas = (global.fetch as jest.Mock).mock.calls.map(([url]) => String(url));
+    expect(pedidas).toEqual([
+      expect.stringMatching(/\/cobertura\/config\?id_empresa=2$/),
+      expect.stringMatching(/\/cobertura\/puntos\?id_empresa=2$/),
+    ]);
+  });
+
   it('CU-60 Excepcion 1: muestra el visor sin capa tematica si no hay datos', async () => {
     mockRespuestas(config, null);
 
-    render(await CoberturaPage());
+    render(await CoberturaPage(conMarca('finet')));
 
     expect(screen.getByTestId('visor-cobertura')).toHaveAttribute(
       'data-total-puntos',

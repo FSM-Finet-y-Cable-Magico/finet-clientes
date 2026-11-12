@@ -9,6 +9,14 @@ export type SmtpEmpresa = {
   user: string;
   pass: string;
   from: string;
+  /** TLS desde el primer byte (465). Si no se dice, según el puerto. */
+  secure: boolean;
+  /** Exige STARTTLS antes de autenticar (587), como G8. */
+  requireTLS: boolean;
+  /** Rechaza un certificado inválido. Solo se apaga diciéndolo. */
+  rejectUnauthorized: boolean;
+  /** Tope de la conexión y de cada espera, en ms; `null` usa el de nodemailer. */
+  timeoutMs: number | null;
 };
 
 const EmpresasSmtp = z.array(
@@ -21,7 +29,8 @@ const EmpresasSmtp = z.array(
 /**
  * Cada empresa manda sus correos desde su propia cuenta. Se configura igual que
  * en el CRM (G8): `SMTP_COMPANIES` dice qué empresas hay, y cada una trae sus
- * `SMTP_<ALIAS>_*`.
+ * `SMTP_<ALIAS>_*`, con los mismos nombres (`_SECURE`, `_STARTTLS`,
+ * `_REJECT_UNAUTHORIZED` y `_TIMEOUT_MS` incluidos).
  *
  * Una empresa mal configurada no se carga y avisa: sus clientes salen por la
  * cuenta general. Un correo que sale por otra cuenta llega igual; uno sin
@@ -57,6 +66,7 @@ export function leerSmtpEmpresas(
       continue;
     }
     const nombre = dato('FROM_NAME').replace(/["<>\r\n]/g, '');
+    const timeout = Number(dato('TIMEOUT_MS'));
     cuentas.push({
       idEmpresa,
       alias,
@@ -65,6 +75,10 @@ export function leerSmtpEmpresas(
       user: dato('USER'),
       pass: dato('PASSWORD'),
       from: nombre ? `"${nombre}" <${dato('FROM')}>` : dato('FROM'),
+      secure: dato('SECURE') ? dato('SECURE') === 'true' : port === 465,
+      requireTLS: dato('STARTTLS') === 'true',
+      rejectUnauthorized: dato('REJECT_UNAUTHORIZED') !== 'false',
+      timeoutMs: Number.isInteger(timeout) && timeout > 0 ? timeout : null,
     });
   }
   return cuentas;
