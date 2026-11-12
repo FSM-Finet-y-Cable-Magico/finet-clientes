@@ -19,6 +19,8 @@ export type Cliente = {
   rut: string;
   email: string;
   telefono: string;
+  /** De qué empresa es (1 Finet, 2 Cable Mágico). */
+  id_empresa?: number | null;
 };
 
 type AuthState = {

@@ -13,9 +13,12 @@ import {
   type CambiarPasswordDto,
   type PerfilResponseDto,
 } from './dto/perfil.dto.js';
+import {
+  esPasswordReciente,
+  MENSAJE_PASSWORD_REPETIDA,
+} from '../auth/password-reciente.js';
 
-/** RNF-08.2: cuántas contraseñas recientes no se pueden reutilizar. */
-export const PASSWORDS_SIN_REPETIR = 5;
+export { PASSWORDS_SIN_REPETIR } from '../auth/password-reciente.js';
 
 /** Lo que devuelve el perfil (CU-07) y cada cambio (CU-08 y 09). */
 const SELECT_PERFIL = {
@@ -148,22 +151,15 @@ export class PerfilService {
       dto.password_actual,
     );
 
-    const anteriores = await this.prisma.historial_password_portal.findMany({
-      where: { id_cliente: idCliente },
-      orderBy: [{ fecha: 'desc' }, { id_historial: 'desc' }],
-      take: PASSWORDS_SIN_REPETIR - 1,
-      select: { password_hash: true },
-    });
-    const recientes = [
-      cliente.password_portal_hash,
-      ...anteriores.map((h) => h.password_hash),
-    ];
-    for (const hash of recientes) {
-      if (await bcrypt.compare(dto.password_nuevo, hash)) {
-        throw new BadRequestException(
-          `La nueva contraseña no puede ser igual a ninguna de tus últimas ${PASSWORDS_SIN_REPETIR} contraseñas`,
-        );
-      }
+    if (
+      await esPasswordReciente(
+        this.prisma,
+        idCliente,
+        cliente.password_portal_hash,
+        dto.password_nuevo,
+      )
+    ) {
+      throw new BadRequestException(MENSAJE_PASSWORD_REPETIDA);
     }
 
     await this.prisma.$transaction([
