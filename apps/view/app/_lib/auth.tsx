@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { API_URL, EVENTO_SESION_EXPIRADA } from "./consts";
 import { securityLogger } from "./logger";
+import { hayAvisoDeSesion } from "./aviso-sesion";
 
 export type Cliente = {
   id_cliente: number;
@@ -68,6 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function checkAuth() {
+      // Sin el aviso del proxy no hay sesión en este dominio: preguntar sería
+      // un 401 seguro, que la consola marca como error.
+      if (!hayAvisoDeSesion(document.cookie)) {
+        if (mountedRef.current) setIsLoading(false);
+        return;
+      }
       try {
         const res = await fetchWithRetry(`${API_URL}/auth/perfil`, {
           credentials: "include",
