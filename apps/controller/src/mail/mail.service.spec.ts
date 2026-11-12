@@ -162,6 +162,56 @@ describe('MailService — correos del Incremento 3', () => {
     });
   });
 
+  // CU-53: el comprobante del pago va adjunto a la misma confirmación.
+  describe('confirmación con el comprobante adjunto', () => {
+    const PDF = Buffer.from('%PDF-1.3 prueba');
+    const adjuntos = () =>
+      (sendMail.mock.calls[0]![0] as { attachments: unknown[] }).attachments;
+
+    it('adjunta el PDF y lo dice en el cuerpo', async () => {
+      await mail.sendConfirmacionPago(
+        'ana@b.cl',
+        'Ana',
+        57980,
+        new Date(),
+        'AUT-1',
+        2,
+        {
+          archivo: PDF,
+          nombreArchivo: 'comprobante-cable-magico-5.pdf',
+        },
+      );
+
+      expect(adjuntos()).toEqual(
+        expect.arrayContaining([
+          {
+            filename: 'comprobante-cable-magico-5.pdf',
+            content: PDF,
+            contentType: 'application/pdf',
+          },
+        ]),
+      );
+      expect(html()).toContain(
+        'Adjuntamos el comprobante de este pago en PDF.',
+      );
+    });
+
+    it('sin comprobante, sale igual: solo con el logo', async () => {
+      await mail.sendConfirmacionPago(
+        'ana@b.cl',
+        'Ana',
+        57980,
+        new Date(),
+        'AUT-1',
+        2,
+        null,
+      );
+
+      expect(adjuntos()).toHaveLength(1);
+      expect(html()).not.toContain('Adjuntamos el comprobante');
+    });
+  });
+
   it('el logo no se descarga del portal: Gmail no llega a una URL privada', async () => {
     const conSitio = new MailService({
       get: (k: string, porDefecto?: unknown) =>

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { ComprobantePagoService } from '../common/comprobantes/comprobante-pago.service.js';
 import {
   DespachoNotificacion,
   type EstadoDespacho,
@@ -10,6 +11,8 @@ import { TIPO_EVENTO_CONFIRMACION_PAGO } from './confirmacion-pago.constantes.js
 
 /** RF-32: lo que queda registrado de cada pago confirmado. */
 export type PagoRegistrado = {
+  /** El id que devuelve G8 al registrarlo: con él se arma el comprobante. */
+  idPago: number;
   idCliente: number;
   monto: number;
   fecha: Date;
@@ -37,6 +40,7 @@ export class ConfirmacionPagoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly comprobantes: ComprobantePagoService,
   ) {
     this.despacho = new DespachoNotificacion(
       prisma,
@@ -62,6 +66,16 @@ export class ConfirmacionPagoService {
         select: { id_empresa: true, nombre_completo: true, email: true },
       });
       const idPlantilla = await this.despacho.plantilla();
+      // CU-53: el comprobante va adjunto. Si no se puede armar (Excepción 3),
+      // la confirmación sale igual, sin él.
+      const comprobante = await this.comprobantes
+        .delPago(pago.idPago)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `[CU-53] el pago ${pago.idPago} sale sin comprobante adjunto: ${mensaje(error)}`,
+          );
+          return null;
+        });
 
       return await this.despacho.despachar({
         idCliente: pago.idCliente,
@@ -77,6 +91,7 @@ export class ConfirmacionPagoService {
             pago.fecha,
             pago.codigoAutorizacion,
             cliente!.id_empresa,
+            comprobante,
           ),
       });
     } catch (error) {
