@@ -14,6 +14,7 @@ import {
   type SlugMarca,
 } from "./app/_lib/company";
 import { COOKIE_MARCA, enrutarMarca } from "./app/_lib/enrutar-marca";
+import { COOKIE_HAY_SESION } from "./app/_lib/aviso-sesion";
 
 const PROTECTED_PATHS = ["/portal", "/perfil"];
 
@@ -75,8 +76,20 @@ export async function proxy(request: NextRequest) {
   const ajena =
     marcaToken !== null &&
     MARCAS[marcaToken].url !== (host ?? MARCA_POR_DEFECTO).url;
-  const sinSesion = <T extends NextResponse>(response: T): T => {
+  // El aviso de sesión para el navegador (app/_lib/aviso-sesion.ts): sin él,
+  // el AuthProvider no le pregunta al backend por el perfil.
+  const sesionValida = payload !== null && !ajena;
+  const ajustarSesion = <T extends NextResponse>(response: T): T => {
     if (ajena) response.cookies.delete("access_token");
+    if (sesionValida && !request.cookies.has(COOKIE_HAY_SESION)) {
+      response.cookies.set(COOKIE_HAY_SESION, "1", {
+        path: "/",
+        sameSite: "lax",
+        secure: request.nextUrl.protocol === "https:",
+      });
+    } else if (!sesionValida && request.cookies.has(COOKIE_HAY_SESION)) {
+      response.cookies.delete(COOKIE_HAY_SESION);
+    }
     return response;
   };
 
@@ -89,7 +102,7 @@ export async function proxy(request: NextRequest) {
   });
 
   if (decision.tipo === "redirigir") {
-    return sinSesion(NextResponse.redirect(new URL(decision.destino, request.url)));
+    return ajustarSesion(NextResponse.redirect(new URL(decision.destino, request.url)));
   }
 
   // El portal y el perfil piden sesión, en el sitio de cualquier empresa.
@@ -98,11 +111,13 @@ export async function proxy(request: NextRequest) {
     (p) => ruta === p || ruta.startsWith(p + "/"),
   );
   if (isProtected && (!token || ajena)) {
-    return sinSesion(alLogin(request, decision.marca, false));
+    return ajustarSesion(alLogin(request, decision.marca, false));
   }
-  if (isProtected && !payload) return alLogin(request, decision.marca, true);
+  if (isProtected && !payload) {
+    return ajustarSesion(alLogin(request, decision.marca, true));
+  }
 
-  const response = sinSesion(
+  const response = ajustarSesion(
     NextResponse.rewrite(new URL(decision.destino, request.url)),
   );
   if (decision.guardarCookie) {

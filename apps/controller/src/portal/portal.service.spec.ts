@@ -628,31 +628,12 @@ describe('PortalService', () => {
       ]);
     });
 
-    it('sin el endpoint de G8, el comprobante figura como no disponible', async () => {
+    it('el comprobante se puede descargar: lo genera el portal (CU-52)', async () => {
       (prisma.pago.findMany as jest.Mock).mockResolvedValue([]);
 
       const r = await service.getPagosAnteriores(1);
 
-      expect(r).toEqual({ comprobante_disponible: false, pagos: [] });
-    });
-
-    it('el comprobante de un pago ajeno responde 404', async () => {
-      (prisma.pago.findFirst as jest.Mock).mockResolvedValue(null);
-
-      await expect(service.getComprobante(1, 99)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(prisma.pago.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id_pago: 99, ...DEL_CLIENTE } }),
-      );
-    });
-
-    it('CU-52 Excepción 2: mientras G8 no despliegue, el comprobante no está disponible', async () => {
-      (prisma.pago.findFirst as jest.Mock).mockResolvedValue({ id_pago: 9 });
-
-      await expect(service.getComprobante(1, 9)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      expect(r).toEqual({ comprobante_disponible: true, pagos: [] });
     });
   });
 

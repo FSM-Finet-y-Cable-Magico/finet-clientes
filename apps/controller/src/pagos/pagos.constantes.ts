@@ -17,6 +17,16 @@ export const MEDIOS_PAGO = [
 
 export type MedioPago = (typeof MEDIOS_PAGO)[number]['id'];
 
+/**
+ * El nombre del medio, el mismo que muestra `/pagar` (`webpay` → Webpay). El
+ * §11.15 no define un enum de medio de pago, así que un valor que no
+ * conocemos se muestra tal como está guardado.
+ */
+export function nombreMedioPago(pasarela: string): string {
+  const medio = MEDIOS_PAGO.find((m) => m.id === pasarela.trim().toLowerCase());
+  return medio?.nombre ?? pasarela;
+}
+
 export const IDS_MEDIOS_PAGO = MEDIOS_PAGO.map((m) => m.id) as [
   MedioPago,
   ...MedioPago[],

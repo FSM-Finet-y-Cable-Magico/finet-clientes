@@ -66,6 +66,8 @@ describe("URL del backend desde el navegador (NEXT_PUBLIC_API_URL)", () => {
 
   it("sesión: perfil y cierre", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 401 });
+    // Con el aviso del proxy de que hay sesión: sin él no pregunta.
+    document.cookie = "hay_sesion=1; path=/";
     const { fireEvent, render, screen, waitFor } = await cargarTestingLibrary();
     const { AuthProvider, useAuth } = await import("@/app/_lib/auth");
     function Cerrar() {

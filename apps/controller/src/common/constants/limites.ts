@@ -19,6 +19,12 @@ export const UN_MINUTO_MS = 60_000;
  */
 export const LIMITE_CON_SESION_POR_MINUTO = 120;
 
+/**
+ * Descargas de comprobantes por minuto (CU-52): cada una genera un PDF en el
+ * servidor, así que tiene un tope propio, más bajo que el del resto del portal.
+ */
+export const LIMITE_COMPROBANTES_POR_MINUTO = 20;
+
 /** El límite de las rutas con sesión, para el controlador o la ruta. */
 export const ConLimiteDeSesion = () =>
   Throttle({

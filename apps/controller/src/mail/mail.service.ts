@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { SendMailOptions, Transporter } from 'nodemailer';
+import type { ArchivoComprobante } from '../common/comprobantes/comprobante-pago.service.js';
 import {
   escaparHtml,
   fechaCliente,
@@ -223,6 +224,8 @@ export class MailService {
     fecha: Date,
     codigoAutorizacion: string,
     idEmpresa?: number | null,
+    /** CU-53: el comprobante del pago en PDF; sin él, sale sin adjunto. */
+    comprobante?: ArchivoComprobante | null,
   ) {
     await this.enviar(idEmpresa, {
       to: email,
@@ -233,7 +236,17 @@ export class MailService {
         fecha,
         codigoAutorizacion,
         marcaCorreoDe(idEmpresa),
+        !!comprobante,
       ),
+      attachments: comprobante
+        ? [
+            {
+              filename: comprobante.nombreArchivo,
+              content: comprobante.archivo,
+              contentType: 'application/pdf',
+            },
+          ]
+        : [],
     });
 
     this.logger.log('Payment confirmation email sent');
@@ -333,6 +346,7 @@ export class MailService {
     fecha: Date,
     codigoAutorizacion: string,
     marca: MarcaCorreo,
+    conComprobante: boolean,
   ): string {
     return plantillaCorreo({
       resumen: `Registramos tu pago de ${pesos(monto)}.`,
@@ -340,6 +354,9 @@ export class MailService {
       titulo: 'Registramos tu pago',
       cuerpo:
         `Hola ${escaparHtml(nombre)}: tu pago quedó registrado. Guarda este correo como respaldo.` +
+        (conComprobante
+          ? ' Adjuntamos el comprobante de este pago en PDF.'
+          : '') +
         comprobante([
           ['Monto pagado', pesos(monto)],
           ['Fecha', fechaHoraCliente(fecha)],

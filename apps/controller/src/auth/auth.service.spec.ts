@@ -144,9 +144,11 @@ describe('AuthService', () => {
 
       await authService.login('12.345.678-5', 'Password1', '127.0.0.1');
 
-      expect(prisma.cliente.findFirst).toHaveBeenCalledWith({
-        where: { rut: { in: ['123456785', '12345678-5'] } },
-      });
+      expect(prisma.cliente.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { rut: { in: ['123456785', '12345678-5'] } },
+        }),
+      );
     });
 
     it('throw UnauthorizedException when cliente not found', async () => {
@@ -175,6 +177,73 @@ describe('AuthService', () => {
       await expect(
         authService.login('123456785', 'wrongpassword', '127.0.0.1'),
       ).rejects.toThrow('RUT o contraseña incorrectos');
+    });
+  });
+
+  /**
+   * Con un sitio por empresa, la misma persona puede ser cliente de Finet y
+   * de Cable Mágico (en la base, su RUT escrito de dos formas). El login, la
+   * recuperación y el registro buscan el RUT en la empresa del sitio: si no,
+   * podían tomar registros distintos y la contraseña que se restablecía no
+   * era la que pedía el login (prueba de Emilio en la VPS, 12-11).
+   */
+  describe('el RUT se busca en la empresa del sitio', () => {
+    const where = () =>
+      (prisma.cliente.findFirst as jest.Mock).mock.calls[0]![0] as {
+        where: Record<string, unknown>;
+        orderBy?: unknown;
+      };
+
+    it('el login de Cable Mágico busca solo entre sus clientes', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      porRut.mockResolvedValue({ ...mockCliente, id_empresa: 2 });
+
+      await authService.login('123456785', 'Password1', '1.1.1.1', 2);
+
+      expect(where().where).toEqual({
+        rut: { in: ['123456785', '12345678-5'] },
+        id_empresa: 2,
+      });
+    });
+
+    it('en Finet cuenta también un cliente sin empresa, que es de Finet', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      porRut.mockResolvedValue(mockCliente);
+
+      await authService.login('123456785', 'Password1', '1.1.1.1', 1);
+
+      expect(where().where).toEqual({
+        rut: { in: ['123456785', '12345678-5'] },
+        OR: [{ id_empresa: 1 }, { id_empresa: null }],
+      });
+    });
+
+    it('la recuperación manda el enlace del cliente de esa empresa', async () => {
+      porRut.mockResolvedValue({ ...mockCliente, id_empresa: 2 });
+      (jwtService.signAsync as jest.Mock).mockResolvedValue('reset-token');
+
+      await authService.recuperarPassword('123456785', '1.1.1.1', 2);
+
+      expect(where().where).toMatchObject({ id_empresa: 2 });
+    });
+
+    it('el registro también', async () => {
+      porRut.mockResolvedValue(null);
+
+      await authService.solicitarRegistro('123456785', 2);
+
+      expect(where().where).toMatchObject({ id_empresa: 2 });
+    });
+
+    it('sin la empresa, como antes, pero siempre el mismo registro', async () => {
+      porRut.mockResolvedValue(null);
+
+      await authService.recuperarPassword('123456785');
+
+      expect(where().where).toEqual({
+        rut: { in: ['123456785', '12345678-5'] },
+      });
+      expect(where().orderBy).toEqual({ id_cliente: 'asc' });
     });
   });
 

@@ -43,7 +43,8 @@ describe("CU-04: el RUT (paso 1)", () => {
     expect(container.querySelectorAll("input")).toHaveLength(1);
     await pedirConRut(container, "ENLACE_ENVIADO");
 
-    expect(post).toHaveBeenCalledWith("/auth/registro", { rut: "123456785" });
+    // Con la empresa del sitio (Finet, sin provider): el RUT se busca entre sus clientes.
+    expect(post).toHaveBeenCalledWith("/auth/registro", { rut: "123456785", id_empresa: 1 });
   });
 
   it("enlace enviado: avisa que revise su correo y cuánto dura", async () => {

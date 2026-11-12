@@ -59,15 +59,14 @@ export const SALDO_CLIENTE_DEFINIDO = true;
 export const TICKET_WIFI_DEFINIDO = true;
 
 /**
- * La boleta de un pago, para descargarla (CU-52). En la reunión con G8 quedó que
- * el "comprobante" del CU-52 es la boleta: la emite G8 con Facturacion.cl y la
- * entrega `GET /api/integrations/g2/payments/{id_pago}/tax-document` (su
- * respuesta del 02-10, §10, con `documento_url`). Falta que G8 lo implemente y
- * que Finet confirme que quiere la descarga en el portal (G8 le pregunta al área
- * comercial). Hasta entonces el cliente ve sus pagos anteriores, pero la descarga
- * cae en la Excepción 2 del CU-52: el comprobante no está disponible.
+ * Guardar el comprobante en `pago` (CU-52): al generarlo, el portal escribe el
+ * PDF entero en `comprobante_pdf_url` (data URL) y `comprobante_estado =
+ * 'GENERADO'`, solo esas dos columnas (Emilio, 12-11). G8 dio el permiso el
+ * 12-11: `g2_app=w` solo en esas dos columnas de `pago` en
+ * `finet_global_validacion` (has_column_privilege true; `monto` y el resto,
+ * solo lectura).
  */
-export const COMPROBANTE_G8_DEFINIDO = false;
+export const COMPROBANTE_EN_PAGO = true;
 
 export type Pendiente = {
   dato: string;
@@ -102,10 +101,10 @@ export const PENDIENTES: readonly Pendiente[] = [
     estaVacio: () => !TICKET_WIFI_DEFINIDO,
   },
   {
-    dato: 'Boleta del pago (GET /api/integrations/g2/payments/{id}/tax-document) y que Finet confirme la descarga',
+    dato: 'Permiso para guardar el comprobante en pago (UPDATE de comprobante_pdf_url y comprobante_estado)',
     quien: 'Grupo 8',
-    destraba: 'CU-52',
-    estaVacio: () => !COMPROBANTE_G8_DEFINIDO,
+    destraba: 'CU-52 (el PDF guardado en pago y en GENERADO)',
+    estaVacio: () => !COMPROBANTE_EN_PAGO,
   },
 ];
 

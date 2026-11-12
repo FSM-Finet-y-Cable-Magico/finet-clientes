@@ -360,6 +360,8 @@ describe('PagosService', () => {
       });
       expect(confirmacion.confirmar).toHaveBeenCalledTimes(1);
       expect(confirmacion.confirmar).toHaveBeenCalledWith({
+        // El id que devuelve G8: con él se arma el comprobante adjunto.
+        idPago: 9001,
         idCliente: 10,
         monto: 14990,
         fecha: new Date('2026-10-29T16:41:21.063Z'),

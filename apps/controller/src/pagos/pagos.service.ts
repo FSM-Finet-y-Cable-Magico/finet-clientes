@@ -294,11 +294,12 @@ export class PagosService {
     }
 
     try {
-      const { duplicado } = await this.g8.registrarPago(pago);
+      const { duplicado, idPago } = await this.g8.registrarPago(pago);
       if (!duplicado) {
         // RNF-51.1: "inmediatamente". No se espera: el CU-69 no lanza, y lo
         // que pase queda en log_notificacion.
         void this.confirmacion.confirmar({
+          idPago,
           idCliente: sesion.idCliente,
           monto: pago.monto,
           fecha: new Date(pago.fechaPago),

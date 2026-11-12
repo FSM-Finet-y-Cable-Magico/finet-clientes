@@ -5,12 +5,14 @@
  * dos y cada fila dice de qué empresa es, como lo hace G8.
  *
  * Única fuente del backend para lo que cambia entre empresas: nombre visible,
- * región del prospecto y dónde vive su sitio. Lo visual del correo vive en
- * `mail/`.
+ * datos legales, región del prospecto y dónde vive su sitio. Lo visual del
+ * correo vive en `mail/`.
  */
 
 export type Empresa = {
   readonly idEmpresa: number;
+  /** Como la nombra la vista (`finet`, `cable-magico`): va en nombres de archivo. */
+  readonly slug: 'finet' | 'cable-magico';
   /** Como se ve en el sitio y en los correos. */
   readonly nombre: string;
   /** Región que se escribe en el prospecto (CU-18), como la guarda G8. */
@@ -19,21 +21,44 @@ export type Empresa = {
   readonly prefijoWeb: string;
   /** La variable del .env con la URL de su propio host, si llega a tenerlo. */
   readonly variableSitio?: string;
+  /**
+   * Los "datos de la empresa" del comprobante de pago (CU-52, RF-38), los que
+   * entregó cada una; los mismos de `apps/view/app/_lib/company.ts`. En la base
+   * compartida, `empresa.rut_empresa` está vacío en las dos.
+   */
+  readonly razonSocial: string;
+  readonly rut: string | null;
+  readonly direccion: string;
+  readonly telefono: string;
+  readonly correo: string | null;
 };
 
 export const EMPRESAS = {
   1: {
     idEmpresa: 1,
+    slug: 'finet',
     nombre: 'Finet',
     region: 'Metropolitana de Santiago',
     prefijoWeb: '',
+    razonSocial: 'Fibernet Limitada',
+    rut: null,
+    direccion: 'Avenida Santa Rosa 12980, La Pintana',
+    telefono: '+56 9 4500 2319',
+    correo: null,
   },
   2: {
     idEmpresa: 2,
+    slug: 'cable-magico',
     nombre: 'Cable Mágico',
     region: 'Valparaíso',
     prefijoWeb: '/cable-magico',
     variableSitio: 'FRONTEND_URL_CABLE_MAGICO',
+    // Datos que entregó Cable Mágico el 11-11.
+    razonSocial: 'Cable Magico Estelar S.A.',
+    rut: '76.620.850-9',
+    direccion: 'Avenida Peñablanca 525, Algarrobo',
+    telefono: '+56 9 3303 1480',
+    correo: 'pagos@cablemagico.cl',
   },
 } as const satisfies Record<number, Empresa>;
 

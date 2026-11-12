@@ -1,4 +1,5 @@
 import { Logger, Module, OnModuleInit } from '@nestjs/common';
+import { ComprobantePagoModule } from '../common/comprobantes/comprobante-pago.module.js';
 import { EnlacePagoModule } from '../common/enlaces/enlace-pago.module.js';
 import { SaldoClienteModule } from '../common/saldo/saldo-cliente.module.js';
 import { pendientesVacios } from '../common/pendientes.js';
@@ -7,7 +8,7 @@ import { AvisoCorteService } from './aviso-corte.service.js';
 import { ConfirmacionPagoService } from './confirmacion-pago.service.js';
 
 @Module({
-  imports: [EnlacePagoModule, SaldoClienteModule],
+  imports: [ComprobantePagoModule, EnlacePagoModule, SaldoClienteModule],
   providers: [
     RecordatorioPagoService,
     AvisoCorteService,

@@ -23,6 +23,25 @@ describe('empresas', () => {
     expect(EMPRESAS[2].prefijoWeb).toBe('/cable-magico');
   });
 
+  // Los "datos de la empresa" del comprobante de pago (CU-52, RF-38): los que
+  // entregó cada una. En la base, empresa.rut_empresa está vacío en las dos.
+  it('cada una tiene sus datos legales para el comprobante de pago', () => {
+    expect(EMPRESAS[1]).toMatchObject({
+      razonSocial: 'Fibernet Limitada',
+      rut: null,
+      direccion: 'Avenida Santa Rosa 12980, La Pintana',
+      telefono: '+56 9 4500 2319',
+      correo: null,
+    });
+    expect(EMPRESAS[2]).toMatchObject({
+      razonSocial: 'Cable Magico Estelar S.A.',
+      rut: '76.620.850-9',
+      direccion: 'Avenida Peñablanca 525, Algarrobo',
+      telefono: '+56 9 3303 1480',
+      correo: 'pagos@cablemagico.cl',
+    });
+  });
+
   it('una empresa que no se conoce, o ninguna, cae en Finet', () => {
     expect(empresaDe(2)).toBe(EMPRESAS[2]);
     expect(empresaDe(99)).toBe(EMPRESAS[1]);

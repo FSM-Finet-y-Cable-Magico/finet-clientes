@@ -7,12 +7,20 @@ import {
   Post,
   Query,
   ServiceUnavailableException,
+  StreamableFile,
   UseGuards,
+  Header,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { PortalService } from './portal.service.js';
 import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
+import { ComprobantePagoService } from '../common/comprobantes/comprobante-pago.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import { ConLimiteDeSesion } from '../common/constants/limites.js';
+import {
+  ConLimiteDeSesion,
+  LIMITE_COMPROBANTES_POR_MINUTO,
+  UN_MINUTO_MS,
+} from '../common/constants/limites.js';
 import { CurrentClient } from '../auth/decorators/current-client.decorator.js';
 import type { cliente } from '../../generated/prisma/client.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
@@ -40,6 +48,7 @@ export class PortalController {
   constructor(
     private readonly portalService: PortalService,
     private readonly enlaces: EnlacePagoService,
+    private readonly comprobantes: ComprobantePagoService,
   ) {}
 
   /**
@@ -150,8 +159,8 @@ export class PortalController {
    * Auth: Bearer <token>
    *
    * Respuesta: PagosAnterioresDto
-   *   - comprobante_disponible: boolean (false mientras G8 no implemente la
-   *     boleta en su tax-document: ver COMPROBANTE_G8_DEFINIDO)
+   *   - comprobante_disponible: boolean (true: el comprobante lo genera el
+   *     portal, common/comprobantes/)
    *   - pagos: id_pago, fecha_pago (ISO), periodo ("Abril 2026" o null),
    *     monto, pasarela. Del más nuevo al más viejo
    *
@@ -169,20 +178,35 @@ export class PortalController {
    * GET /portal/pagos/:id/comprobante
    * Auth: Bearer <token>
    *
-   * El PDF lo genera G8. Mientras su endpoint no esté desplegado, responde 503
-   * (Excepción 2 del CU-52).
+   * Lo genera el portal con la marca de la empresa del cliente (RF-38). Va
+   * como descarga y sin caché: trae datos personales.
    *
    * Errores:
    *   401 - Sesión expirada por inactividad / Token JWT inválido
    *   404 - El pago no existe o no es del cliente
-   *   503 - El comprobante no está disponible en este momento
+   *   429 - Más de 20 descargas por minuto
+   *   503 - Faltan datos del pago o falló el PDF (Excepciones 1 y 2 del CU-52)
    */
   @Get('pagos/:id/comprobante')
-  getComprobante(
+  @Throttle({
+    default: { limit: LIMITE_COMPROBANTES_POR_MINUTO, ttl: UN_MINUTO_MS },
+  })
+  @Header('Cache-Control', 'no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async getComprobante(
     @CurrentClient() cliente: cliente,
     @Param('id', ParseIntPipe) idPago: number,
-  ) {
-    return this.portalService.getComprobante(cliente.id_cliente, idPago);
+  ): Promise<StreamableFile> {
+    const { archivo, nombreArchivo } = await this.comprobantes.delCliente(
+      cliente.id_cliente,
+      idPago,
+    );
+    // El nombre solo lleva el slug de la empresa y el id numérico del pago.
+    return new StreamableFile(archivo, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${nombreArchivo}"`,
+      length: archivo.length,
+    });
   }
 
   @Get('tickets/categorias')

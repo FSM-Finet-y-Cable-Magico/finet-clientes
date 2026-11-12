@@ -13,7 +13,10 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
-import { urlDelSitio } from '../common/constants/empresas.js';
+import {
+  ID_EMPRESA_POR_DEFECTO,
+  urlDelSitio,
+} from '../common/constants/empresas.js';
 import {
   esPasswordReciente,
   MENSAJE_PASSWORD_REPETIDA,
@@ -243,7 +246,29 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  async login(rut: string, password: string, ip: string) {
+  /**
+   * El cliente de ese RUT en la empresa del sitio. La misma persona puede ser
+   * cliente de Finet y de Cable Mágico (su RUT guardado de dos formas, una por
+   * empresa): sin la empresa, el login, la recuperación y el registro podían
+   * tomar registros distintos, y la contraseña que se restablecía no era la
+   * que después pedía el login. Un cliente sin empresa es de Finet, como en
+   * `empresaDe`. Sin el dato, como antes, pero siempre el mismo registro.
+   */
+  private clientePorRut(rutLimpio: string, idEmpresa?: number) {
+    const deLaEmpresa =
+      idEmpresa === undefined
+        ? {}
+        : idEmpresa === ID_EMPRESA_POR_DEFECTO
+          ? { OR: [{ id_empresa: idEmpresa }, { id_empresa: null }] }
+          : { id_empresa: idEmpresa };
+    return this.prisma.cliente.findFirst({
+      where: { rut: { in: variantesRut(rutLimpio) }, ...deLaEmpresa },
+      orderBy: { id_cliente: 'asc' },
+    });
+  }
+
+  /** @param idEmpresa la empresa del sitio donde se ingresa. */
+  async login(rut: string, password: string, ip: string, idEmpresa?: number) {
     const rutLimpio = cleanRut(rut);
 
     // Verificar bloqueo de IP y RUT — con fallback en memoria (CU-05 Excepción 1)
@@ -299,9 +324,7 @@ export class AuthService {
       }
     }
 
-    const cliente = await this.prisma.cliente.findFirst({
-      where: { rut: { in: variantesRut(rutLimpio) } },
-    });
+    const cliente = await this.clientePorRut(rutLimpio, idEmpresa);
 
     if (!cliente) {
       this.logger.warn(`Login failed: RUT ${rutLimpio} not found, IP ${ip}`);
@@ -371,15 +394,13 @@ export class AuthService {
     });
   }
 
-  async recuperarPassword(rut: string, ip?: string) {
+  async recuperarPassword(rut: string, ip?: string, idEmpresa?: number) {
     const rutLimpio = cleanRut(rut);
     const mensajeGenerico = {
       message: 'Si el RUT está registrado, recibirás un enlace de recuperación',
     };
 
-    const cliente = await this.prisma.cliente.findFirst({
-      where: { rut: { in: variantesRut(rutLimpio) } },
-    });
+    const cliente = await this.clientePorRut(rutLimpio, idEmpresa);
 
     if (!cliente) {
       return mensajeGenerico;
@@ -452,10 +473,9 @@ export class AuthService {
    */
   async solicitarRegistro(
     rut: string,
+    idEmpresa?: number,
   ): Promise<{ resultado: ResultadoRegistro }> {
-    const cliente = await this.prisma.cliente.findFirst({
-      where: { rut: { in: variantesRut(cleanRut(rut)) } },
-    });
+    const cliente = await this.clientePorRut(cleanRut(rut), idEmpresa);
 
     if (!cliente || !clienteActivo(cliente.estado)) {
       return { resultado: 'NO_CLIENTE' };

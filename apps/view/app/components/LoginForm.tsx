@@ -62,7 +62,12 @@ export default function LoginForm() {
     try {
       const data = await api.post<{ access_token: string; cliente: Cliente }>(
         "/auth/login",
-        { rut: cleanRut(result.data.rut), password: result.data.password }
+        {
+          rut: cleanRut(result.data.rut),
+          password: result.data.password,
+          // El RUT se busca entre los clientes de la empresa de este sitio.
+          id_empresa: marca.idEmpresa,
+        }
       );
       // Con un host por empresa, la sesión queda en el host donde se inicia:
       // un cliente de la otra empresa tiene que entrar en su sitio (proxy.ts
