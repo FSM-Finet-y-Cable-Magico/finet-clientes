@@ -19,10 +19,15 @@ export async function generateMetadata({
   }, marca);
 }
 
-export default async function CoberturaPage() {
+export default async function CoberturaPage({
+  params,
+}: {
+  params: Promise<{ marca: string }>;
+}) {
+  const { idEmpresa } = marcaPorSlug((await params).marca);
   const [config, puntos] = await Promise.all([
-    getVisorCoberturaConfig(),
-    getPuntosCobertura(),
+    getVisorCoberturaConfig(idEmpresa),
+    getPuntosCobertura(idEmpresa),
   ]);
 
   return (

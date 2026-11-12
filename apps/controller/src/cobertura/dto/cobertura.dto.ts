@@ -1,11 +1,25 @@
 import { z } from 'zod';
+import { esEmpresaConocida } from '../../common/constants/empresas.js';
+
+/** Cada sitio (Finet o Cable Mágico) pide el visor de su red; sin él, Finet. */
+export const consultaVisorCoberturaSchema = z.object({
+  id_empresa: z.coerce
+    .number()
+    .int()
+    .refine(esEmpresaConocida, { message: 'Empresa desconocida' })
+    .optional(),
+});
+export type ConsultaVisorCoberturaDto = z.infer<
+  typeof consultaVisorCoberturaSchema
+>;
 
 /**
  * CU-60: filtro opcional de la capa de calor por tipo de cobertura.
  */
-export const consultaPuntosCoberturaSchema = z.object({
-  tipo_cobertura: z.string().max(20).optional(),
-});
+export const consultaPuntosCoberturaSchema =
+  consultaVisorCoberturaSchema.extend({
+    tipo_cobertura: z.string().max(20).optional(),
+  });
 export type ConsultaPuntosCoberturaDto = z.infer<
   typeof consultaPuntosCoberturaSchema
 >;

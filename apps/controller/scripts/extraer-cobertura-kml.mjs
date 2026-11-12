@@ -1,7 +1,10 @@
 /**
- * Genera la capa de cobertura estatica de Finet a partir del KML de planta externa.
+ * Genera la capa de cobertura estatica de una empresa a partir de su KML de
+ * planta externa.
  *
- *   node scripts/extraer-cobertura-kml.mjs "<ruta al .kml>"
+ *   node scripts/extraer-cobertura-kml.mjs "<ruta al .kml>" [finet|cable-magico]
+ *
+ * Sin el segundo argumento, Finet.
  *
  * El KML de origen NO se versiona: contiene nombre, RUT, telefono y direccion de
  * clientes reales. Este script existe para que la extraccion sea reproducible y,
@@ -14,20 +17,51 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
-const ORIGEN = process.argv[2];
-assert(ORIGEN, 'Uso: node scripts/extraer-cobertura-kml.mjs "<ruta al .kml>"');
+/**
+ * Lo que cambia entre empresas. `limites` son los mismos del visor de esa
+ * empresa en cobertura.service.ts; `minimos` hace fallar la extraccion si el
+ * KML no trae lo que se espera de esa red.
+ */
+const EMPRESAS = {
+  finet: {
+    nombre: 'Finet',
+    constante: 'COBERTURA_FINET',
+    origen: `KML de planta externa (NAPs, MUFAs y trazado de fibra de la red FTTH
+ * de La Pintana y Puente Alto)`,
+    limites: { latMin: -33.72, latMax: -33.48, lngMin: -70.78, lngMax: -70.45 },
+    minimos: { naps: 100, tramos: 50 },
+  },
+  'cable-magico': {
+    nombre: 'Cable Magico',
+    constante: 'COBERTURA_CABLE_MAGICO',
+    origen: `KML de Tomodat (cajas de acceso y empalmes de la red de Algarrobo y
+ * El Quisco; el export no trae el trazado de fibra)`,
+    limites: { latMin: -33.49, latMax: -33.25, lngMin: -71.84, lngMax: -71.51 },
+    minimos: { naps: 50, tramos: 0 },
+    /**
+     * Tomodat nombra cada caja por su calle o condominio, no por su tipo: el
+     * tipo va en el color del icono (aabbggrr), y este archivo usa siete.
+     * Amarillo y azul son cajas desde las que se acomete; las rojas son los
+     * empalmes del troncal, una cada ~700 m en linea de Mirasol a El Quisco.
+     *
+     * ponytail: la lectura de los colores es nuestra, no de Cable Magico. Si
+     * confirman otra cosa, se cambia este mapa y se regenera.
+     */
+    tipoPorColor: { ff00ffff: 'nap', ffff0000: 'nap', ff0000ff: 'mufa' },
+  },
+};
+
+const [ORIGEN, SLUG = 'finet'] = process.argv.slice(2);
+const EMPRESA = EMPRESAS[SLUG];
+assert(
+  ORIGEN && EMPRESA,
+  'Uso: node scripts/extraer-cobertura-kml.mjs "<ruta al .kml>" [finet|cable-magico]',
+);
 const DESTINO = new URL(
-  '../src/cobertura/cobertura-finet.data.ts',
+  `../src/cobertura/cobertura-${SLUG}.data.ts`,
   import.meta.url,
 );
-
-/** Mismos limites que VISOR_CONFIG en cobertura.service.ts. */
-const LIMITES = {
-  latMin: -33.72,
-  latMax: -33.48,
-  lngMin: -70.78,
-  lngMax: -70.45,
-};
+const LIMITES = EMPRESA.limites;
 
 /**
  * Paso de la grilla, en grados (~220 m).
@@ -80,6 +114,7 @@ const placemarks = [...xml.matchAll(/<Placemark>([\s\S]*?)<\/Placemark>/g)].map(
     );
     return {
       nombre,
+      color: (cuerpo.match(/<color>(\w{8})<\/color>/) || [, ''])[1].toLowerCase(),
       geometria: punto ? 'punto' : 'linea',
       coords: coordenadas((punto || linea)[1]),
     };
@@ -99,15 +134,16 @@ const dentroDeLimites = ([lat, lng]) =>
 
 /**
  * Clasifica por nombre. El `<color>` del icono seria mas directo, pero el archivo
- * usa 32 colores distintos con una cola larga de valores unicos: no es fiable.
+ * de Finet usa 32 colores distintos con una cola larga de valores unicos: no es
+ * fiable. Solo se mira si la empresa dice que significa (`tipoPorColor`).
  */
-function clasificar({ nombre, geometria }) {
+function clasificar({ nombre, geometria, color }) {
   const n = nombre.toUpperCase();
   if (geometria === 'linea') return /TRONCAL|BRAZO/.test(n) ? 'fibra' : null;
   if (/BRAZO|TRONCAL/.test(n)) return null;
   if (/\bNAP\b|\bNAP\d|NAP#|\bCTO\b|CTO\d/.test(n)) return 'nap';
   if (/\bMUFA\b|MUFA\d|\bNODO\b|\bOLT\b/.test(n)) return 'mufa';
-  return null;
+  return EMPRESA.tipoPorColor?.[color] ?? null;
 }
 
 const descartados = {
@@ -140,8 +176,14 @@ const naps = elementos.filter((e) => e.tipo === 'nap').map((e) => e.coords[0]);
 const mufas = elementos.filter((e) => e.tipo === 'mufa').map((e) => e.coords[0]);
 const tramos = elementos.filter((e) => e.tipo === 'fibra').map((e) => e.coords);
 
-assert(naps.length > 100, `Se esperaban NAPs y solo hay ${naps.length}`);
-assert(tramos.length > 50, `Se esperaban tramos y solo hay ${tramos.length}`);
+assert(
+  naps.length >= EMPRESA.minimos.naps,
+  `Se esperaban NAPs y solo hay ${naps.length}`,
+);
+assert(
+  tramos.length >= EMPRESA.minimos.tramos,
+  `Se esperaban tramos y solo hay ${tramos.length}`,
+);
 
 // --- Geometria en metros ----------------------------------------------------
 
@@ -259,12 +301,11 @@ const cuerpo = celdas
   .join('\n');
 
 const archivo = `/**
- * Capa de cobertura de Finet. GENERADO - no editar a mano.
+ * Capa de cobertura de ${EMPRESA.nombre}. GENERADO - no editar a mano.
  *
- * Origen: KML de planta externa (NAPs, MUFAs y trazado de fibra de la red FTTH
- * de La Pintana y Puente Alto). Regenerar con:
+ * Origen: ${EMPRESA.origen}. Regenerar con:
  *
- *     node scripts/extraer-cobertura-kml.mjs "<ruta al .kml>"
+ *     node scripts/extraer-cobertura-kml.mjs "<ruta al .kml>"${SLUG === 'finet' ? '' : ` ${SLUG}`}
  *
  * Contiene solo geometria y una densidad derivada. Ningun dato de cliente: el
  * script descarta las fichas con RUT o telefono antes de calcular nada.
@@ -280,7 +321,7 @@ export interface PuntoCoberturaEstatico {
   tipo_cobertura: string;
 }
 
-export const COBERTURA_FINET: readonly PuntoCoberturaEstatico[] = [
+export const ${EMPRESA.constante}: readonly PuntoCoberturaEstatico[] = [
 ${cuerpo}
 ];
 `;
