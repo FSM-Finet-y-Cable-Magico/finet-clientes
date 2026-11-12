@@ -14,6 +14,8 @@ export const ContratacionDto = z.object({
   id_plan: z.number().int().positive(),
   direccion_completa: z.string().min(1).max(200),
   comuna: z.string().min(1).max(80),
+  region: z.string().min(1).max(80),
+  origen_contacto: z.string().min(1).max(40),
   ciudad: z.string().max(80).optional().nullable(),
 });
 export type ContratacionDto = z.infer<typeof ContratacionDto>;

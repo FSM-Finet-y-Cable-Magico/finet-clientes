@@ -17,6 +17,8 @@ const DTO_MOCK: ContratacionDto = {
   id_plan: 1,
   direccion_completa: 'Av. Siempre Viva 742',
   comuna: 'Providencia',
+  region: 'Metropolitana de Santiago',
+  origen_contacto: 'Formulario web',
   ciudad: 'Santiago',
   acepta_politica_privacidad: true,
   version_politica_privacidad: '1.1',
@@ -106,6 +108,7 @@ describe('ContratacionesService', () => {
           direccion: 'Av. Siempre Viva 742',
           comuna: 'Providencia',
           region: 'Metropolitana de Santiago',
+          origen_contacto: 'Formulario web',
           id_plan_interes: 1,
           estado_pipeline: 'Prospecto Nuevo',
         }),
@@ -113,14 +116,17 @@ describe('ContratacionesService', () => {
       });
     });
 
-    it('el prospecto es de la empresa del plan: uno de Cable Mágico llega a G8 como empresa 2, en Valparaíso', async () => {
+    it('el prospecto es de la empresa del plan: uno de Cable Mágico llega a G8 como empresa 2', async () => {
       mockTransaccionExitosa();
       (tx.plan.findFirst as jest.Mock).mockResolvedValue({
         id_plan: 2,
         id_empresa: 2,
       });
 
-      await service.crear({ ...DTO_MOCK, id_plan: 2 }, IP);
+      await service.crear(
+        { ...DTO_MOCK, id_plan: 2, region: 'Valparaíso', comuna: 'Algarrobo' },
+        IP,
+      );
 
       expect(tx.plan.findFirst).toHaveBeenCalledWith({
         where: { id_plan: 2, activo: true },
@@ -130,7 +136,33 @@ describe('ContratacionesService', () => {
         data: expect.objectContaining({
           id_empresa: 2,
           region: 'Valparaíso',
+          comuna: 'Algarrobo',
           id_plan_interes: 2,
+        }),
+        select: { id_prospecto: true },
+      });
+    });
+
+    // Formato del prospecto de G8 (12-11): la región, la comuna y el origen
+    // son los que eligió el cliente en el formulario.
+    it('guarda la región, la comuna y el origen de contacto que eligió el cliente', async () => {
+      mockTransaccionExitosa();
+
+      await service.crear(
+        {
+          ...DTO_MOCK,
+          region: 'Valparaíso',
+          comuna: 'El Quisco',
+          origen_contacto: 'Redes sociales',
+        },
+        IP,
+      );
+
+      expect(tx.prospecto.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          region: 'Valparaíso',
+          comuna: 'El Quisco',
+          origen_contacto: 'Redes sociales',
         }),
         select: { id_prospecto: true },
       });
