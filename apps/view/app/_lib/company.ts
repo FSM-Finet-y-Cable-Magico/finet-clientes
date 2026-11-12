@@ -58,7 +58,7 @@ export type Marca = {
    * lo hay, no se pide: en el DS 194, art. 5, el correo es opcional.
    */
   readonly correoContacto: string | null;
-  /** Para ejercer los derechos sobre datos personales. */
+  /** Si la empresa lo tiene, se suma al WhatsApp para las solicitudes sobre datos personales. */
   readonly correoPrivacidad: string | null;
   readonly direccion: {
     /** Calle y número del domicilio legal. */

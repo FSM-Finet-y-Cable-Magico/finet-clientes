@@ -45,6 +45,21 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
       {marca.direccion.region}
     </>
   );
+  // Las solicitudes sobre datos llegan por un medio electrónico equivalente de
+  // uso común (Ley 19.628, arts. 11 y 14 ter c, según la Ley 21.719): el
+  // WhatsApp, y el correo si la empresa lo tiene.
+  const contacto = (
+    <>
+      <a href={marca.whatsappUrl} target="_blank" rel="noopener noreferrer">
+        WhatsApp
+      </a>
+      {marca.correoPrivacidad && (
+        <>
+          {" "}o <Correo valor={marca.correoPrivacidad} />
+        </>
+      )}
+    </>
+  );
 
   return [
     {
@@ -59,7 +74,7 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             ...(marca.rut ? [["RUT", marca.rut]] : []),
             ["Representante legal", <Dato key="representante" valor={marca.representanteLegal} />],
             ["Domicilio", domicilio],
-            ["Contacto de privacidad", <Correo key="correo" valor={marca.correoPrivacidad} />],
+            ["Contacto de privacidad", contacto],
           ]}
         />
       ),
@@ -362,9 +377,8 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             (esta última exigible desde el 1 de diciembre de 2026).
           </p>
           <p>
-            <strong>Cómo:</strong> escribe a <Correo valor={marca.correoPrivacidad} />{" "}
-            desde el correo registrado en tu cuenta, indicando nombre, RUT y el
-            derecho que quieres ejercer. Podemos pedirte antecedentes para
+            <strong>Cómo:</strong> escríbenos por {contacto}, indicando nombre,
+            RUT y el derecho que quieres ejercer. Podemos pedirte antecedentes para
             verificar tu identidad. Respondemos dentro de 2 días hábiles (Ley N°
             19.628, art. 16) y, desde el 1 de diciembre de 2026, dentro de 30
             días corridos, prorrogables por una vez por otros 30 (art. 11,
@@ -400,7 +414,7 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
         <p>
           Publicaremos la versión vigente en esta página con su fecha. Si el
           cambio es sustancial, te avisaremos por correo o por el Portal.
-          Consultas: <Correo valor={marca.correoPrivacidad} /> ·{" "}
+          Consultas: {contacto} ·{" "}
           <a href={`tel:${marca.telefono.tel}`}>{marca.telefono.display}</a> ·{" "}
           {domicilio}.
         </p>

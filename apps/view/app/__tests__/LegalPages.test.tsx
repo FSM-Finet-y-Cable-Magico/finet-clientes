@@ -195,6 +195,24 @@ describe("CU-73: Politica de Privacidad con respaldo normativo", () => {
     expect(seccion).toHaveTextContent(/2 días hábiles/);
     expect(seccion).toHaveTextContent(/30 días corridos/);
   });
+
+  // Arts. 11 y 14 ter c): basta un medio electrónico equivalente de uso común;
+  // el WhatsApp ya está publicado. El correo, solo si la empresa lo tiene.
+  it("las solicitudes sobre tus datos van por WhatsApp, sin hueco de correo", async () => {
+    const { container } = render(await PrivacidadPage(conMarca("finet")));
+
+    for (const id of ["quienes-somos", "derechos", "cambios"]) {
+      const seccion = container.querySelector<HTMLElement>(`section#${id}`)!;
+      expect(within(seccion).getByRole("link", { name: "WhatsApp" })).toHaveAttribute(
+        "href",
+        "https://wa.me/56945002319",
+      );
+    }
+    for (const id of ["derechos", "cambios"]) {
+      const seccion = container.querySelector<HTMLElement>(`section#${id}`)!;
+      expect(within(seccion).queryByText("dato pendiente")).toBeNull();
+    }
+  });
 });
 
 describe("CU-73: datos pendientes", () => {
