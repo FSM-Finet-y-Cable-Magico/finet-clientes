@@ -1,14 +1,10 @@
 import { z } from 'zod';
-import { esEmpresaConocida } from '../../common/constants/empresas.js';
+import { empresaSchema } from '../../common/utils/validaciones.js';
 
 export const ConsultaPlanesDto = z.object({
   tipo_cliente: z.string().max(20).optional(),
   /** Cada sitio (Finet o Cable Mágico) pide solo sus planes. */
-  id_empresa: z.coerce
-    .number()
-    .int()
-    .refine(esEmpresaConocida, { message: 'Empresa desconocida' })
-    .optional(),
+  id_empresa: z.coerce.number().pipe(empresaSchema).optional(),
 });
 export type ConsultaPlanesDto = z.infer<typeof ConsultaPlanesDto>;
 

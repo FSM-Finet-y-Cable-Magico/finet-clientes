@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { validateRut } from '../../common/utils/rut.js';
-import { esEmpresaConocida } from '../../common/constants/empresas.js';
+import { empresaSchema } from '../../common/utils/validaciones.js';
 
 /**
  * Largo maximo de un mensaje del visitante. Cada mensaje se cobra en tokens
@@ -30,11 +30,7 @@ export const MensajeAsistenteDto = z.object({
    * el asistente hable como ella. Solo elige marca y contenido público: los
    * datos del cliente siguen pidiendo su RUT y su sesión.
    */
-  id_empresa: z
-    .number()
-    .int()
-    .refine(esEmpresaConocida, { message: 'Empresa desconocida' })
-    .optional(),
+  id_empresa: empresaSchema.optional(),
 });
 export type MensajeAsistenteDto = z.infer<typeof MensajeAsistenteDto>;
 

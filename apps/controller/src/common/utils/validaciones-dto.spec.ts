@@ -185,3 +185,33 @@ describe('confirmar el registro (CU-04)', () => {
     ).toEqual(['Token es requerido']);
   });
 });
+
+/** El sitio desde donde se escribe: cada empresa busca entre sus clientes. */
+describe('empresa del sitio', () => {
+  const conEmpresa: [string, Esquema, Record<string, unknown>][] = [
+    ['login', loginSchema, { rut: RUT_VALIDO, password: 'x' }],
+    ['recuperar contraseña', recuperarPasswordSchema, { rut: RUT_VALIDO }],
+    ['registro (CU-04)', solicitudRegistroSchema, { rut: RUT_VALIDO }],
+  ];
+
+  it.each(conEmpresa)(
+    '%s: acepta Finet, Cable Mágico o nada',
+    (_n, esquema, base) => {
+      expect(esquema.safeParse({ ...base, id_empresa: 1 }).success).toBe(true);
+      expect(esquema.safeParse({ ...base, id_empresa: 2 }).success).toBe(true);
+      expect(esquema.safeParse(base).success).toBe(true);
+    },
+  );
+
+  it.each(conEmpresa)(
+    '%s: rechaza una empresa que no existe',
+    (_n, esquema, base) => {
+      expect(
+        mensajes(esquema, { ...base, id_empresa: 3 }, 'id_empresa'),
+      ).toEqual(['Empresa desconocida']);
+      expect(esquema.safeParse({ ...base, id_empresa: 'cable' }).success).toBe(
+        false,
+      );
+    },
+  );
+});

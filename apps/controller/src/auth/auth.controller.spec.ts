@@ -69,6 +69,27 @@ describe('AuthController', () => {
         '123456785',
         'password',
         '127.0.0.1',
+        undefined,
+      );
+    });
+
+    it('pasa la empresa del sitio al servicio', async () => {
+      mockAuthService.login.mockResolvedValue({
+        access_token: 'jwt-token',
+        cliente: mockCliente,
+      });
+
+      await authController.login(
+        { rut: '123456785', password: 'password', id_empresa: 2 },
+        { ip: '127.0.0.1' } as Request,
+        { cookie: jest.fn() } as unknown as Response,
+      );
+
+      expect(mockAuthService.login).toHaveBeenCalledWith(
+        '123456785',
+        'password',
+        '127.0.0.1',
+        2,
       );
     });
   });
@@ -84,6 +105,21 @@ describe('AuthController', () => {
       ).resolves.toEqual({ resultado: 'ENLACE_ENVIADO' });
       expect(mockAuthService.solicitarRegistro).toHaveBeenCalledWith(
         '123456785',
+        undefined,
+      );
+    });
+
+    it('pasa la empresa del sitio', async () => {
+      mockAuthService.solicitarRegistro.mockResolvedValue({
+        resultado: 'ENLACE_ENVIADO',
+      });
+      await authController.solicitarRegistro({
+        rut: '123456785',
+        id_empresa: 2,
+      });
+      expect(mockAuthService.solicitarRegistro).toHaveBeenCalledWith(
+        '123456785',
+        2,
       );
     });
   });
@@ -141,6 +177,20 @@ describe('AuthController', () => {
       expect(mockAuthService.recuperarPassword).toHaveBeenCalledWith(
         '123456785',
         '127.0.0.1',
+        undefined,
+      );
+    });
+
+    it('pasa la empresa del sitio', async () => {
+      mockAuthService.recuperarPassword.mockResolvedValue({ message: 'ok' });
+      await authController.recuperarPassword(
+        { rut: '123456785', id_empresa: 2 },
+        { ip: '127.0.0.1' } as any,
+      );
+      expect(mockAuthService.recuperarPassword).toHaveBeenCalledWith(
+        '123456785',
+        '127.0.0.1',
+        2,
       );
     });
   });
