@@ -374,7 +374,7 @@ Las páginas están publicadas con el contenido de `legales-isp-v2.md`. Donde fa
 | Dato | Dónde se ve | Dónde se completa | Quién lo entrega |
 |---|---|---|---|
 | RUT de la razón social | Encabezado de Términos, Privacidad §1 | `company.ts` → `COMPANY_RUT` | Administración |
-| Calle y número del domicilio | Encabezado de Términos, Privacidad §1 y §14 | `company.ts` → `COMPANY_STREET_ADDRESS` | Administración |
+| ~~Calle y número del domicilio~~ ✅ Avenida Santa Rosa 12980, La Pintana (12-11) | Encabezado de Términos, Privacidad §1 y §14 | `company.ts` → `MARCAS.finet.direccion.calle` | Administración |
 | Correo de contacto general | Términos §2, §5 y §6 | `company.ts` → `COMPANY_CONTACT_EMAIL` | Administración |
 | Correo de privacidad | Privacidad §1, §12 y §14 | `company.ts` → `COMPANY_PRIVACY_EMAIL` | Administración |
 | Velocidad mínima garantizada, sobreventa, disponibilidad, latencia y pérdida, direccionamiento IP | Términos §4, tabla de características | `legal.ts` → `CALIDAD_SERVICIO` | Área técnica |
