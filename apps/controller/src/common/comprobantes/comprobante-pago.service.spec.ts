@@ -47,7 +47,7 @@ describe('ComprobantePagoService', () => {
     service = module.get(ComprobantePagoService);
   });
 
-  /** El interruptor de G8 (COMPROBANTE_EN_PAGO), prendido para la prueba. */
+  /** El interruptor (COMPROBANTE_EN_PAGO), prendido aunque cambie el archivo. */
   function conPermisoDeG8() {
     jest
       .spyOn(
@@ -152,7 +152,14 @@ describe('ComprobantePagoService', () => {
       prisma.cliente.findUnique.mockResolvedValue(CLIENTE_CABLE as never);
     });
 
-    it('sin el permiso de G8 no escribe nada', async () => {
+    it('con el interruptor apagado no escribe nada', async () => {
+      jest
+        .spyOn(
+          service as unknown as { marcaEnPago: () => boolean },
+          'marcaEnPago',
+        )
+        .mockReturnValue(false);
+
       await service.delCliente(2, 5);
       expect(prisma.pago.updateMany).not.toHaveBeenCalled();
     });
@@ -272,5 +279,15 @@ describe('ComprobantePagoService', () => {
 
       expect(r?.archivo.equals(GUARDADO)).toBe(true);
     });
+  });
+
+  // G8 dio el permiso el 12-11 (has_column_privilege true en las dos columnas).
+  it('con el permiso de G8, el interruptor está prendido', async () => {
+    prisma.pago.findFirst.mockResolvedValue(PAGO as never);
+    prisma.cliente.findUnique.mockResolvedValue(CLIENTE_CABLE as never);
+
+    await service.delCliente(2, 5);
+
+    expect(prisma.pago.updateMany).toHaveBeenCalledTimes(1);
   });
 });
