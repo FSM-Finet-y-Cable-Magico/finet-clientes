@@ -4,10 +4,13 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '../../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { nombreMedioPago } from '../../pagos/pagos.constantes.js';
 import { formatPeriodo } from '../utils/periodo.js';
+import { urlDelSitio } from '../constants/empresas.js';
+import { COMPROBANTE_EN_PAGO } from '../pendientes.js';
 import {
   generarComprobantePdf,
   contenidoComprobante,
@@ -66,7 +69,10 @@ type ClienteLeido = Prisma.clienteGetPayload<{
 export class ComprobantePagoService {
   private readonly logger = new Logger(ComprobantePagoService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   /**
    * La descarga desde el portal. Un pago de otro cliente responde 404, igual
@@ -145,21 +151,68 @@ export class ComprobantePagoService {
       generado: new Date(),
     };
 
+    let archivo: Buffer;
     try {
-      return {
-        archivo: await this.pdf(datos),
-        nombreArchivo: contenidoComprobante(datos).nombreArchivo,
-      };
+      archivo = await this.pdf(datos);
     } catch (error) {
       this.logger.error(
-        `[CU-52] no se pudo generar el comprobante del pago ${pago.id_pago}: ${error instanceof Error ? error.message : String(error)}`,
+        `[CU-52] no se pudo generar el comprobante del pago ${pago.id_pago}: ${mensaje(error)}`,
       );
       return null;
     }
+
+    await this.marcarEnPago(pago.id_pago, cliente.id_empresa);
+    return {
+      archivo,
+      nombreArchivo: contenidoComprobante(datos).nombreArchivo,
+    };
+  }
+
+  /**
+   * Con el permiso de G8, el pago queda con la URL de su comprobante y en
+   * GENERADO. Solo esas dos columnas de `pago` (Emilio, 12-11), y solo si nadie
+   * lo había marcado: nunca pisa lo que ponga G8. Si la base lo rechaza, se
+   * registra y el comprobante se entrega igual.
+   */
+  private async marcarEnPago(
+    idPago: number,
+    idEmpresa: number | null,
+  ): Promise<void> {
+    if (!this.marcaEnPago()) return;
+    try {
+      await this.prisma.pago.updateMany({
+        where: {
+          id_pago: idPago,
+          comprobante_estado: 'PENDIENTE',
+          comprobante_pdf_url: null,
+        },
+        data: {
+          comprobante_pdf_url: urlDelSitio(
+            idEmpresa,
+            `/api/portal/pagos/${idPago}/comprobante`,
+            this.config.getOrThrow<string>('FRONTEND_URL'),
+          ),
+          comprobante_estado: 'GENERADO',
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `[CU-52] no se pudo marcar el comprobante del pago ${idPago} en pago: ${mensaje(error)}`,
+      );
+    }
+  }
+
+  /** El interruptor de G8, aparte para poder probar los dos casos. */
+  protected marcaEnPago(): boolean {
+    return COMPROBANTE_EN_PAGO;
   }
 
   /** El dibujo, aparte para poder simular su falla en los tests. */
   protected pdf(datos: DatosComprobante): Promise<Buffer> {
     return generarComprobantePdf(datos);
   }
+}
+
+function mensaje(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

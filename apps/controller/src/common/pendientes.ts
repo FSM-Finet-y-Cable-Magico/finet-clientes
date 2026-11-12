@@ -58,6 +58,17 @@ export const SALDO_CLIENTE_DEFINIDO = true;
  */
 export const TICKET_WIFI_DEFINIDO = true;
 
+/**
+ * Marcar el comprobante en `pago` (CU-52): al generarlo, el portal escribe su
+ * URL y `comprobante_estado = 'GENERADO'`, solo en esas dos columnas. Emilio lo
+ * pidió el 12-11 y G8 avisó que dio el permiso, pero en la base `g2_app` todavía
+ * no puede hacer UPDATE en ninguna columna de `pago` (has_column_privilege, 12-11).
+ * Se prende cuando G8 corra
+ * `GRANT UPDATE (comprobante_pdf_url, comprobante_estado) ON public.pago TO g2_app`
+ * y la misma consulta dé true. Mientras tanto el comprobante se descarga igual.
+ */
+export const COMPROBANTE_EN_PAGO = false;
+
 export type Pendiente = {
   dato: string;
   quien: 'Grupo 2' | 'Grupo 8' | 'Grupo 3';
@@ -89,6 +100,12 @@ export const PENDIENTES: readonly Pendiente[] = [
     quien: 'Grupo 8',
     destraba: 'CU-32 (envío directo a G3)',
     estaVacio: () => !TICKET_WIFI_DEFINIDO,
+  },
+  {
+    dato: 'Permiso para marcar el comprobante en pago (UPDATE de comprobante_pdf_url y comprobante_estado)',
+    quien: 'Grupo 8',
+    destraba: 'CU-52 (pago en GENERADO con su URL)',
+    estaVacio: () => !COMPROBANTE_EN_PAGO,
   },
 ];
 
