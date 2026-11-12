@@ -4,6 +4,8 @@ import { jwtVerify } from "jose";
 import type { JWTPayload } from "jose";
 import {
   esSlugMarca,
+  MARCA_POR_DEFECTO,
+  MARCAS,
   marcaPorEmpresa,
   marcaPorHost,
   marcaPorSlug,
@@ -64,18 +66,30 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
   const payload = token ? await verifyToken(token) : null;
   const cookie = request.cookies.get(COOKIE_MARCA)?.value;
+  const host = marcaPorHost(request.headers.get("host"));
+  const marcaToken = marcaDelToken(payload);
+
+  // Con un host por empresa, la cookie de sesión es de este host. Una de un
+  // cliente de la otra empresa no vale aquí: se borra y no manda a su sitio,
+  // donde no hay sesión (si no, el visitante quedaba atrapado en ese host).
+  const ajena =
+    marcaToken !== null &&
+    MARCAS[marcaToken].url !== (host ?? MARCA_POR_DEFECTO).url;
+  const sinSesion = <T extends NextResponse>(response: T): T => {
+    if (ajena) response.cookies.delete("access_token");
+    return response;
+  };
 
   const decision = enrutarMarca({
     pathname,
     search,
-    marcaToken: marcaDelToken(payload),
+    marcaToken: ajena ? null : marcaToken,
     marcaCookie: esSlugMarca(cookie) ? cookie : null,
-    marcaHost:
-      (marcaPorHost(request.headers.get("host"))?.slug as SlugMarca) ?? null,
+    marcaHost: (host?.slug as SlugMarca) ?? null,
   });
 
   if (decision.tipo === "redirigir") {
-    return NextResponse.redirect(new URL(decision.destino, request.url));
+    return sinSesion(NextResponse.redirect(new URL(decision.destino, request.url)));
   }
 
   // El portal y el perfil piden sesión, en el sitio de cualquier empresa.
@@ -83,10 +97,14 @@ export async function proxy(request: NextRequest) {
   const isProtected = PROTECTED_PATHS.some(
     (p) => ruta === p || ruta.startsWith(p + "/"),
   );
-  if (isProtected && !token) return alLogin(request, decision.marca, false);
+  if (isProtected && (!token || ajena)) {
+    return sinSesion(alLogin(request, decision.marca, false));
+  }
   if (isProtected && !payload) return alLogin(request, decision.marca, true);
 
-  const response = NextResponse.rewrite(new URL(decision.destino, request.url));
+  const response = sinSesion(
+    NextResponse.rewrite(new URL(decision.destino, request.url)),
+  );
   if (decision.guardarCookie) {
     response.cookies.set(COOKIE_MARCA, decision.guardarCookie, {
       path: "/",
