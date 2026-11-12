@@ -43,7 +43,8 @@ describe("CU-75: formulario de contratación", () => {
     await user.type(screen.getByLabelText("Correo electronico"), "Juan@Ejemplo.cl");
     await user.type(screen.getByLabelText("Telefono movil"), "912345678");
     await user.type(screen.getByLabelText("Calle + numero"), "Av. Siempre Viva 742");
-    await user.type(screen.getByLabelText("Comuna"), "La Pintana");
+    await user.selectOptions(screen.getByLabelText("Región"), "Metropolitana de Santiago");
+    await user.selectOptions(screen.getByLabelText("Comuna"), "La Pintana");
     return user;
   }
 
@@ -209,8 +210,134 @@ describe("CU-75: formulario de contratación", () => {
       telefono: "+56912345678",
       direccion_completa: "Av. Siempre Viva 742",
       comuna: "La Pintana",
+      region: "Metropolitana de Santiago",
+      origen_contacto: "Formulario web",
       acepta_politica_privacidad: true,
       version_politica_privacidad: POLITICA_PRIVACIDAD_VERSION,
+    });
+  });
+
+  /**
+   * El formato del registro de prospectos de G8 (fotos del 12-11): mismos
+   * textos, letra por letra, mayúsculas, minúsculas y tildes incluidas.
+   */
+  describe("formato del prospecto de G8", () => {
+    const opciones = (etiqueta: string) =>
+      Array.from(
+        (screen.getByLabelText(etiqueta) as HTMLSelectElement).options,
+        (o) => o.textContent,
+      );
+
+    it("Origen de contacto: las 6 opciones de G8, en su orden, con Formulario web marcado", () => {
+      render(<FormularioContratacion plan={plan} />);
+      expect(opciones("Origen de contacto")).toEqual([
+        "Formulario web",
+        "Telefono",
+        "Sucursal",
+        "Referido",
+        "Redes sociales",
+        "Terreno",
+      ]);
+      expect(screen.getByLabelText("Origen de contacto")).toHaveValue("Formulario web");
+    });
+
+    it("Región: «Seleccionar región» y las 16 regiones, en el orden de G8", () => {
+      render(<FormularioContratacion plan={plan} />);
+      expect(opciones("Región")).toEqual([
+        "Seleccionar región",
+        "Tarapacá",
+        "Antofagasta",
+        "Atacama",
+        "Coquimbo",
+        "Valparaíso",
+        "Libertador General Bernardo O'Higgins",
+        "Maule",
+        "Biobío",
+        "La Araucanía",
+        "Los Lagos",
+        "Aysén del General Carlos Ibáñez del Campo",
+        "Magallanes y de la Antártica Chilena",
+        "Metropolitana de Santiago",
+        "Los Ríos",
+        "Arica y Parinacota",
+        "Ñuble",
+      ]);
+    });
+
+    it("Comuna: sin región, deshabilitada con «Selecciona primero una región»", () => {
+      render(<FormularioContratacion plan={plan} />);
+      expect(screen.getByLabelText("Comuna")).toBeDisabled();
+      expect(opciones("Comuna")).toEqual(["Selecciona primero una región"]);
+    });
+
+    it("Comuna: con región, «Seleccionar comuna» y sus comunas, como en la foto", async () => {
+      render(<FormularioContratacion plan={plan} />);
+      await userEvent.setup().selectOptions(
+        screen.getByLabelText("Región"),
+        "Metropolitana de Santiago",
+      );
+      expect(screen.getByLabelText("Comuna")).toBeEnabled();
+      expect(opciones("Comuna").slice(0, 20)).toEqual([
+        "Seleccionar comuna",
+        "Alhué",
+        "Buin",
+        "Calera de Tango",
+        "Cerrillos",
+        "Cerro Navia",
+        "Colina",
+        "Conchalí",
+        "Curacaví",
+        "El Bosque",
+        "El Monte",
+        "Estación Central",
+        "Huechuraba",
+        "Independencia",
+        "Isla de Maipo",
+        "La Cisterna",
+        "La Florida",
+        "La Granja",
+        "La Pintana",
+        "La Reina",
+      ]);
+    });
+
+    it("cada región trae todas sus comunas oficiales: 346 en total", async () => {
+      const COMUNAS = {
+        Tarapacá: 7,
+        Antofagasta: 9,
+        Atacama: 9,
+        Coquimbo: 15,
+        Valparaíso: 38,
+        "Libertador General Bernardo O'Higgins": 33,
+        Maule: 30,
+        Biobío: 33,
+        "La Araucanía": 32,
+        "Los Lagos": 30,
+        "Aysén del General Carlos Ibáñez del Campo": 10,
+        "Magallanes y de la Antártica Chilena": 11,
+        "Metropolitana de Santiago": 52,
+        "Los Ríos": 12,
+        "Arica y Parinacota": 4,
+        Ñuble: 21,
+      };
+      render(<FormularioContratacion plan={plan} />);
+      const user = userEvent.setup();
+      for (const [region, cantidad] of Object.entries(COMUNAS)) {
+        await user.selectOptions(screen.getByLabelText("Región"), region);
+        const comunas = opciones("Comuna").slice(1);
+        expect([region, comunas.length]).toEqual([region, cantidad]);
+        expect(new Set(comunas).size).toBe(cantidad);
+      }
+      expect(Object.values(COMUNAS).reduce((a, b) => a + b, 0)).toBe(346);
+    });
+
+    it("cambiar la región borra la comuna elegida", async () => {
+      render(<FormularioContratacion plan={plan} />);
+      const user = userEvent.setup();
+      await user.selectOptions(screen.getByLabelText("Región"), "Metropolitana de Santiago");
+      await user.selectOptions(screen.getByLabelText("Comuna"), "La Pintana");
+      await user.selectOptions(screen.getByLabelText("Región"), "Valparaíso");
+      expect(screen.getByLabelText("Comuna")).toHaveValue("");
     });
   });
 
