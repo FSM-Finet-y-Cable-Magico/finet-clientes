@@ -112,7 +112,7 @@ export const MARCAS = {
     correoContacto: null,
     correoPrivacidad: null,
     direccion: {
-      calle: null,
+      calle: "Avenida Santa Rosa 12980",
       comuna: "La Pintana",
       region: "Region Metropolitana",
       pais: "CL",

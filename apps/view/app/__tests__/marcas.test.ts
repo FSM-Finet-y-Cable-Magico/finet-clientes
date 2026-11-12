@@ -26,6 +26,7 @@ describe("marcas", () => {
     expect(cm.razonSocial).toBe("Cable Magico Estelar S.A.");
     expect(cm.rut).toBe("76.620.850-9");
     expect(cm.direccion.calle).toBe("Avenida Peñablanca 525");
+    expect(MARCAS.finet.direccion.calle).toBe("Avenida Santa Rosa 12980");
     expect(cm.direccion.comuna).toBe("Algarrobo");
     expect(cm.telefono.display).toBe("+56 9 3303 1480");
     expect(cm.whatsappUrl).toBe("https://wa.me/56933031480");
