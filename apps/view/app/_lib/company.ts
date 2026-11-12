@@ -34,7 +34,13 @@ export type Marca = {
   /** Nombre comercial. */
   readonly nombre: string;
   readonly razonSocial: string;
+  /**
+   * Se muestra si la empresa lo entregó: ninguna norma que aplique al Portal lo
+   * exige. El DS 6/2021 no, porque aquí no se contrata (art. 3 N° 4).
+   */
   readonly rut: string | null;
+  /** Ley 19.628, art. 14 ter b), según la Ley 21.719: va en la Política de Privacidad. */
+  readonly representanteLegal: string | null;
   readonly logo: {
     readonly webp: string;
     readonly png: string;
@@ -47,9 +53,12 @@ export type Marca = {
   readonly telefono: Telefono;
   readonly whatsappUrl: string;
   readonly instagramUrl: string;
-  /** Contacto general: reclamos, término de contrato, accesos indebidos. */
+  /**
+   * Contacto general: reclamos, término de contrato, accesos indebidos. Si no
+   * lo hay, no se pide: en el DS 194, art. 5, el correo es opcional.
+   */
   readonly correoContacto: string | null;
-  /** Para ejercer los derechos sobre datos personales. */
+  /** Si la empresa lo tiene, se suma al WhatsApp para las solicitudes sobre datos personales. */
   readonly correoPrivacidad: string | null;
   readonly direccion: {
     /** Calle y número del domicilio legal. */
@@ -98,6 +107,7 @@ export const MARCAS = {
     nombre: "Finet",
     razonSocial: "Fibernet Limitada",
     rut: null,
+    representanteLegal: null,
     logo: {
       webp: "/brand/FinetLogo.webp",
       png: "/brand/FinetLogo.png",
@@ -134,6 +144,7 @@ export const MARCAS = {
     nombre: "Cable Mágico",
     razonSocial: "Cable Magico Estelar S.A.",
     rut: "76.620.850-9",
+    representanteLegal: null,
     logo: {
       webp: "/brand/CableMagicoLogo.webp",
       png: "/brand/CableMagicoLogo.png",
