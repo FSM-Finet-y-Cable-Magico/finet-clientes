@@ -15,6 +15,8 @@ const DTO_VALIDO: ContratacionDto = {
   id_plan: 1,
   direccion_completa: 'Av. Siempre Viva 742',
   comuna: 'Providencia',
+  region: 'Metropolitana de Santiago',
+  origen_contacto: 'Formulario web',
   ciudad: 'Santiago',
   acepta_politica_privacidad: true,
   version_politica_privacidad: '1.1',
@@ -82,6 +84,23 @@ describe('ContratacionesController', () => {
       expect(result.success).toBe(false);
     });
 
+    // Formato del prospecto de G8 (12-11): región y origen de contacto.
+    it('rechaza un envío sin región', () => {
+      const result = ContratacionDto.safeParse({
+        ...DTO_VALIDO,
+        region: undefined,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rechaza un envío sin origen de contacto', () => {
+      const result = ContratacionDto.safeParse({
+        ...DTO_VALIDO,
+        origen_contacto: undefined,
+      });
+      expect(result.success).toBe(false);
+    });
+
     it('rechaza nombre_completo vacío', () => {
       const result = ContratacionDto.safeParse({
         ...DTO_VALIDO,
@@ -106,6 +125,8 @@ describe('ContratacionesController', () => {
         id_plan: 1,
         direccion_completa: 'Av. Siempre Viva 742',
         comuna: 'Providencia',
+        region: 'Metropolitana de Santiago',
+        origen_contacto: 'Formulario web',
         acepta_politica_privacidad: true,
         version_politica_privacidad: '1.1',
       });
@@ -121,6 +142,8 @@ describe('ContratacionesController', () => {
         id_plan: 1,
         direccion_completa: 'Av. Siempre Viva 742',
         comuna: 'Providencia',
+        region: 'Metropolitana de Santiago',
+        origen_contacto: 'Formulario web',
         ciudad: null,
         acepta_politica_privacidad: true,
         version_politica_privacidad: '1.1',

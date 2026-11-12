@@ -552,6 +552,7 @@ model prospecto {
   direccion              String?      @db.VarChar(200)
   comuna                 String?      @db.VarChar(80)
   region                 String?      @db.VarChar(80)
+  origen_contacto        String?      @db.VarChar(40)
   id_plan_interes        Int?
   estado_pipeline        String?      @db.VarChar(30)
   motivo_perdida         String?      @db.VarChar(30)
