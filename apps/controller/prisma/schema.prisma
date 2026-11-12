@@ -482,9 +482,11 @@ model pago {
   monto               Decimal  @db.Decimal(10, 2)
   fecha_pago          DateTime @db.Timestamp(6)
   codigo_transaccion  String?  @unique @db.VarChar(100)
+  codigo_autorizacion String?  @db.VarChar(100)
   pasarela            String   @db.VarChar(30)
   token_transaccional String?  @db.VarChar(200)
   comprobante_pdf_url String?
+  comprobante_estado  String   @default("PENDIENTE") @db.VarChar(20)
   cliente             cliente? @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_pago_id_cliente")
   factura             factura? @relation(fields: [id_factura], references: [id_factura], onDelete: NoAction, onUpdate: NoAction, map: "fk_pago_id_factura")
 }
