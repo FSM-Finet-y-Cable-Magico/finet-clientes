@@ -151,6 +151,41 @@ describe("CU-73: Politica de Privacidad", () => {
   });
 });
 
+/** Ley 19.628, art. 14 ter (Ley 21.719, desde el 1-12-2026): lo que se informa. */
+describe("CU-73: Politica de Privacidad con respaldo normativo", () => {
+  it("identifica al responsable con su representante legal (letra b)", async () => {
+    render(await PrivacidadPage(conMarca("finet")));
+    const tabla = screen.getByRole("table", { name: "Responsable del tratamiento de datos" });
+
+    expect(within(tabla).getByRole("rowheader", { name: "Representante legal" })).toBeInTheDocument();
+  });
+
+  it("nombra a los proveedores reales: Transbank, y ya no Railway (letra d)", async () => {
+    const { container } = render(await PrivacidadPage(conMarca("finet")));
+
+    expect(container.textContent).toContain("Transbank (Webpay)");
+    expect(container.textContent).not.toContain("Railway");
+  });
+
+  it("informa las transferencias internacionales (letra h)", async () => {
+    const { container } = render(await PrivacidadPage(conMarca("finet")));
+
+    expect(
+      within(container.querySelector<HTMLElement>("section#transferencias")!).getByRole("heading", {
+        name: /Transferencias internacionales/,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("el plazo de respuesta es el de la ley: hoy y desde la Ley 21.719", async () => {
+    const { container } = render(await PrivacidadPage(conMarca("finet")));
+    const seccion = container.querySelector<HTMLElement>("section#derechos")!;
+
+    expect(seccion).toHaveTextContent(/2 días hábiles/);
+    expect(seccion).toHaveTextContent(/30 días corridos/);
+  });
+});
+
 describe("CU-73: datos pendientes", () => {
   it("muestra el dato cuando ya esta", () => {
     render(<p><Dato valor="76.123.456-7" /></p>);

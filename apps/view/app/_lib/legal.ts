@@ -17,7 +17,7 @@ export const LEGAL_ACTUALIZACION = "12 de noviembre de 2026";
  * Versión publicada en /privacidad. Viaja con cada aceptación (CU-75), así
  * que al cambiar el texto de la política hay que subirla.
  */
-export const POLITICA_PRIVACIDAD_VERSION = "1.1";
+export const POLITICA_PRIVACIDAD_VERSION = "1.2";
 
 /** CU-75, Excepción 1. El backend responde lo mismo si llega sin marcar. */
 export const MENSAJE_POLITICA_REQUERIDA =
@@ -65,7 +65,25 @@ export type DatosLegales = {
   readonly llamadasAbandonadas: Dato;
   /** Art. 33: la dirección del informativo de derechos que entrega Subtel. */
   readonly informativoSubtel: Dato;
+
+  // Privacidad: Ley 19.628, art. 14 ter, según la Ley 21.719 (desde el 1-12-2026).
+  /** Letra d), los destinatarios: dónde se aloja el Portal en producción. */
+  readonly alojamiento: Dato;
+  /** Letra d): el servicio que envía los correos del Portal. */
+  readonly servicioCorreo: Dato;
+  /** Letra d): el proveedor de boletas y facturas electrónicas, si lo usan. */
+  readonly facturacionElectronica: Dato;
+  /** Letra h): los proveedores que guardan datos fuera de Chile, el país y sus garantías. */
+  readonly transferenciasInternacionales: Dato;
+  /** Letra i): los plazos de conservación que define la empresa. */
+  readonly conservacionRegistrosRed: Dato;
+  readonly conservacionAccesosPortal: Dato;
+  readonly conservacionTickets: Dato;
+  readonly conservacionSolicitudes: Dato;
 };
+
+/** Privacidad, letra d): la pasarela del Portal (CU-42) es la misma para las dos. */
+export const PASARELA_PAGO = "Transbank (Webpay)";
 
 const SIN_DATOS: DatosLegales = {
   velocidadGarantizada: null,
@@ -87,6 +105,14 @@ const SIN_DATOS: DatosLegales = {
   tiempoEspera: null,
   llamadasAbandonadas: null,
   informativoSubtel: null,
+  alojamiento: null,
+  servicioCorreo: null,
+  facturacionElectronica: null,
+  transferenciasInternacionales: null,
+  conservacionRegistrosRed: null,
+  conservacionAccesosPortal: null,
+  conservacionTickets: null,
+  conservacionSolicitudes: null,
 };
 
 /**
@@ -101,21 +127,3 @@ const LEGALES: Record<SlugMarca, DatosLegales> = {
 export function legalesDe(marca: Marca): DatosLegales {
   return esSlugMarca(marca.slug) ? LEGALES[marca.slug] : SIN_DATOS;
 }
-
-/** Privacidad §3, §7 y §9: proveedores que tratan datos por cuenta de Finet. */
-export const PROVEEDORES = {
-  pasarelaPago: null,
-  facturacionElectronica: null,
-  correo: null,
-  /** Región de Railway donde se aloja la base de datos. */
-  regionAlojamiento: null,
-} satisfies Record<string, Dato>;
-
-/** Privacidad §6 y §12: plazos que define administración. */
-export const PLAZOS_DATOS = {
-  registrosTecnicosRed: null,
-  logsPortal: null,
-  tickets: null,
-  solicitudesSinContrato: null,
-  respuestaDerechos: null,
-} satisfies Record<string, Dato>;

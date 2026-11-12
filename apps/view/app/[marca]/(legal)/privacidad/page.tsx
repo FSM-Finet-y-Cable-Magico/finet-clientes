@@ -6,9 +6,9 @@ import { Correo, Dato } from "../../../_components/legal/Pendiente";
 import TablaLegal from "../../../_components/legal/TablaLegal";
 import {
   LEGAL_ACTUALIZACION,
-  PLAZOS_DATOS,
+  legalesDe,
+  PASARELA_PAGO,
   POLITICA_PRIVACIDAD_VERSION,
-  PROVEEDORES,
 } from "../../../_lib/legal";
 import { metadataSeccion } from "../../../_lib/seo";
 import { marcaPorSlug, type Marca } from "../../../_lib/company";
@@ -38,6 +38,7 @@ export async function generateMetadata({
 
 /** Las secciones con los datos de la empresa del sitio. */
 function seccionesDe(marca: Marca): SeccionLegal[] {
+  const legal = legalesDe(marca);
   const domicilio = (
     <>
       <Dato valor={marca.direccion.calle} />, {marca.direccion.comuna},{" "}
@@ -56,6 +57,7 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
           filas={[
             ["Responsable del tratamiento", marca.razonSocial],
             ["RUT", <Dato key="rut" valor={marca.rut} />],
+            ["Representante legal", <Dato key="representante" valor={marca.representanteLegal} />],
             ["Domicilio", domicilio],
             ["Contacto de privacidad", <Correo key="correo" valor={marca.correoPrivacidad} />],
           ]}
@@ -92,7 +94,7 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             <strong>Facturación y pago:</strong> número de cliente, plan, montos,
             estado de pago y documentos emitidos.{" "}
             <strong>No almacenamos números de tarjeta ni claves</strong>; los
-            pagos los procesa <Dato valor={PROVEEDORES.pasarelaPago} />.
+            pagos los procesa {PASARELA_PAGO}.
           </p>
           <p>
             <strong>Técnicos y de red:</strong> identificador del equipo
@@ -215,12 +217,12 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
                 "Registro de IP de conexiones",
                 "No menos de 1 año (art. 222 CPP); destrucción segura vencido el plazo",
               ],
-              ["Registros técnicos de red", <Dato key="red" valor={PLAZOS_DATOS.registrosTecnicosRed} />],
-              ["Registros de acceso al Portal", <Dato key="portal" valor={PLAZOS_DATOS.logsPortal} />],
-              ["Tickets y soporte", <Dato key="tickets" valor={PLAZOS_DATOS.tickets} />],
+              ["Registros técnicos de red", <Dato key="red" valor={legal.conservacionRegistrosRed} />],
+              ["Registros de acceso al Portal", <Dato key="portal" valor={legal.conservacionAccesosPortal} />],
+              ["Tickets y soporte", <Dato key="tickets" valor={legal.conservacionTickets} />],
               [
                 "Solicitudes sin contrato celebrado",
-                <Dato key="solicitudes" valor={PLAZOS_DATOS.solicitudesSinContrato} />,
+                <Dato key="solicitudes" valor={legal.conservacionSolicitudes} />,
               ],
               ["Contacto para fines comerciales", "Hasta que revoques tu consentimiento"],
             ]}
@@ -246,14 +248,14 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             titulo="Proveedores que tratan datos por cuenta nuestra"
             columnas={["Proveedor", "Servicio"]}
             filas={[
-              ["Railway", "Alojamiento de la base de datos"],
+              [<Dato key="alojamiento" valor={legal.alojamiento} />, "Alojamiento del Portal y de sus bases de datos"],
               ["SmartOLT", "Monitoreo y gestión de los equipos de fibra"],
-              [<Dato key="pasarela" valor={PROVEEDORES.pasarelaPago} />, "Procesamiento de pagos"],
+              [PASARELA_PAGO, "Procesamiento de pagos"],
               [
-                <Dato key="facturacion" valor={PROVEEDORES.facturacionElectronica} />,
+                <Dato key="facturacion" valor={legal.facturacionElectronica} />,
                 "Emisión de boletas y facturas",
               ],
-              [<Dato key="correo" valor={PROVEEDORES.correo} />, "Avisos y notificaciones por correo"],
+              [<Dato key="correo" valor={legal.servicioCorreo} />, "Avisos y notificaciones por correo"],
             ]}
           />
           <p>
@@ -300,14 +302,14 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
       ),
     },
     {
-      id: "alojamiento",
-      titulo: "Dónde se alojan",
+      id: "transferencias",
+      titulo: "Transferencias internacionales",
       contenido: (
         <p>
-          Algunos proveedores alojan datos fuera de Chile (
-          <Dato valor={PROVEEDORES.regionAlojamiento} />), exigiéndoles
-          contractualmente estándares de seguridad equivalentes a los de la
-          legislación chilena.
+          Proveedores que guardan datos fuera de Chile, con el país, si ofrece
+          un nivel adecuado de protección y, si no, las garantías de la
+          transferencia (Ley N° 19.628, art. 14 ter letra h, según la Ley N°
+          21.719): <Dato valor={legal.transferenciasInternacionales} />.
         </p>
       ),
     },
@@ -363,8 +365,10 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             <strong>Cómo:</strong> escribe a <Correo valor={marca.correoPrivacidad} />{" "}
             desde el correo registrado en tu cuenta, indicando nombre, RUT y el
             derecho que quieres ejercer. Podemos pedirte antecedentes para
-            verificar tu identidad. Respondemos en un máximo de{" "}
-            <Dato valor={PLAZOS_DATOS.respuestaDerechos} />.
+            verificar tu identidad. Respondemos dentro de 2 días hábiles (Ley N°
+            19.628, art. 16) y, desde el 1 de diciembre de 2026, dentro de 30
+            días corridos, prorrogables por una vez por otros 30 (art. 11,
+            según la Ley N° 21.719).
           </p>
           <p>
             Límites: no podemos eliminar datos que la ley nos obliga a conservar
