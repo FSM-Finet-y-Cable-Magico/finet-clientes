@@ -5,8 +5,8 @@
  * dos y cada fila dice de qué empresa es, como lo hace G8.
  *
  * Única fuente del backend para lo que cambia entre empresas: nombre visible,
- * región del prospecto y dónde vive su sitio. Lo visual del correo vive en
- * `mail/`.
+ * datos legales, región del prospecto y dónde vive su sitio. Lo visual del
+ * correo vive en `mail/`.
  */
 
 export type Empresa = {
@@ -19,6 +19,16 @@ export type Empresa = {
   readonly prefijoWeb: string;
   /** La variable del .env con la URL de su propio host, si llega a tenerlo. */
   readonly variableSitio?: string;
+  /**
+   * Los "datos de la empresa" del comprobante de pago (CU-52, RF-38), los que
+   * entregó cada una; los mismos de `apps/view/app/_lib/company.ts`. En la base
+   * compartida, `empresa.rut_empresa` está vacío en las dos.
+   */
+  readonly razonSocial: string;
+  readonly rut: string | null;
+  readonly direccion: string;
+  readonly telefono: string;
+  readonly correo: string | null;
 };
 
 export const EMPRESAS = {
@@ -27,6 +37,11 @@ export const EMPRESAS = {
     nombre: 'Finet',
     region: 'Metropolitana de Santiago',
     prefijoWeb: '',
+    razonSocial: 'Fibernet Limitada',
+    rut: null,
+    direccion: 'Avenida Santa Rosa 12980, La Pintana',
+    telefono: '+56 9 4500 2319',
+    correo: null,
   },
   2: {
     idEmpresa: 2,
@@ -34,6 +49,12 @@ export const EMPRESAS = {
     region: 'Valparaíso',
     prefijoWeb: '/cable-magico',
     variableSitio: 'FRONTEND_URL_CABLE_MAGICO',
+    // Datos que entregó Cable Mágico el 11-11.
+    razonSocial: 'Cable Magico Estelar S.A.',
+    rut: '76.620.850-9',
+    direccion: 'Avenida Peñablanca 525, Algarrobo',
+    telefono: '+56 9 3303 1480',
+    correo: 'pagos@cablemagico.cl',
   },
 } as const satisfies Record<number, Empresa>;
 
