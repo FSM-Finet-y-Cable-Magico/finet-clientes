@@ -76,6 +76,21 @@ describe('PerfilService', () => {
       expect(result.fecha_creacion).toBe('2024-01-01T00:00:00.000Z');
     });
 
+    it('trae la empresa del cliente: la vista se arma con la marca de su empresa', async () => {
+      (prisma.cliente.findUnique as jest.Mock).mockResolvedValue({
+        ...CLIENTE_DB_MOCK,
+        id_empresa: 2,
+      });
+
+      const result = await service.getPerfil(1);
+
+      expect(result.id_empresa).toBe(2);
+      expect(prisma.cliente.findUnique).toHaveBeenCalledWith({
+        where: { id_cliente: 1 },
+        select: expect.objectContaining({ id_empresa: true }),
+      });
+    });
+
     it('CU-07: lanza NotFoundException si el cliente no existe', async () => {
       (prisma.cliente.findUnique as jest.Mock).mockResolvedValue(null);
 

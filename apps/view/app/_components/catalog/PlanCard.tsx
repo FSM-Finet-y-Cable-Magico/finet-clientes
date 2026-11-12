@@ -1,13 +1,16 @@
 import type { PlanBackend } from "../../_lib/api";
 import { formatPrecio } from "../../_lib/formato";
 import PrimaryButton from "../ui/PrimaryButton";
+import { rutaMarca, type Marca } from "../../_lib/company";
 
 type PlanCardProps = {
   plan: PlanBackend;
+  /** La empresa del sitio: su soporte local y su contratación. */
+  marca: Marca;
   featured?: boolean;
 };
 
-function buildFeatures(plan: PlanBackend): string[] {
+function buildFeatures(plan: PlanBackend, marca: Marca): string[] {
   const features: string[] = [];
   if (plan.velocidad_mbps) {
     features.push(
@@ -18,12 +21,12 @@ function buildFeatures(plan: PlanBackend): string[] {
   }
   features.push("Instalacion incluida");
   features.push("Datos ilimitados");
-  features.push("Soporte local en La Pintana");
+  features.push(`Soporte local en ${marca.comunaSoporte}`);
   return features;
 }
 
-export default function PlanCard({ plan, featured }: PlanCardProps) {
-  const features = buildFeatures(plan);
+export default function PlanCard({ plan, marca, featured }: PlanCardProps) {
+  const features = buildFeatures(plan, marca);
 
   return (
     <article
@@ -72,7 +75,7 @@ export default function PlanCard({ plan, featured }: PlanCardProps) {
       </ul>
       <div className="mt-6">
         <PrimaryButton
-          href={`/contratar/${plan.id_plan}`}
+          href={rutaMarca(marca, `/contratar/${plan.id_plan}`)}
           variant="conversion"
           className="w-full"
         >

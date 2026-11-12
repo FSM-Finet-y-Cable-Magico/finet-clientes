@@ -36,13 +36,19 @@ describe('LandingController', () => {
     it('llama al service sin argumentos cuando no hay query param', async () => {
       const query = ConsultaPlanesDto.parse({});
       await controller.getPlanes(query);
-      expect(service.getPlanes).toHaveBeenCalledWith(undefined);
+      expect(service.getPlanes).toHaveBeenCalledWith(undefined, undefined);
     });
 
     it('pasa tipo_cliente al service cuando se envia query param', async () => {
       const query = ConsultaPlanesDto.parse({ tipo_cliente: 'residencial' });
       await controller.getPlanes(query);
-      expect(service.getPlanes).toHaveBeenCalledWith('residencial');
+      expect(service.getPlanes).toHaveBeenCalledWith('residencial', undefined);
+    });
+
+    it('pasa la empresa al service: cada sitio pide sus planes (Finet o Cable Mágico)', async () => {
+      const query = ConsultaPlanesDto.parse({ id_empresa: '2' });
+      await controller.getPlanes(query);
+      expect(service.getPlanes).toHaveBeenCalledWith(undefined, 2);
     });
   });
 
@@ -52,6 +58,22 @@ describe('LandingController', () => {
         tipo_cliente: 'a'.repeat(21),
       });
       expect(result.success).toBe(false);
+    });
+
+    it('id_empresa llega como texto en la URL y se convierte a número', () => {
+      expect(ConsultaPlanesDto.parse({ id_empresa: '1' }).id_empresa).toBe(1);
+    });
+
+    it('rechaza una empresa que no existe o que no es un número', () => {
+      expect(ConsultaPlanesDto.safeParse({ id_empresa: '3' }).success).toBe(
+        false,
+      );
+      expect(ConsultaPlanesDto.safeParse({ id_empresa: 'abc' }).success).toBe(
+        false,
+      );
+      expect(ConsultaPlanesDto.safeParse({ id_empresa: '1.5' }).success).toBe(
+        false,
+      );
     });
 
     it('acepta sin tipo_cliente (es opcional)', () => {

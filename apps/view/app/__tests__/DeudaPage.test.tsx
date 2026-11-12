@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
-import DeudaPage from '@/app/portal/deuda/page';
+import DeudaPage from '@/app/[marca]/portal/deuda/page';
 
 // Las fechas de calendario (@db.Date) llegan como medianoche UTC. Con la hora de
 // Chile, si no se formatean en UTC, se ven un día antes: se fija para que el test

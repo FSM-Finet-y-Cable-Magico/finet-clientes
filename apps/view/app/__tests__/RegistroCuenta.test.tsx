@@ -13,11 +13,11 @@ jest.mock("@/app/_lib/auth", () => ({ useAuth: () => ({ ...sesion, login }) }));
 jest.mock("@/app/utils/api", () => ({ api: { post: jest.fn() } }));
 
 import { api } from "@/app/utils/api";
-import { WHATSAPP_URL } from "@/app/_lib/company";
+import { MARCAS } from "@/app/_lib/company";
 import RegistroForm from "@/app/components/RegistroForm";
 import ConfirmarRegistroForm from "@/app/components/ConfirmarRegistroForm";
-import ConfirmarRegistroPage from "@/app/registro/confirmar/page";
-import InicioSesionPage from "@/app/inicio-sesion/page";
+import ConfirmarRegistroPage from "@/app/[marca]/registro/confirmar/page";
+import InicioSesionPage from "@/app/[marca]/inicio-sesion/page";
 
 // CU-04 sobre un cliente que G8 ya creó: se pide el RUT, se manda un enlace al
 // correo registrado y con él se crea la contraseña y se abre la sesión.
@@ -77,7 +77,7 @@ describe("CU-04: el RUT (paso 1)", () => {
 
     expect(await screen.findByText("No podemos crear tu cuenta en línea")).toBeInTheDocument();
     const whatsapp = screen.getByRole("link", { name: /Escribir por WhatsApp/ });
-    expect(whatsapp).toHaveAttribute("href", WHATSAPP_URL);
+    expect(whatsapp).toHaveAttribute("href", MARCAS.finet.whatsappUrl);
     expect(whatsapp).toHaveAttribute("target", "_blank");
     expect(whatsapp).toHaveAttribute("rel", "noopener noreferrer");
   });

@@ -142,8 +142,8 @@ todavía, no que no exista.
 > una por una, está en `CAMBIOS-BD-Y-SOLICITUDES.md`, enviado a G8 el 12-09-2026.
 
 > **Datos del bloque Mapa:** la capa de calor se genera desde el KML de planta externa que
-> entrega Finet (NAPs, MUFAs y trazado de fibra de la red FTTH) y vive como archivo estático
-> en el backend. Los cuatro CU son de lectura, así que el bloque no necesita administración:
+> entrega cada empresa (Finet: NAPs, MUFAs y trazado de fibra de la red FTTH; Cable Mágico:
+> cajas y empalmes de Tomodat) y vive como un archivo estático por empresa en el backend. Los cuatro CU son de lectura, así que el bloque no necesita administración:
 > el editor y las tablas que lo sostenían se eliminaron. Actualizar la cobertura significa
 > regenerar el archivo con un KML nuevo y desplegar.
 > Ver [`apps/controller/docs/cobertura.md`](../apps/controller/docs/cobertura.md).

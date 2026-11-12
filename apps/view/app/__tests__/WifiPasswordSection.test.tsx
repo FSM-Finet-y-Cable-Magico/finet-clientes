@@ -4,9 +4,9 @@ import userEvent from "@testing-library/user-event";
 import WifiPasswordSection, {
   type ContratoWifi,
 } from "@/app/_components/portal/WifiPasswordSection";
-import { changeWifiPassword } from "@/app/portal/_lib/portal-actions";
+import { changeWifiPassword } from "@/app/[marca]/portal/_lib/portal-actions";
 
-jest.mock("@/app/portal/_lib/portal-actions", () => ({
+jest.mock("@/app/[marca]/portal/_lib/portal-actions", () => ({
   changeWifiPassword: jest.fn(),
 }));
 

@@ -15,8 +15,12 @@ import RutInput from "./RutInput";
 import PasswordInput from "./PasswordInput";
 import { MensajeError } from "./MensajesFormulario";
 import { erroresPorCampo, validarCampo } from "../utils/errores-formulario";
+import { useMarca } from "../_lib/marca";
+import { rutaMarca } from "../_lib/company";
+import { destinoInterno } from "../_lib/enrutar-marca";
 
 export default function LoginForm() {
+  const marca = useMarca();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
@@ -58,7 +62,8 @@ export default function LoginForm() {
         { rut: cleanRut(result.data.rut), password: result.data.password }
       );
       login(data.cliente);
-      router.push(redirect ?? "/portal");
+      // Solo a una página del portal; por defecto, el de su empresa.
+      router.push(destinoInterno(redirect, rutaMarca(marca, "/portal")));
     } catch (err) {
       const error = err as ApiError;
       securityLogger.loginFailed(result.data.rut, error.message ?? "Error desconocido");
@@ -129,9 +134,12 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-xs text-muted">
         Al ingresar aceptas nuestros{" "}
-        <a href="/terminos" className="text-primary underline hover:opacity-80">
+        <Link
+          href={rutaMarca(marca, "/terminos")}
+          className="text-primary underline hover:opacity-80"
+        >
           Términos y Condiciones
-        </a>
+        </Link>
       </p>
     </div>
   );

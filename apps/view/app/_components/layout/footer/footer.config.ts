@@ -1,4 +1,4 @@
-import { WHATSAPP_URL } from '../../../_lib/company';
+import type { Marca } from '../../../_lib/company';
 
 export type FooterLink = {
   label: string;
@@ -8,7 +8,8 @@ export type FooterLink = {
 };
 export type FooterColumn = { title: string; links: FooterLink[] };
 
-export const footerColumns: FooterColumn[] = [
+/** Las columnas del pie del sitio de una empresa: el WhatsApp es el suyo. */
+export const columnasDelPie = (marca: Marca): FooterColumn[] => [
   {
     title: 'Acciones',
     links: [
@@ -21,7 +22,7 @@ export const footerColumns: FooterColumn[] = [
   {
     title: 'Te ayudamos',
     links: [
-      { label: 'WhatsApp', href: WHATSAPP_URL, icon: 'whatsapp' },
+      { label: 'WhatsApp', href: marca.whatsappUrl, icon: 'whatsapp' },
       { label: 'Preguntas Frecuentes', href: '/ayuda' },
     ],
   },

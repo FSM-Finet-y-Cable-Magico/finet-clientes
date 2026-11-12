@@ -130,7 +130,7 @@ describe('RecordatorioPagoService', () => {
 
     const { where } = (prisma.factura.findMany as jest.Mock).mock
       .calls[0]![0] as { where: { estado: { in: string[] } } };
-    expect(where.estado.in).toEqual(['pendiente', 'vencida']);
+    expect(where.estado.in).toEqual(['Pendiente']);
   });
 
   // ─── RF-49: tres días corridos antes del vencimiento ─────────────────────

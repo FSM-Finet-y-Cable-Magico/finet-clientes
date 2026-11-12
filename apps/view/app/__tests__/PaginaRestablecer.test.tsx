@@ -6,7 +6,7 @@ jest.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 let sesion = { isAuthenticated: false, isLoading: false };
 jest.mock("@/app/_lib/auth", () => ({ useAuth: () => sesion }));
 
-import RestablecerPasswordPage from "@/app/restablecer-password/page";
+import RestablecerPasswordPage from "@/app/[marca]/restablecer-password/page";
 
 // Fija lo que muestra /restablecer-password (CU-03) con y sin el token del
 // enlace, para que la lectura del token y el aviso de enlace inválido se

@@ -71,6 +71,7 @@ export class AsistenteService {
           content: dto.mensaje,
           ...(accessToken ? { accessToken } : {}),
           ...(ip ? { clientIp: ip } : {}),
+          ...(dto.id_empresa ? { companyId: dto.id_empresa } : {}),
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });

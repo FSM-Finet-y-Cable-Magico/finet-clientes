@@ -5,7 +5,8 @@ import {
   MapPin,
   User,
 } from 'lucide-react';
-import { footerColumns } from './footer.config';
+import { columnasDelPie } from './footer.config';
+import { hrefMarca, type Marca } from '../../../_lib/company';
 
 const iconMap: Record<string, React.ReactNode> = {
   'credit-card': <CreditCard size={14} aria-hidden />,
@@ -14,11 +15,11 @@ const iconMap: Record<string, React.ReactNode> = {
   'user': <User size={14} aria-hidden />,
 };
 
-export default function FooterNav() {
+export default function FooterNav({ marca }: { marca: Marca }) {
   return (
     <nav aria-label="Navegación del pie de página">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-        {footerColumns.map((col) => (
+        {columnasDelPie(marca).map((col) => (
           <div key={col.title}>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-foreground">
               {col.title}
@@ -42,14 +43,14 @@ export default function FooterNav() {
                       </a>
                     ) : isButton ? (
                       <Link
-                        href={link.href}
+                        href={hrefMarca(marca, link.href)}
                         className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-white hover:opacity-90 transition-opacity"
                       >
                         {link.label}
                       </Link>
                     ) : (
                       <Link
-                        href={link.href}
+                        href={hrefMarca(marca, link.href)}
                         {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                         className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
                       >

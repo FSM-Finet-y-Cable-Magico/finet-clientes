@@ -52,6 +52,43 @@ describe('leerSmtpEmpresas', () => {
     ]);
   });
 
+  it('lee el TLS y el timeout de cada cuenta con los mismos nombres que G8', () => {
+    const [finet] = leerSmtpEmpresas(
+      leerDe({
+        ...COMPLETA,
+        SMTP_FINET_SECURE: 'false',
+        SMTP_FINET_STARTTLS: 'true',
+        SMTP_FINET_REJECT_UNAUTHORIZED: 'true',
+        SMTP_FINET_TIMEOUT_MS: '15000',
+      }),
+      jest.fn(),
+    );
+    expect(finet).toMatchObject({
+      secure: false,
+      requireTLS: true,
+      rejectUnauthorized: true,
+      timeoutMs: 15000,
+    });
+  });
+
+  it('sin esas variables queda como antes: TLS según el puerto, certificado verificado y sin timeout propio', () => {
+    const [finet] = leerSmtpEmpresas(leerDe(COMPLETA), jest.fn());
+    expect(finet).toMatchObject({
+      secure: false,
+      requireTLS: false,
+      rejectUnauthorized: true,
+      timeoutMs: null,
+    });
+  });
+
+  it('un timeout que no es un número positivo se ignora', () => {
+    const [finet] = leerSmtpEmpresas(
+      leerDe({ ...COMPLETA, SMTP_FINET_TIMEOUT_MS: 'abc' }),
+      jest.fn(),
+    );
+    expect(finet!.timeoutMs).toBeNull();
+  });
+
   it('un JSON inválido avisa y deja solo la cuenta general', () => {
     const avisar = jest.fn();
     expect(leerSmtpEmpresas(leerDe({ SMTP_COMPANIES: '{no' }), avisar)).toEqual(
@@ -98,6 +135,33 @@ describe('MailService — una cuenta por empresa', () => {
     };
     return { mail, general, finet, cable };
   }
+
+  it('la cuenta de la empresa se conecta con el TLS y el timeout configurados', () => {
+    const mail = new MailService({
+      get: (clave: string) =>
+        ({
+          ...COMPLETA,
+          SMTP_CABLE_MAGICO_STARTTLS: 'true',
+          SMTP_CABLE_MAGICO_TIMEOUT_MS: '15000',
+        })[clave],
+    } as unknown as ConfigService);
+    const opciones = (
+      mail as unknown as {
+        porEmpresa: Map<
+          number,
+          { transporter: { transporter: { options: Record<string, unknown> } } }
+        >;
+      }
+    ).porEmpresa.get(2)!.transporter.transporter.options;
+
+    expect(opciones).toMatchObject({
+      secure: false,
+      requireTLS: true,
+      tls: { rejectUnauthorized: true },
+      connectionTimeout: 15000,
+      socketTimeout: 15000,
+    });
+  });
 
   it('el cliente de Cable Mágico recibe desde la cuenta de Cable Mágico', async () => {
     const { mail, general, finet, cable } = servicio();

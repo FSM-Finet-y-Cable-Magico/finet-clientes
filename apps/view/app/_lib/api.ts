@@ -6,6 +6,8 @@ import { apiUrl } from "./api-servidor";
 
 export type PlanBackend = {
   id_plan: number;
+  /** De qué empresa es (1 Finet, 2 Cable Mágico). Opcional en los datos de prueba. */
+  id_empresa?: number | null;
   nombre_comercial: string;
   tipo_plan: string;
   tipo_cliente: string;
@@ -34,11 +36,16 @@ export function idPlanDestacado(ordenados: PlanBackend[]): number | null {
  * "backend caido" con "catalogo vacio", como el sitemap (CU-74).
  */
 export async function fetchLandingPlanes(
-  tipoCliente?: string
+  tipoCliente?: string,
+  idEmpresa?: number
 ): Promise<PlanBackend[]> {
   const url = new URL(apiUrl("/landing/planes"));
   if (tipoCliente) {
     url.searchParams.set("tipo_cliente", tipoCliente);
+  }
+  // Cada sitio (Finet o Cable Mágico) muestra solo sus planes.
+  if (idEmpresa) {
+    url.searchParams.set("id_empresa", String(idEmpresa));
   }
 
   const res = await fetch(url.toString(), { next: { revalidate: 300 } });
@@ -52,10 +59,11 @@ export async function fetchLandingPlanes(
 }
 
 export async function getLandingPlanes(
-  tipoCliente?: string
+  tipoCliente?: string,
+  idEmpresa?: number
 ): Promise<PlanBackend[]> {
   try {
-    return await fetchLandingPlanes(tipoCliente);
+    return await fetchLandingPlanes(tipoCliente, idEmpresa);
   } catch (error) {
     console.error(
       `Backend no disponible (${error instanceof Error ? error.message : error}). Mostrando catalogo vacio.`
@@ -102,14 +110,23 @@ export type VisorCoberturaConfig = {
  */
 const COBERTURA_REVALIDATE = 86400;
 
+/** Cada sitio (Finet o Cable Mágico) pide el visor y la capa de su red. */
+function urlCobertura(ruta: string, idEmpresa?: number): string {
+  const url = new URL(apiUrl(ruta));
+  if (idEmpresa) url.searchParams.set("id_empresa", String(idEmpresa));
+  return url.toString();
+}
+
 /**
  * CU-59: encuadre y limites del visor.
  * Excepcion 2 del CU: si el backend no responde devolvemos `null` y la
  * pagina informa que el visor no esta disponible temporalmente.
  */
-export async function getVisorCoberturaConfig(): Promise<VisorCoberturaConfig | null> {
+export async function getVisorCoberturaConfig(
+  idEmpresa?: number
+): Promise<VisorCoberturaConfig | null> {
   try {
-    const res = await fetch(apiUrl("/cobertura/config"), {
+    const res = await fetch(urlCobertura("/cobertura/config", idEmpresa), {
       next: { revalidate: COBERTURA_REVALIDATE },
     });
 
@@ -131,16 +148,13 @@ export async function getVisorCoberturaConfig(): Promise<VisorCoberturaConfig | 
  * por eso el fallback es una lista vacia y no un error.
  */
 export async function getPuntosCobertura(
-  tipoCobertura?: string
+  idEmpresa?: number
 ): Promise<PuntoCobertura[]> {
   try {
-    const url = new URL(apiUrl("/cobertura/puntos"));
-    if (tipoCobertura) {
-      url.searchParams.set("tipo_cobertura", tipoCobertura);
-    }
-
     // El CRM puede publicar sin pasar por Next. Cada consulta lee la ultima version.
-    const res = await fetch(url.toString(), { cache: "no-store" });
+    const res = await fetch(urlCobertura("/cobertura/puntos", idEmpresa), {
+      cache: "no-store",
+    });
 
     if (!res.ok) {
       console.error(`Error al obtener puntos de cobertura: ${res.status}`);

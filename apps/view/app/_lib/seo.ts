@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { formatPrecio } from "./formato";
 import type { PlanBackend } from "./api";
-import { COMPANY_BRAND } from "./company";
+import { MARCA_POR_DEFECTO, rutaMarca, type Marca } from "./company";
 import { esIndexable } from "./rutas-publicas";
 
 /**
@@ -14,35 +14,47 @@ import { esIndexable } from "./rutas-publicas";
  * en vez de heredar pedazos del layout.
  */
 
-/** Excepcion 1 del CU: valores genericos del sitio cuando la seccion o el plan no traen los suyos. */
-export const SEO_DEFAULTS = {
-  title: "Finet — Internet Fibra Optica y TV Digital | La Pintana, Puente Alto",
-  shareTitle: "Finet — Internet Fibra Optica y TV Digital",
-  // Sin cifras de planes: el valor por defecto no se regenera con el catalogo.
-  description:
-    "Internet de fibra optica simetrica de alta velocidad. Planes hogar y empresa en La Pintana, Puente Alto, La Florida y La Granja. Contrata en linea.",
-} as const;
+/**
+ * Excepcion 1 del CU: valores genericos del sitio de cada empresa cuando la
+ * seccion o el plan no traen los suyos. Sin cifras de planes: el valor por
+ * defecto no se regenera con el catalogo.
+ */
+export function seoDe(marca: Marca) {
+  return {
+    title: `${marca.nombre} — Internet Fibra Optica y TV Digital | ${marca.comunas.slice(0, 2).join(", ")}`,
+    shareTitle: `${marca.nombre} — Internet Fibra Optica y TV Digital`,
+    description: `Internet de fibra optica simetrica de alta velocidad. Planes hogar y empresa en ${marca.zonaTexto}. Contrata en linea.`,
+  };
+}
 
-/** Sale de `app/opengraph-image.tsx`. */
-export const DEFAULT_SHARE_IMAGE = {
-  url: "/opengraph-image",
-  width: 1200,
-  height: 630,
-  alt: SEO_DEFAULTS.shareTitle,
-};
+/** La imagen para compartir del sitio de cada empresa (`[marca]/opengraph-image`). */
+export function imagenCompartir(marca: Marca) {
+  return {
+    url: rutaMarca(marca, "/opengraph-image"),
+    width: 1200,
+    height: 630,
+    alt: seoDe(marca).shareTitle,
+  };
+}
 
-/** Lo que el layout raiz deja a las rutas que no pasan por este helper. */
-export const BASE_SHARE_METADATA = {
-  openGraph: {
-    type: "website",
-    siteName: COMPANY_BRAND,
-    locale: "es_CL",
-    images: [DEFAULT_SHARE_IMAGE],
-  },
-  // Sin titulo ni descripcion: Next los completa desde `openGraph`, que si
-  // cambia por pagina.
-  twitter: { card: "summary_large_image" },
-} satisfies Pick<Metadata, "openGraph" | "twitter">;
+/** Lo que el layout de cada empresa deja a las rutas que no pasan por este helper. */
+export function metadataCompartir(marca: Marca) {
+  return {
+    openGraph: {
+      type: "website",
+      siteName: marca.nombre,
+      locale: "es_CL",
+      images: [imagenCompartir(marca)],
+    },
+    // Sin titulo ni descripcion: Next los completa desde `openGraph`, que si
+    // cambia por pagina.
+    twitter: { card: "summary_large_image" },
+  } satisfies Pick<Metadata, "openGraph" | "twitter">;
+}
+
+/** Los de Finet, la marca por defecto. */
+export const SEO_DEFAULTS = seoDe(MARCA_POR_DEFECTO);
+export const DEFAULT_SHARE_IMAGE = imagenCompartir(MARCA_POR_DEFECTO);
 
 type SeccionSeo = {
   /** Ruta de la seccion (`/planes`). Es la URL canonica y la que se comparte. */
@@ -61,37 +73,45 @@ function texto(valor: string | null | undefined): string | undefined {
 function construir(
   seccion: SeccionSeo,
   { imagenPropia }: { imagenPropia: boolean },
+  marca: Marca,
 ): Metadata {
+  const seo = seoDe(marca);
   const title = texto(seccion.title);
-  const description = texto(seccion.description) ?? SEO_DEFAULTS.description;
+  const description = texto(seccion.description) ?? seo.description;
+  // La URL de la seccion en el sitio de su empresa.
+  const url = rutaMarca(marca, seccion.path as `/${string}`);
 
-  const { images, ...openGraphBase } = BASE_SHARE_METADATA.openGraph;
+  const { images, ...openGraphBase } = metadataCompartir(marca).openGraph;
 
   return {
-    title: title ?? { absolute: SEO_DEFAULTS.title },
+    title: title ?? { absolute: seo.title },
     description,
     // CU-74: el registro de rutas decide. Una pagina con noindex no declara
     // canonical, que le pediria al buscador indexar esa URL.
     ...(esIndexable(seccion.path)
-      ? { alternates: { canonical: seccion.path } }
+      ? { alternates: { canonical: url } }
       : { robots: { index: false, follow: true } }),
     openGraph: {
       ...openGraphBase,
       // Si la ruta tiene su propia opengraph-image, la clave `images` no puede
       // existir: con ella presente Next descarta la imagen por archivo.
       ...(imagenPropia ? {} : { images }),
-      url: seccion.path,
+      url,
       title:
         texto(seccion.shareTitle) ??
-        (title ? `${title} | ${COMPANY_BRAND}` : SEO_DEFAULTS.shareTitle),
+        (title ? `${title} | ${marca.nombre}` : seo.shareTitle),
       description: texto(seccion.shareDescription) ?? description,
     },
-    twitter: BASE_SHARE_METADATA.twitter,
+    twitter: metadataCompartir(marca).twitter,
   };
 }
 
-export function metadataSeccion(seccion: SeccionSeo): Metadata {
-  return construir(seccion, { imagenPropia: false });
+/** Metadata de una seccion del sitio de una empresa (Finet si no se dice). */
+export function metadataSeccion(
+  seccion: SeccionSeo,
+  marca: Marca = MARCA_POR_DEFECTO,
+): Metadata {
+  return construir(seccion, { imagenPropia: false }, marca);
 }
 
 /**
@@ -117,8 +137,12 @@ export function resumenPlanes(planes: PlanBackend[]) {
  * Metadata de `/contratar/[planId]`. La imagen la genera la
  * `opengraph-image` de esa ruta con los datos del plan.
  */
-export function metadataPlan(plan: PlanBackend | null, path: string): Metadata {
-  if (!plan) return construir({ path }, { imagenPropia: true });
+export function metadataPlan(
+  plan: PlanBackend | null,
+  path: string,
+  marca: Marca = MARCA_POR_DEFECTO,
+): Metadata {
+  if (!plan) return construir({ path }, { imagenPropia: true }, marca);
 
   const precio = `${formatPrecio(plan.precio_mensual)}/mes`;
   const descripcion = texto(plan.descripcion);
@@ -128,10 +152,11 @@ export function metadataPlan(plan: PlanBackend | null, path: string): Metadata {
       path,
       title: `Contratar ${plan.nombre_comercial}`,
       description: descripcion
-        ? `${plan.nombre_comercial}: ${descripcion} por ${precio}. Internet fibra optica en La Pintana y Puente Alto.`
+        ? `${plan.nombre_comercial}: ${descripcion} por ${precio}. Internet fibra optica en ${marca.zonaCorta}.`
         : undefined,
-      shareTitle: `${plan.nombre_comercial} por ${precio} | ${COMPANY_BRAND}`,
+      shareTitle: `${plan.nombre_comercial} por ${precio} | ${marca.nombre}`,
     },
     { imagenPropia: true },
+    marca,
   );
 }

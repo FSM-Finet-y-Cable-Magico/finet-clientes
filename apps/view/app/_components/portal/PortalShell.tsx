@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react";
 import { Menu } from "lucide-react";
 import PortalSidebar from "./PortalSidebar";
+import { useMarca } from "../../_lib/marca";
 
 export default function PortalShell({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const marca = useMarca();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
 
@@ -52,7 +54,7 @@ export default function PortalShell({
             <Menu size={18} />
           </button>
           <span className="text-sm font-medium text-foreground">
-            Portal Cliente
+            Portal Cliente {marca.nombre}
           </span>
         </div>
         <div className="p-4 lg:p-8">{children}</div>

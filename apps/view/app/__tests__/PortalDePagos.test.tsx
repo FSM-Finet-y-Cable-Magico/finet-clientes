@@ -5,8 +5,8 @@ import userEvent from '@testing-library/user-event';
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
-import PortalDePagos from '@/app/pagar/_components/PortalDePagos';
-import { WHATSAPP_URL } from '@/app/_lib/company';
+import PortalDePagos from '@/app/[marca]/pagar/_components/PortalDePagos';
+import { MARCAS } from '@/app/_lib/company';
 
 const MEDIOS = [
   { id: 'webpay', nombre: 'Webpay', descripcion: 'Tarjetas', disponible: true },
@@ -196,7 +196,7 @@ describe('PortalDePagos', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /whatsapp/i })).toHaveAttribute(
       'href',
-      WHATSAPP_URL,
+      MARCAS.finet.whatsappUrl,
     );
     expect(screen.queryByRole('button', { name: /^pagar$/i })).not.toBeInTheDocument();
   });

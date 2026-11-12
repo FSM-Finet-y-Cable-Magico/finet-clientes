@@ -10,11 +10,16 @@
 #   nombres. Ese archivo no se guarda.
 # - No pisa nada: si ya existe un archivo, lo deja como está.
 #
-# PORTAL_URL es adonde entra el navegador (por defecto, el túnel SSH).
+# PORTAL_URL y PORTAL_URL_CABLE_MAGICO son los hosts de cada empresa. Por
+# defecto, finet.localhost y cablemagico.localhost por el mismo túnel SSH: el
+# navegador resuelve solo cualquier *.localhost a la propia máquina. Si
+# PORTAL_URL_CABLE_MAGICO se pasa vacío, Cable Mágico queda en el host de
+# Finet, bajo /cable-magico.
 set -eu
 
 G2_CONFIG="${G2_CONFIG:-/srv/finet/grupo2/config}"
-PORTAL_URL="${PORTAL_URL:-http://localhost:18200}"
+PORTAL_URL="${PORTAL_URL:-http://finet.localhost:18200}"
+PORTAL_URL_CABLE_MAGICO="${PORTAL_URL_CABLE_MAGICO-http://cablemagico.localhost:18200}"
 EXTERNAS="${1:--}"
 
 umask 077
@@ -46,8 +51,9 @@ DATABASE_URL=postgresql://portal:$DB_PASS@db:5432/finet_portal
 JWT_SECRET=$JWT
 SESSION_INACTIVITY_MINUTES=15
 NODE_ENV=production
-CORS_ORIGIN=$PORTAL_URL
+CORS_ORIGIN=$PORTAL_URL${PORTAL_URL_CABLE_MAGICO:+,$PORTAL_URL_CABLE_MAGICO}
 FRONTEND_URL=$PORTAL_URL
+FRONTEND_URL_CABLE_MAGICO=$PORTAL_URL_CABLE_MAGICO
 
 SMTP_HOST=mailpit
 SMTP_PORT=1025
@@ -68,9 +74,12 @@ ENLACE_PAGO_SECRET=$(secreto)
 EOF
 
 cat > "$G2_CONFIG/view.env" <<EOF
-NEXT_PUBLIC_API_URL=$PORTAL_URL/api
+NEXT_PUBLIC_API_URL=/api
 JWT_SECRET=$JWT
 NEXT_PUBLIC_SITE_URL=$PORTAL_URL
+NEXT_PUBLIC_SITE_URL_CABLE_MAGICO=$PORTAL_URL_CABLE_MAGICO
+# El selector Finet / Cable Mágico de la barra: solo para la demostración.
+NEXT_PUBLIC_SELECTOR_EMPRESA=true
 NEXT_PUBLIC_SENTRY_DSN=
 COOKIE_CONSENTIMIENTO_SECRET=$(secreto)
 EOF

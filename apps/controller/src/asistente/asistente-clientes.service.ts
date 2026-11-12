@@ -72,6 +72,7 @@ export class AsistenteClientesService {
       where: { rut: { in: variantesRut(rut) } },
       select: {
         id_cliente: true,
+        id_empresa: true,
         nombre_completo: true,
         contrato: {
           select: {
@@ -100,6 +101,7 @@ export class AsistenteClientesService {
       encontrado: true,
       cliente: {
         nombre_completo: cliente.nombre_completo,
+        id_empresa: cliente.id_empresa,
         planes: conSesion
           ? cliente.contrato.flatMap((contrato) =>
               contrato.plan

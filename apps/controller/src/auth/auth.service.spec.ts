@@ -107,6 +107,33 @@ describe('AuthService', () => {
       expect(result.cliente.rut).toBe('123456785');
     });
 
+    it('el token lleva la empresa del cliente: un token por empresa, como G8 (11-11)', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      porRut.mockResolvedValue({ ...mockCliente, id_empresa: 2 });
+
+      await authService.login('123456785', 'password', '127.0.0.1');
+
+      expect(jwtService.signAsync).toHaveBeenCalledWith({
+        sub: 1,
+        rut: '123456785',
+        type: 'access',
+        id_empresa: 2,
+      });
+    });
+
+    it('la respuesta del login dice de qué empresa es el cliente', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      porRut.mockResolvedValue({ ...mockCliente, id_empresa: 2 });
+
+      const result = await authService.login(
+        '123456785',
+        'password',
+        '127.0.0.1',
+      );
+
+      expect(result.cliente.id_empresa).toBe(2);
+    });
+
     it('encuentra al cliente aunque su RUT esté guardado con guion (G3, 29-09)', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       porRut.mockResolvedValue({ ...mockCliente, rut: '12345678-5' });
@@ -354,6 +381,29 @@ describe('AuthService', () => {
           expect.stringContaining('/registro/confirmar#token=registro-token'),
           2,
         );
+      });
+
+      it('el enlace lleva al sitio de la empresa del cliente', async () => {
+        porRut.mockResolvedValue({ ...sinCuenta, id_empresa: 2 });
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
+
+        await authService.solicitarRegistro('123456785');
+
+        const enlace = correo().sendRegistroCuenta.mock.calls[0][2] as string;
+        expect(enlace).toMatch(
+          /\/cable-magico\/registro\/confirmar#token=registro-token$/,
+        );
+      });
+
+      it('el enlace de un cliente de Finet no lleva prefijo', async () => {
+        porRut.mockResolvedValue({ ...sinCuenta, id_empresa: 1 });
+        (jwtService.signAsync as jest.Mock).mockResolvedValue('registro-token');
+
+        await authService.solicitarRegistro('123456785');
+
+        const enlace = correo().sendRegistroCuenta.mock.calls[0][2] as string;
+        expect(enlace).not.toContain('/cable-magico');
+        expect(enlace).toMatch(/\/registro\/confirmar#token=registro-token$/);
       });
 
       it('si el correo no sale, lo dice en vez de decir que se envió', async () => {

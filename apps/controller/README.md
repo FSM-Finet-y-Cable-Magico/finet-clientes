@@ -117,8 +117,8 @@ Regenerar Prisma Client (si se modifica el schema):
 $ pnpm prisma generate
 ```
 
-El visor cartográfico (CU-59 a CU-62) no necesita seed: su capa es estática y
-vive en `src/cobertura/cobertura-finet.data.ts`. Ver
+El visor cartográfico (CU-59 a CU-62) no necesita seed: la capa de cada empresa
+es estática y vive en `src/cobertura/cobertura-<empresa>.data.ts`. Ver
 [`docs/cobertura.md`](./docs/cobertura.md).
 
 ## Scripts

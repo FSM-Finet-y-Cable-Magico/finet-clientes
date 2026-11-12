@@ -94,6 +94,38 @@
   --shadow-xl: 0px 24px 48px rgba(0, 0, 0, 0.40);
 }
 
+/*
+ * Cable Mágico: el mismo diseño con el rojo de su logo (Emilio, 11-11). Va en
+ * el contenedor del sitio de esa empresa (`data-brand`, MarcaShell). Blanco
+ * sobre #D7141A da 5,2:1 y sobre #B5121B 6,9:1.
+ */
+[data-brand="cable-magico"] {
+  --color-primary: #D7141A;
+  --color-primary-bright: #B5121B;
+  --color-accent: #B5121B;
+  --color-on-accent: #FFFFFF;
+
+  --color-hero-slide-1: #D7141A;
+  --color-hero-slide-2: #8E0E14;
+
+  --shadow-md: 0px 4px 8px rgba(215, 20, 26, 0.06), 0px 2px 4px rgba(215, 20, 26, 0.04);
+  --shadow-lg: 0px 12px 24px rgba(215, 20, 26, 0.08);
+}
+
+/* Sobre fondo oscuro, el texto oscuro sobre #FF6B6B da 6,2:1. */
+[data-theme="dark"] [data-brand="cable-magico"] {
+  --color-primary: #FF6B6B;
+  --color-primary-bright: #FFB3B3;
+  --color-accent: #FF8A80;
+  --color-on-accent: #2B0000;
+
+  --color-hero-slide-1: #8E0E14;
+  --color-hero-slide-2: #4A0A0E;
+
+  --shadow-md: 0px 4px 8px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0px 12px 24px rgba(0, 0, 0, 0.30);
+}
+
 @theme inline {
   --color-primary: var(--color-primary);
   --color-primary-bright: var(--color-primary-bright);

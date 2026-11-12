@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
+import { urlDelSitio } from '../common/constants/empresas.js';
 
 /**
  * CU-05: "se registra el evento en la bitácora de auditoría". Y es lo que deja el
@@ -46,7 +47,7 @@ function huellaPassword(hash: string | null): string {
 type TipoEnlace = 'reset' | 'registro';
 
 /** Dónde abre cada enlace en la vista. */
-const RUTA_ENLACE: Record<TipoEnlace, string> = {
+const RUTA_ENLACE: Record<TipoEnlace, `/${string}`> = {
   reset: '/restablecer-password',
   registro: '/registro/confirmar',
 };
@@ -527,7 +528,11 @@ export class AuthService {
    * servir.
    */
   private async crearEnlace(
-    cliente: { id_cliente: number; password_portal_hash: string | null },
+    cliente: {
+      id_cliente: number;
+      id_empresa: number | null;
+      password_portal_hash: string | null;
+    },
     tipo: TipoEnlace,
   ): Promise<string> {
     const token = await this.jwtService.signAsync(
@@ -539,7 +544,8 @@ export class AuthService {
       { expiresIn: '30m' },
     );
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    return `${frontendUrl}${RUTA_ENLACE[tipo]}#token=${token}`;
+    // Al sitio de la empresa del cliente.
+    return `${urlDelSitio(cliente.id_empresa, RUTA_ENLACE[tipo], frontendUrl)}#token=${token}`;
   }
 
   /**
@@ -617,12 +623,17 @@ export class AuthService {
   /**
    * La sesión del portal: el JWT de tipo `access`, la fila de `sesion_portal`
    * y los datos del cliente. Cierra las sesiones anteriores del cliente.
+   *
+   * El token lleva la empresa del cliente, como los de G8: cada empresa tiene
+   * su token y la vista se arma según él. `JwtStrategy` la compara con la base
+   * en cada petición, así que no se puede cambiar desde el navegador.
    */
   private async abrirSesion(cliente: ClienteSesion, ip: string) {
     const token = await this.jwtService.signAsync({
       sub: cliente.id_cliente,
       rut: cliente.rut,
       type: 'access',
+      id_empresa: cliente.id_empresa,
     });
 
     await this.invalidarSesionesAnteriores(cliente.id_cliente);
@@ -641,6 +652,7 @@ export class AuthService {
       access_token: token,
       cliente: {
         id: cliente.id_cliente,
+        id_empresa: cliente.id_empresa,
         rut: cliente.rut,
         nombre_completo: cliente.nombre_completo,
         email: cliente.email,
