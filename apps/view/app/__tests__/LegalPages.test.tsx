@@ -127,6 +127,16 @@ describe("CU-73: Terminos con respaldo normativo", () => {
     expect(container.querySelector("section#uso")).toHaveTextContent(/WhatsApp o al \+56 9 4500 2319\./);
   });
 
+  // El contrato lo firma el equipo en terreno; en la web solo se solicita (Emilio, 12-11).
+  it("en la web se solicita el plan y el contrato se firma con el equipo en terreno", async () => {
+    const { container } = render(await TerminosPage(conMarca("finet")));
+    const seccion = container.querySelector<HTMLElement>("section#termino")!;
+
+    expect(seccion).toHaveTextContent(/Puedes solicitar tu plan desde nuestra web/);
+    expect(seccion).toHaveTextContent(/El contrato lo firmas con nuestro equipo en terreno/);
+    expect(seccion).not.toHaveTextContent(/contrataste por la web/);
+  });
+
   it("reclamos: los plazos de Subtel y el texto del reglamento (DS 194, arts. 14, 16 y 33)", async () => {
     const { container } = render(await TerminosPage(conMarca("finet")));
     const seccion = container.querySelector<HTMLElement>("section#reclamos")!;

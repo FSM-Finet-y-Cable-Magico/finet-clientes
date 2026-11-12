@@ -257,11 +257,11 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
         <>
           <h3 id="como-contratar">Cómo contratar</h3>
           <p>
-            Puedes contratar desde <Link href={rutaMarca(marca, "/planes")}>nuestra web</Link>, por
+            Puedes solicitar tu plan desde <Link href={rutaMarca(marca, "/planes")}>nuestra web</Link>, por
             teléfono al {telefono}, por {whatsapp} o de forma presencial en{" "}
-            {marca.direccion.comuna}. Antes de contratar te informamos el plan,
-            el precio total, el plazo de instalación y las condiciones
-            aplicables.
+            {marca.direccion.comuna}. El contrato lo firmas con nuestro equipo
+            en terreno, que antes te informa el plan, el precio total, el plazo
+            de instalación y las condiciones aplicables.
           </p>
 
           <h3 id="como-terminar">Cómo terminar tu contrato</h3>
@@ -269,10 +269,7 @@ function seccionesDe(marca: Marca): SeccionLegal[] {
             <strong>
               Puedes poner término a tu contrato en cualquier momento y sin
               expresar causa.
-            </strong>{" "}
-            Ponemos a tu disposición{" "}
-            <strong>los mismos canales que usaste para contratar</strong>: si
-            contrataste por la web, puedes terminarlo por la web.
+            </strong>
           </p>
           <p>
             Cómo hacerlo:{" "}
