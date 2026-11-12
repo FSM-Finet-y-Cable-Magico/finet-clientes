@@ -18,7 +18,8 @@ import { COLOR, marcaCorreoDe } from '../../mail/plantilla-correo.js';
 export type DatosComprobante = {
   /** La empresa del cliente (1 Finet, 2 Cable Mágico). */
   readonly idEmpresa: number | null;
-  readonly cliente: { readonly nombre: string; readonly rut: string };
+  /** `cliente.rut` puede venir vacío en la base: entonces no va la fila. */
+  readonly cliente: { readonly nombre: string; readonly rut: string | null };
   readonly pago: {
     readonly idPago: number;
     readonly fecha: Date;
@@ -55,10 +56,8 @@ export function contenidoComprobante(
     .filter(Boolean)
     .join(' · ');
 
-  const filas: [string, string][] = [
-    ['Cliente', cliente.nombre],
-    ['RUT del cliente', formatRut(cliente.rut)],
-  ];
+  const filas: [string, string][] = [['Cliente', cliente.nombre]];
+  if (cliente.rut) filas.push(['RUT del cliente', formatRut(cliente.rut)]);
   if (pago.periodo) filas.push(['Período pagado', pago.periodo]);
   filas.push(['Fecha del pago', fechaHoraCliente(pago.fecha)]);
   filas.push(['Medio de pago', pago.medio]);

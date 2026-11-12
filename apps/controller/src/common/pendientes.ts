@@ -58,17 +58,6 @@ export const SALDO_CLIENTE_DEFINIDO = true;
  */
 export const TICKET_WIFI_DEFINIDO = true;
 
-/**
- * La boleta de un pago, para descargarla (CU-52). En la reunión con G8 quedó que
- * el "comprobante" del CU-52 es la boleta: la emite G8 con Facturacion.cl y la
- * entrega `GET /api/integrations/g2/payments/{id_pago}/tax-document` (su
- * respuesta del 02-10, §10, con `documento_url`). Falta que G8 lo implemente y
- * que Finet confirme que quiere la descarga en el portal (G8 le pregunta al área
- * comercial). Hasta entonces el cliente ve sus pagos anteriores, pero la descarga
- * cae en la Excepción 2 del CU-52: el comprobante no está disponible.
- */
-export const COMPROBANTE_G8_DEFINIDO = false;
-
 export type Pendiente = {
   dato: string;
   quien: 'Grupo 2' | 'Grupo 8' | 'Grupo 3';
@@ -100,12 +89,6 @@ export const PENDIENTES: readonly Pendiente[] = [
     quien: 'Grupo 8',
     destraba: 'CU-32 (envío directo a G3)',
     estaVacio: () => !TICKET_WIFI_DEFINIDO,
-  },
-  {
-    dato: 'Boleta del pago (GET /api/integrations/g2/payments/{id}/tax-document) y que Finet confirme la descarga',
-    quien: 'Grupo 8',
-    destraba: 'CU-52',
-    estaVacio: () => !COMPROBANTE_G8_DEFINIDO,
   },
 ];
 

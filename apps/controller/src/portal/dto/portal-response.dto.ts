@@ -54,7 +54,7 @@ export interface FacturaPendienteDto {
 
 // ─── CU-52: Pagos anteriores y su comprobante ────────────────────────────────
 // El cliente ve sus pagos y descarga el comprobante del que quiera. El PDF lo
-// genera G8; `comprobante_disponible` dice si su endpoint ya se puede usar.
+// genera el portal (common/comprobantes/); `comprobante_disponible` lo dice.
 export interface PagosAnterioresDto {
   comprobante_disponible: boolean;
   pagos: PagoAnteriorDto[];

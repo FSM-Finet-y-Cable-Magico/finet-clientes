@@ -3,10 +3,10 @@ import { PENDIENTES, pendientesVacios } from './pendientes.js';
 
 /** Lo que el backend lista al arrancar: qué falta, de quién, y qué destraba. */
 describe('pendientes del Incremento 3', () => {
-  it('hoy falta un dato, de Grupo 8: la boleta (CU-52)', () => {
-    expect(pendientesVacios()).toEqual([
-      'CU-52 ← Boleta del pago (GET /api/integrations/g2/payments/{id}/tax-document) y que Finet confirme la descarga (Grupo 8)',
-    ]);
+  // El comprobante del CU-52 lo genera el portal desde el 12-11: ya no se
+  // espera la boleta de G8 (tax-document), que no la implementó.
+  it('hoy no falta ningún dato de otro grupo', () => {
+    expect(pendientesVacios()).toEqual([]);
   });
 
   it('cada dato dice quién tiene que responder y qué caso de uso destraba', () => {

@@ -4,6 +4,8 @@ import { PortalController } from './portal.controller.js';
 import { PortalService } from './portal.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { EnlacePagoService } from '../common/enlaces/enlace-pago.service.js';
+import { ComprobantePagoService } from '../common/comprobantes/comprobante-pago.service.js';
+import { StreamableFile } from '@nestjs/common';
 
 const CLIENTE_MOCK = {
   id_cliente: 1,
@@ -29,6 +31,7 @@ describe('PortalController', () => {
   let controller: PortalController;
   let service: jest.Mocked<PortalService>;
   let enlaces: { crearEnlacePago: jest.Mock };
+  let comprobantes: { delCliente: jest.Mock };
 
   beforeEach(async () => {
     const mockService = {
@@ -63,6 +66,15 @@ describe('PortalController', () => {
           provide: EnlacePagoService,
           useValue: { crearEnlacePago: jest.fn().mockReturnValue('p.a.b.c.d') },
         },
+        {
+          provide: ComprobantePagoService,
+          useValue: {
+            delCliente: jest.fn().mockResolvedValue({
+              archivo: Buffer.from('%PDF-1.3 prueba'),
+              nombreArchivo: 'comprobante-cable-magico-5.pdf',
+            }),
+          },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -71,6 +83,7 @@ describe('PortalController', () => {
     controller = module.get(PortalController);
     service = module.get(PortalService);
     enlaces = module.get(EnlacePagoService);
+    comprobantes = module.get(ComprobantePagoService);
   });
 
   it('GET /portal/panel llama getPanelPrincipal con el id del cliente autenticado', async () => {
@@ -149,5 +162,18 @@ describe('PortalController', () => {
     expect(() => controller.enlacePago(CLIENTE_MOCK as any)).toThrow(
       'El pago en línea no está disponible por ahora.',
     );
+  });
+
+  // CU-52: el comprobante del pago, como archivo para descargar.
+  it('GET /portal/pagos/:id/comprobante entrega el PDF del cliente como descarga', async () => {
+    const r = await controller.getComprobante(CLIENTE_MOCK as any, 5);
+
+    expect(comprobantes.delCliente).toHaveBeenCalledWith(1, 5);
+    expect(r).toBeInstanceOf(StreamableFile);
+    expect(r.getHeaders()).toMatchObject({
+      type: 'application/pdf',
+      disposition: 'attachment; filename="comprobante-cable-magico-5.pdf"',
+      length: 15,
+    });
   });
 });

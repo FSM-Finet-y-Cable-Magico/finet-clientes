@@ -21,10 +21,8 @@ import {
   G8IntegracionService,
   type ResultadoWifiG8,
 } from '../common/g8/g8-integracion.service.js';
-import {
-  COMPROBANTE_G8_DEFINIDO,
-  TICKET_WIFI_DEFINIDO,
-} from '../common/pendientes.js';
+import { TICKET_WIFI_DEFINIDO } from '../common/pendientes.js';
+import { pagosDelCliente } from '../common/comprobantes/comprobante-pago.service.js';
 import {
   ESTADOS_CONTRATO_VIGENTES,
   normalizarEstadoContrato,
@@ -39,7 +37,7 @@ import {
 import { SaldoClienteService } from '../common/saldo/saldo-cliente.service.js';
 import { formatPeriodo } from '../common/utils/periodo.js';
 import { MailService } from '../mail/mail.service.js';
-import { MEDIOS_PAGO } from '../pagos/pagos.constantes.js';
+import { nombreMedioPago } from '../pagos/pagos.constantes.js';
 import type { CrearTicketDto } from './dto/crear-ticket.dto.js';
 import type { SolicitarCambioContrasenaWifiDto } from './dto/solicitud-contrasena-wifi.dto.js';
 import {
@@ -307,13 +305,12 @@ export class PortalService {
 
   //  CU-52: los pagos anteriores del cliente, para descargar su comprobante.
   //
-  //  Se lee `pago` directo, como permite el §5 del acuerdo v2.0. Un pago es del
-  //  cliente si lo dice su `id_cliente` o si su factura es de un contrato suyo:
-  //  `id_cliente` puede venir vacío. No se lee `comprobante_estado`, que todavía
-  //  no existe: está en la migración pendiente de G8.
+  //  Se lee `pago` directo, como permite el §5 del acuerdo v2.0, con el mismo
+  //  filtro de dueño que la descarga (`pagosDelCliente`). El comprobante lo
+  //  genera el portal: `common/comprobantes/`.
   async getPagosAnteriores(idCliente: number): Promise<PagosAnterioresDto> {
     const pagos = await this.prisma.pago.findMany({
-      where: this.pagosDelCliente(idCliente),
+      where: pagosDelCliente(idCliente),
       select: {
         id_pago: true,
         fecha_pago: true,
@@ -325,7 +322,8 @@ export class PortalService {
     });
 
     return {
-      comprobante_disponible: COMPROBANTE_G8_DEFINIDO,
+      // El comprobante lo genera el portal (CU-52): siempre se puede descargar.
+      comprobante_disponible: true,
       pagos: pagos.map((p) => ({
         id_pago: p.id_pago,
         fecha_pago: p.fecha_pago.toISOString(),
@@ -333,52 +331,8 @@ export class PortalService {
           ? formatPeriodo(p.factura.periodo_mes, p.factura.periodo_anio)
           : null,
         monto: Number(p.monto),
-        pasarela: this.nombreMedio(p.pasarela),
+        pasarela: nombreMedioPago(p.pasarela),
       })),
-    };
-  }
-
-  //  CU-52: el comprobante de un pago del cliente.
-  //
-  //  El comprobante es la boleta (reunión con G8): la emite G8, y la descarga va
-  //  por su `GET …/payments/{id_pago}/tax-document` (respuesta del 02-10, §10).
-  //  Mientras G8 no lo implemente y Finet no confirme la descarga
-  //  (`COMPROBANTE_G8_DEFINIDO`), la llamada no se escribe y el cliente cae en la
-  //  Excepción 2 del CU-52: el comprobante no está disponible.
-  async getComprobante(idCliente: number, idPago: number): Promise<never> {
-    // Si el pago es de otro cliente se responde 404, igual que si no existiera:
-    // no se confirma su existencia.
-    const pago = await this.prisma.pago.findFirst({
-      where: { id_pago: idPago, ...this.pagosDelCliente(idCliente) },
-      select: { id_pago: true },
-    });
-    if (!pago) {
-      throw new NotFoundException('No encontramos ese pago');
-    }
-
-    throw new ServiceUnavailableException(
-      'El comprobante de este pago no está disponible en este momento. Intenta más tarde.',
-    );
-  }
-
-  /**
-   * El nombre del medio, el mismo que muestra `/pagar` (`webpay` → Webpay). El
-   * §11.15 no define un enum de medio de pago, así que un valor que no
-   * conocemos se muestra tal como está guardado.
-   */
-  private nombreMedio(pasarela: string): string {
-    const medio = MEDIOS_PAGO.find(
-      (m) => m.id === pasarela.trim().toLowerCase(),
-    );
-    return medio?.nombre ?? pasarela;
-  }
-
-  private pagosDelCliente(idCliente: number): Prisma.pagoWhereInput {
-    return {
-      OR: [
-        { id_cliente: idCliente },
-        { factura: { contrato: { id_cliente: idCliente } } },
-      ],
     };
   }
 
