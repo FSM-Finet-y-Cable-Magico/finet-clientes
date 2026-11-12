@@ -11,6 +11,8 @@
 
 export type Empresa = {
   readonly idEmpresa: number;
+  /** Como la nombra la vista (`finet`, `cable-magico`): va en nombres de archivo. */
+  readonly slug: 'finet' | 'cable-magico';
   /** Como se ve en el sitio y en los correos. */
   readonly nombre: string;
   /** Región que se escribe en el prospecto (CU-18), como la guarda G8. */
@@ -34,6 +36,7 @@ export type Empresa = {
 export const EMPRESAS = {
   1: {
     idEmpresa: 1,
+    slug: 'finet',
     nombre: 'Finet',
     region: 'Metropolitana de Santiago',
     prefijoWeb: '',
@@ -45,6 +48,7 @@ export const EMPRESAS = {
   },
   2: {
     idEmpresa: 2,
+    slug: 'cable-magico',
     nombre: 'Cable Mágico',
     region: 'Valparaíso',
     prefijoWeb: '/cable-magico',

@@ -69,7 +69,8 @@ export function marcaCorreoDe(
   };
 }
 
-const COLOR = {
+/** Colores del molde, compartidos con el comprobante en PDF. */
+export const COLOR = {
   fondo: '#EFF4FF', // --color-surface
   texto: '#0B1C30',
   suave: '#6D797D', // --color-muted
