@@ -1,11 +1,15 @@
 import {
   MARCAS,
+  enlaceEntreSitios,
   esSlugMarca,
   marcaPorEmpresa,
+  marcaPorHost,
   marcaPorSlug,
   rutaMarca,
   separarMarca,
+  urlMarca,
 } from "@/app/_lib/company";
+import { BASE_URL } from "@/app/_lib/consts";
 
 /**
  * Las dos empresas del portal (Documento 0, §6.6): mismo sitio, una marca por
@@ -49,6 +53,25 @@ describe("marcas", () => {
     );
     expect(rutaMarca(MARCAS["cable-magico"], "/")).toBe("/cable-magico");
     expect(rutaMarca(MARCAS.finet, "/")).toBe("/");
+  });
+
+  // Sin dominios (hoy): los dos sitios en un host. Con un host por empresa,
+  // ver MarcaPorHost.test.ts.
+  it("mientras comparten host, la URL de Cable Mágico lleva su prefijo y el host no elige marca", () => {
+    expect(urlMarca(MARCAS.finet, "/")).toBe(BASE_URL);
+    expect(urlMarca(MARCAS["cable-magico"], "/")).toBe(`${BASE_URL}/cable-magico`);
+    expect(urlMarca(MARCAS["cable-magico"], "/planes")).toBe(
+      `${BASE_URL}/cable-magico/planes`,
+    );
+    expect(
+      enlaceEntreSitios(MARCAS.finet, MARCAS["cable-magico"], "/planes"),
+    ).toBe("/cable-magico/planes");
+    expect(marcaPorHost(new URL(BASE_URL).host)).toBeNull();
+  });
+
+  it("cada empresa tiene su ícono de pestaña", () => {
+    expect(MARCAS.finet.icono).toBe("/favicon.ico");
+    expect(MARCAS["cable-magico"].icono).toBe("/brand/CableMagicoIcon.png");
   });
 
   it("separa la marca de una ruta del navegador", () => {

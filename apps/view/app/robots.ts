@@ -13,12 +13,14 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      // Las rutas privadas de los dos sitios (Cable Mágico lleva su prefijo).
+      // Las rutas privadas de los dos sitios (con su prefijo, si lo llevan).
       disallow: [
-        "/api/",
-        ...Object.values(MARCAS).flatMap((marca) =>
-          PREFIJOS_PRIVADOS.map((p) => rutaMarca(marca, p as `/${string}`)),
-        ),
+        ...new Set([
+          "/api/",
+          ...Object.values(MARCAS).flatMap((marca) =>
+            PREFIJOS_PRIVADOS.map((p) => rutaMarca(marca, p as `/${string}`)),
+          ),
+        ]),
       ],
     },
     sitemap: `${BASE_URL}/sitemap.xml`,

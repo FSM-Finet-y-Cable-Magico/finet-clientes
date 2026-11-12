@@ -13,7 +13,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { cleanRut, variantesRut } from '../common/utils/rut.js';
 import { registrarAceptacionPolitica } from '../common/politica-privacidad.js';
-import { rutaDelSitio } from '../common/constants/empresas.js';
+import { urlDelSitio } from '../common/constants/empresas.js';
 
 /**
  * CU-05: "se registra el evento en la bitácora de auditoría". Y es lo que deja el
@@ -544,8 +544,8 @@ export class AuthService {
       { expiresIn: '30m' },
     );
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    // Al sitio de la empresa del cliente: Cable Mágico vive bajo su prefijo.
-    return `${frontendUrl}${rutaDelSitio(cliente.id_empresa, RUTA_ENLACE[tipo])}#token=${token}`;
+    // Al sitio de la empresa del cliente.
+    return `${urlDelSitio(cliente.id_empresa, RUTA_ENLACE[tipo], frontendUrl)}#token=${token}`;
   }
 
   /**

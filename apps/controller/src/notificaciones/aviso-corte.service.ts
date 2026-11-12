@@ -32,7 +32,7 @@ import {
   diaG8,
   facturasQueVencenEl,
 } from './deuda-g8.js';
-import { rutaDelSitio } from '../common/constants/empresas.js';
+import { urlDelSitio } from '../common/constants/empresas.js';
 
 /** Lo que el aviso necesita y todavía no está en el sistema. Ver `common/pendientes.ts`. */
 export type DatosAvisoCorte = {
@@ -238,6 +238,6 @@ export class AvisoCorteService {
     idCliente: number,
     idEmpresa: number | null,
   ): string {
-    return `${sitio}${rutaDelSitio(idEmpresa, '/pagar')}?t=${this.enlaces.crearEnlacePago(idCliente)}`;
+    return `${urlDelSitio(idEmpresa, '/pagar', sitio)}?t=${this.enlaces.crearEnlacePago(idCliente)}`;
   }
 }

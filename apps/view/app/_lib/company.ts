@@ -4,13 +4,16 @@
  * Mágico)" (Documento 0, §6.6). Única fuente de la vista; edita SOLO este
  * archivo para cambiar teléfono, WhatsApp, dirección, razón social o marca.
  *
- * Finet vive en la raíz del sitio y Cable Mágico bajo `/cable-magico`. El
- * `idEmpresa` es el de la tabla `empresa` de la base compartida.
+ * Finet vive en la raíz del sitio y Cable Mágico bajo `/cable-magico`,
+ * mientras no tenga su propio host (ver `URL_CABLE_MAGICO`). El `idEmpresa` es
+ * el de la tabla `empresa` de la base compartida.
  *
  * Los `null` son datos que todavía no entrega la empresa: las páginas legales
  * (CU-73) muestran el hueco marcado. Están listados en "Pendientes del CU-73"
  * de docs/CASOS-DE-USO.md; al completarlos, sacarlos de esa lista.
  */
+
+import { BASE_URL } from "./consts";
 
 type Telefono = {
   /** E.164 sin "+" ni espacios: el que usa wa.me. */
@@ -24,7 +27,9 @@ type Telefono = {
 export type Marca = {
   readonly slug: string;
   readonly idEmpresa: number;
-  /** Dónde vive su sitio: Finet en la raíz. */
+  /** La URL base de su sitio, sin barra final. */
+  readonly url: string;
+  /** Dónde vive dentro de ese sitio: en la raíz, o bajo su prefijo si lo comparte. */
   readonly prefijo: "" | `/${string}`;
   /** Nombre comercial. */
   readonly nombre: string;
@@ -37,6 +42,8 @@ export type Marca = {
     readonly ancho: number;
     readonly alto: number;
   };
+  /** El ícono de la pestaña del navegador. */
+  readonly icono: string;
   readonly telefono: Telefono;
   readonly whatsappUrl: string;
   readonly instagramUrl: string;
@@ -69,6 +76,16 @@ function telefono(e164: string, display: string): Telefono {
   return { e164, display, tel: `+${e164}` };
 }
 
+/**
+ * El host propio de Cable Mágico, si lo tiene. Hoy no hay dominios: sin esta
+ * variable los dos sitios comparten host y Cable Mágico va bajo su prefijo.
+ * Con ella vive en la raíz de ese host, sin prefijo, y `proxy.ts` lo reconoce
+ * por el host. Es `NEXT_PUBLIC_` porque los enlaces también se arman en el
+ * navegador.
+ */
+const URL_CABLE_MAGICO =
+  process.env.NEXT_PUBLIC_SITE_URL_CABLE_MAGICO?.replace(/\/+$/, "") || null;
+
 const TELEFONO_FINET = telefono("56945002319", "+56 9 4500 2319");
 const TELEFONO_CABLE_MAGICO = telefono("56933031480", "+56 9 3303 1480");
 
@@ -76,6 +93,7 @@ export const MARCAS = {
   finet: {
     slug: "finet",
     idEmpresa: 1,
+    url: BASE_URL,
     prefijo: "",
     nombre: "Finet",
     razonSocial: "Fibernet Limitada",
@@ -87,6 +105,7 @@ export const MARCAS = {
       ancho: 120,
       alto: 40,
     },
+    icono: "/favicon.ico",
     telefono: TELEFONO_FINET,
     whatsappUrl: `https://wa.me/${TELEFONO_FINET.e164}`,
     instagramUrl: "https://www.instagram.com/finettcl/",
@@ -110,7 +129,8 @@ export const MARCAS = {
   "cable-magico": {
     slug: "cable-magico",
     idEmpresa: 2,
-    prefijo: "/cable-magico",
+    url: URL_CABLE_MAGICO ?? BASE_URL,
+    prefijo: URL_CABLE_MAGICO ? "" : "/cable-magico",
     nombre: "Cable Mágico",
     razonSocial: "Cable Magico Estelar S.A.",
     rut: "76.620.850-9",
@@ -121,6 +141,7 @@ export const MARCAS = {
       ancho: 72,
       alto: 72,
     },
+    icono: "/brand/CableMagicoIcon.png",
     telefono: TELEFONO_CABLE_MAGICO,
     whatsappUrl: `https://wa.me/${TELEFONO_CABLE_MAGICO.e164}`,
     instagramUrl: "https://www.instagram.com/cablemagicoestelar/",
@@ -164,10 +185,46 @@ export function marcaPorEmpresa(idEmpresa: number | null | undefined): Marca {
   );
 }
 
-/** Una ruta del sitio de la marca: Cable Mágico lleva su prefijo. */
+/** Una ruta del sitio de la marca: lleva su prefijo, si lo tiene. */
 export function rutaMarca(marca: Marca, ruta: `/${string}`): string {
   if (!marca.prefijo) return ruta;
   return ruta === "/" ? marca.prefijo : `${marca.prefijo}${ruta}`;
+}
+
+/** La URL completa de una ruta del sitio de la marca. */
+export function urlMarca(marca: Marca, ruta: `/${string}`): string {
+  const camino = rutaMarca(marca, ruta);
+  return camino === "/" ? marca.url : `${marca.url}${camino}`;
+}
+
+/**
+ * El enlace a una ruta del sitio de `destino` desde el sitio de `actual`: si
+ * comparten host basta la ruta; si no, la URL completa del otro host.
+ */
+export function enlaceEntreSitios(
+  actual: Marca,
+  destino: Marca,
+  ruta: `/${string}`,
+): string {
+  return destino.url === actual.url
+    ? rutaMarca(destino, ruta)
+    : urlMarca(destino, ruta);
+}
+
+// Falla al cargar (y en el build) si una URL del .env está mal escrita.
+const HOSTS = Object.values(MARCAS).map(
+  (marca) => [new URL(marca.url).host, marca] as const,
+);
+
+/**
+ * La marca dueña de ese host. La lista es cerrada, los hosts de las URLs
+ * configuradas: lo que mande el navegador en `Host` solo elige entre ellas y
+ * nunca se usa para armar una URL. `null` si el host no es de ninguna o si lo
+ * comparten, que es lo que pasa mientras Cable Mágico va por prefijo.
+ */
+export function marcaPorHost(host: string | null | undefined): Marca | null {
+  const suyas = HOSTS.filter(([h]) => h === host?.toLowerCase());
+  return suyas.length === 1 ? suyas[0][1] : null;
 }
 
 /**

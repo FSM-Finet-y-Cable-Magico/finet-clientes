@@ -84,6 +84,14 @@ describe("metadata por empresa", () => {
     expect(meta.title).toMatchObject({ template: expect.stringContaining("Cable Mágico") });
     expect(meta.appleWebApp).toMatchObject({ title: "Cable Mágico" });
     expect(meta.authors).toEqual([{ name: "Cable Magico Estelar S.A." }]);
+    expect(meta.icons).toEqual({ icon: "/brand/CableMagicoIcon.png" });
+    expect(meta.metadataBase).toEqual(new URL(CM.url));
+  });
+
+  it("el layout de Finet deja su ícono de pestaña de siempre", async () => {
+    const { generateMetadata } = await import("@/app/[marca]/layout");
+    const meta = await generateMetadata({ params: Promise.resolve({ marca: "finet" }) });
+    expect(meta.icons).toEqual({ icon: "/favicon.ico" });
   });
 });
 

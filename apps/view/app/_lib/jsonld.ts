@@ -1,6 +1,5 @@
 import type { PlanBackend } from "./api";
-import { BASE_URL } from "./consts";
-import { MARCA_POR_DEFECTO, rutaMarca, type Marca } from "./company";
+import { MARCA_POR_DEFECTO, urlMarca, type Marca } from "./company";
 
 type BreadcrumbItem = { name: string; url: string };
 
@@ -13,13 +12,6 @@ function serializar(dato: unknown): string {
   return JSON.stringify(dato).replace(/</g, "\\u003c");
 }
 
-/** La URL absoluta de una ruta del sitio de la empresa. */
-export function urlDelSitio(marca: Marca, ruta: `/${string}`): string {
-  return ruta === "/" && !marca.prefijo
-    ? BASE_URL
-    : `${BASE_URL}${rutaMarca(marca, ruta)}`;
-}
-
 /** La empresa del sitio (antes en el layout raíz, solo de Finet). */
 export function organizacionJsonLd(marca: Marca) {
   return serializar({
@@ -27,8 +19,8 @@ export function organizacionJsonLd(marca: Marca) {
     "@type": "Organization",
     name: marca.razonSocial,
     alternateName: marca.nombre,
-    url: urlDelSitio(marca, "/"),
-    logo: `${BASE_URL}${marca.logo.png}`,
+    url: urlMarca(marca, "/"),
+    logo: `${marca.url}${marca.logo.png}`,
     ...(marca.rut ? { taxID: marca.rut } : {}),
     contactPoint: {
       "@type": "ContactPoint",
@@ -63,7 +55,7 @@ export function productJsonLd(plan: PlanBackend, marca: Marca = MARCA_POR_DEFECT
       price: String(plan.precio_mensual),
       priceCurrency: "CLP",
       availability: "https://schema.org/InStock",
-      url: urlDelSitio(marca, `/contratar/${plan.id_plan}`),
+      url: urlMarca(marca, `/contratar/${plan.id_plan}`),
     },
   });
 }
@@ -97,7 +89,7 @@ export function itemListJsonLd(planes: PlanBackend[], marca: Marca = MARCA_POR_D
           price: String(plan.precio_mensual),
           priceCurrency: "CLP",
           availability: "https://schema.org/InStock",
-          url: urlDelSitio(marca, `/contratar/${plan.id_plan}`),
+          url: urlMarca(marca, `/contratar/${plan.id_plan}`),
         },
       },
     })),

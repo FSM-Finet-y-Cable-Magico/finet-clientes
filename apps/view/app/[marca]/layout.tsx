@@ -28,6 +28,10 @@ export async function generateMetadata({
   const marca = marcaPorSlug((await params).marca);
   const seo = seoDe(marca);
   return {
+    // El canonical, og:url y la imagen de cada página salen con la URL del
+    // sitio de su empresa, que puede estar en otro host.
+    metadataBase: new URL(marca.url),
+    icons: { icon: marca.icono },
     title: {
       template: `%s | ${marca.nombre} — Fibra Optica en ${marca.comunaSoporte}`,
       default: seo.title,

@@ -5,6 +5,7 @@ import type { JWTPayload } from "jose";
 import {
   esSlugMarca,
   marcaPorEmpresa,
+  marcaPorHost,
   marcaPorSlug,
   rutaMarca,
   separarMarca,
@@ -69,6 +70,8 @@ export async function proxy(request: NextRequest) {
     search,
     marcaToken: marcaDelToken(payload),
     marcaCookie: esSlugMarca(cookie) ? cookie : null,
+    marcaHost:
+      (marcaPorHost(request.headers.get("host"))?.slug as SlugMarca) ?? null,
   });
 
   if (decision.tipo === "redirigir") {

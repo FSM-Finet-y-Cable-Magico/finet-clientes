@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 import { fetchLandingPlanes, type PlanBackend } from "./_lib/api";
-import { MARCAS, type Marca } from "./_lib/company";
-import { urlDelSitio } from "./_lib/jsonld";
+import { MARCAS, urlMarca, type Marca } from "./_lib/company";
 import { RUTA_PLAN, RUTAS_PUBLICAS } from "./_lib/rutas-publicas";
 
 /**
@@ -13,7 +12,7 @@ import { RUTA_PLAN, RUTAS_PUBLICAS } from "./_lib/rutas-publicas";
  * generacion le diria a los buscadores que todo cambio en cada regeneracion.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // Las rutas de los dos sitios: Finet en la raíz y Cable Mágico bajo su prefijo.
+  // Las rutas de los dos sitios, cada una con la URL del suyo.
   const porMarca = await Promise.all(
     Object.values(MARCAS).map(async (marca) =>
       rutasDe(marca, await planesPublicados(marca)),
@@ -29,7 +28,7 @@ function rutasDe(marca: Marca, planes: PlanBackend[]): MetadataRoute.Sitemap {
 
     if (ruta.path === RUTA_PLAN) {
       return planes.map((plan) => ({
-        url: urlDelSitio(marca, `/contratar/${plan.id_plan}`),
+        url: urlMarca(marca, `/contratar/${plan.id_plan}`),
         changeFrequency,
         priority,
       }));
@@ -37,7 +36,7 @@ function rutasDe(marca: Marca, planes: PlanBackend[]): MetadataRoute.Sitemap {
 
     return [
       {
-        url: urlDelSitio(marca, ruta.path as `/${string}`),
+        url: urlMarca(marca, ruta.path as `/${string}`),
         changeFrequency,
         priority,
       },

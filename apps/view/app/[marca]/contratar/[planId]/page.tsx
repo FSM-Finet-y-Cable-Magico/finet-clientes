@@ -4,9 +4,15 @@ import { redirect } from "next/navigation";
 import FormularioContratacion from "../../../_components/catalog/FormularioContratacion";
 import { getLandingPlanes, getPlanById } from "../../../_lib/api";
 import { formatPrecio } from "../../../_lib/formato";
-import { productJsonLd, breadcrumbJsonLd, urlDelSitio } from "../../../_lib/jsonld";
+import { productJsonLd, breadcrumbJsonLd } from "../../../_lib/jsonld";
 import { metadataPlan } from "../../../_lib/seo";
-import { marcaPorEmpresa, marcaPorSlug, rutaMarca } from "../../../_lib/company";
+import {
+  enlaceEntreSitios,
+  marcaPorEmpresa,
+  marcaPorSlug,
+  rutaMarca,
+  urlMarca,
+} from "../../../_lib/company";
 
 type ContratarPlanPageProps = {
   params: Promise<{
@@ -48,7 +54,7 @@ export default async function ContratarPlanPage({ params }: ContratarPlanPagePro
   // Un plan se contrata en el sitio de su empresa: el prospecto queda en ella.
   const deLaEmpresa = marcaPorEmpresa(plan.id_empresa);
   if (plan.id_empresa != null && deLaEmpresa.slug !== marca.slug) {
-    redirect(rutaMarca(deLaEmpresa, `/contratar/${planId}`));
+    redirect(enlaceEntreSitios(marca, deLaEmpresa, `/contratar/${planId}`));
   }
 
   return (
@@ -63,11 +69,11 @@ export default async function ContratarPlanPage({ params }: ContratarPlanPagePro
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: breadcrumbJsonLd([
-            { name: "Inicio", url: urlDelSitio(marca, "/") },
-            { name: "Planes", url: urlDelSitio(marca, "/planes") },
+            { name: "Inicio", url: urlMarca(marca, "/") },
+            { name: "Planes", url: urlMarca(marca, "/planes") },
             {
               name: plan.nombre_comercial,
-              url: urlDelSitio(marca, `/contratar/${plan.id_plan}`),
+              url: urlMarca(marca, `/contratar/${plan.id_plan}`),
             },
           ]),
         }}

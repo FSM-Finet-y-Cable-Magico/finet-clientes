@@ -1,7 +1,7 @@
 import {
+  enlaceEntreSitios,
   MARCA_POR_DEFECTO,
   MARCAS,
-  rutaMarca,
   separarMarca,
   type SlugMarca,
 } from "./company";
@@ -15,10 +15,13 @@ import {
  * La empresa se decide, en este orden:
  * 1. la del token de la sesión: como en G8, el token por empresa cambia las
  *    vistas, así que un cliente ve siempre el sitio de su empresa;
- * 2. la de la URL, si trae el prefijo de una marca;
+ * 2. la de la URL: el prefijo de una marca o, si cada empresa tiene su host,
+ *    el host (ahí las dos viven en la raíz del suyo y nadie lleva prefijo);
  * 3. la que eligió antes el visitante (cookie `empresa`), para que siga en su
  *    sitio aunque un enlace no traiga el prefijo;
  * 4. Finet.
+ *
+ * Si la empresa elegida vive en otro host, se redirige a su URL configurada.
  *
  * Función pura, sin `next/server`, para probarla sin el runtime de Next.
  */
@@ -43,9 +46,9 @@ export type EntradaMarca = {
   marcaToken: SlugMarca | null;
   /** La que eligió antes el visitante. */
   marcaCookie: SlugMarca | null;
+  /** La dueña del host pedido, si cada empresa tiene el suyo (`marcaPorHost`). */
+  marcaHost?: SlugMarca | null;
 };
-
-const PREFIJO_INTERNO = `/${MARCA_POR_DEFECTO.slug}`;
 
 /**
  * Una sola barra al comienzo: para el navegador "//sitio" es otro dominio, y
@@ -57,24 +60,34 @@ function sinBarrasDobles(ruta: string): string {
 
 export function enrutarMarca(entrada: EntradaMarca): DecisionMarca {
   const e = { ...entrada, pathname: sinBarrasDobles(entrada.pathname) };
+  // El sitio al que llegó la petición: el de su host, o el de Finet.
+  const sitio = e.marcaHost ? MARCAS[e.marcaHost] : MARCA_POR_DEFECTO;
 
-  // La ruta interna de la marca por defecto no se publica: sería la misma
-  // página en dos URLs.
-  if (e.pathname === PREFIJO_INTERNO || e.pathname.startsWith(`${PREFIJO_INTERNO}/`)) {
-    const ruta = sinBarrasDobles(e.pathname.slice(PREFIJO_INTERNO.length)) || "/";
-    return { tipo: "redirigir", destino: `${ruta}${e.search}` };
+  // La ruta interna (`/finet/…`) de una marca que vive en la raíz de su sitio
+  // no se publica: sería la misma página en dos URLs.
+  for (const marca of Object.values(MARCAS)) {
+    const interna = `/${marca.slug}`;
+    if (marca.prefijo) continue;
+    if (e.pathname === interna || e.pathname.startsWith(`${interna}/`)) {
+      const ruta = sinBarrasDobles(e.pathname.slice(interna.length)) || "/";
+      return {
+        tipo: "redirigir",
+        destino: `${enlaceEntreSitios(sitio, marca, ruta as `/${string}`)}${e.search}`,
+      };
+    }
   }
 
   const separada = separarMarca(e.pathname);
-  const deLaUrl = separada.marca;
   const ruta = sinBarrasDobles(separada.ruta);
-  const conPrefijo = deLaUrl.prefijo !== "";
+  const conPrefijo = separada.marca.prefijo !== "";
+  const deLaUrl = conPrefijo ? (separada.marca.slug as SlugMarca) : e.marcaHost;
   const elegida: SlugMarca =
     e.marcaToken ??
-    (conPrefijo ? (deLaUrl.slug as SlugMarca) : e.marcaCookie) ??
+    deLaUrl ??
+    e.marcaCookie ??
     (MARCA_POR_DEFECTO.slug as SlugMarca);
 
-  const canonica = rutaMarca(MARCAS[elegida], ruta as `/${string}`);
+  const canonica = enlaceEntreSitios(sitio, MARCAS[elegida], ruta as `/${string}`);
   if (canonica !== e.pathname) {
     return { tipo: "redirigir", destino: `${canonica}${e.search}` };
   }

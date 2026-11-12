@@ -4,8 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../../../_lib/auth";
 import { recordarMarca, useMarca } from "../../../_lib/marca";
 import {
+  enlaceEntreSitios,
   MARCAS,
-  rutaMarca,
   separarMarca,
   type SlugMarca,
 } from "../../../_lib/company";
@@ -14,6 +14,10 @@ import {
  * Finet o Cable Mágico, como el selector de empresa de G3: lleva a la misma
  * página en el sitio de la otra empresa y la deja recordada (proxy.ts). Con
  * sesión no aparece: la empresa la fija el token, como en G8.
+ *
+ * Es para la demostración. En producción cada empresa tiene su dominio y el
+ * selector se apaga con `NEXT_PUBLIC_SELECTOR_EMPRESA=false` (se lee al
+ * compilar), sin tocar código.
  */
 export default function SelectorMarca() {
   const marca = useMarca();
@@ -21,12 +25,17 @@ export default function SelectorMarca() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
 
-  if (isAuthenticated) return null;
+  if (isAuthenticated || process.env.NEXT_PUBLIC_SELECTOR_EMPRESA === "false") {
+    return null;
+  }
 
   function elegir(slug: SlugMarca) {
     recordarMarca(slug);
     const { ruta } = separarMarca(pathname);
-    router.push(rutaMarca(MARCAS[slug], ruta as `/${string}`));
+    const destino = enlaceEntreSitios(marca, MARCAS[slug], ruta as `/${string}`);
+    // El sitio de la otra empresa puede estar en otro host.
+    if (destino.startsWith("/")) router.push(destino);
+    else window.location.assign(destino);
   }
 
   return (

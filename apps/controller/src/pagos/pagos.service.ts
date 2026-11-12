@@ -46,7 +46,7 @@ import {
   type ResultadoWebpayRespuestaDto,
   type ResumenPagoDto,
 } from './dto/pagos.dto.js';
-import { rutaDelSitio } from '../common/constants/empresas.js';
+import { urlDelSitio } from '../common/constants/empresas.js';
 
 type Pagador = Cuenta & {
   nombre: string;
@@ -419,8 +419,11 @@ export class PagosService {
     idEmpresa?: number | null,
   ): string {
     const url = new URL(
-      rutaDelSitio(idEmpresa, '/pagar/resultado'),
-      this.config.getOrThrow<string>('FRONTEND_URL'),
+      urlDelSitio(
+        idEmpresa,
+        '/pagar/resultado',
+        this.config.getOrThrow<string>('FRONTEND_URL'),
+      ),
     );
     url.searchParams.set('resultado', resultado);
     if (token) url.searchParams.set('token_ws', token);

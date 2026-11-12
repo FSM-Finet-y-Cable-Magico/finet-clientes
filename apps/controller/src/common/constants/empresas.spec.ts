@@ -1,9 +1,9 @@
-import { describe, it, expect } from '@jest/globals';
+import { afterEach, describe, it, expect } from '@jest/globals';
 import {
   EMPRESAS,
   empresaDe,
   esEmpresaConocida,
-  rutaDelSitio,
+  urlDelSitio,
 } from './empresas.js';
 
 /** Las dos empresas del portal (Documento 0, §6.6), con los ids de la base. */
@@ -37,9 +37,38 @@ describe('empresas', () => {
     expect(esEmpresaConocida(null)).toBe(false);
   });
 
-  it('una ruta del sitio lleva el prefijo de su empresa', () => {
-    expect(rutaDelSitio(1, '/pagar')).toBe('/pagar');
-    expect(rutaDelSitio(2, '/pagar')).toBe('/cable-magico/pagar');
-    expect(rutaDelSitio(null, '/pagar')).toBe('/pagar');
+  describe('urlDelSitio', () => {
+    const SITIO = 'http://localhost:18200';
+    const antes = process.env.FRONTEND_URL_CABLE_MAGICO;
+    afterEach(() => {
+      if (antes === undefined) delete process.env.FRONTEND_URL_CABLE_MAGICO;
+      else process.env.FRONTEND_URL_CABLE_MAGICO = antes;
+    });
+
+    it('mientras comparten host, Cable Mágico va bajo su prefijo', () => {
+      delete process.env.FRONTEND_URL_CABLE_MAGICO;
+      expect(urlDelSitio(1, '/pagar', SITIO)).toBe(`${SITIO}/pagar`);
+      expect(urlDelSitio(2, '/pagar', SITIO)).toBe(
+        `${SITIO}/cable-magico/pagar`,
+      );
+      expect(urlDelSitio(null, '/pagar', SITIO)).toBe(`${SITIO}/pagar`);
+    });
+
+    it('con su propio host, Cable Mágico va ahí y sin prefijo; Finet no cambia', () => {
+      process.env.FRONTEND_URL_CABLE_MAGICO =
+        'http://cablemagico.localhost:18200/';
+      expect(urlDelSitio(2, '/pagar', SITIO)).toBe(
+        'http://cablemagico.localhost:18200/pagar',
+      );
+      expect(urlDelSitio(1, '/pagar', SITIO)).toBe(`${SITIO}/pagar`);
+      expect(urlDelSitio(99, '/pagar', SITIO)).toBe(`${SITIO}/pagar`);
+    });
+
+    it('una variable vacía es como no tenerla', () => {
+      process.env.FRONTEND_URL_CABLE_MAGICO = '  ';
+      expect(urlDelSitio(2, '/pagar', SITIO)).toBe(
+        `${SITIO}/cable-magico/pagar`,
+      );
+    });
   });
 });

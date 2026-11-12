@@ -85,6 +85,16 @@ describe("selector de empresa", () => {
     expect(document.cookie).toContain("empresa=cable-magico");
   });
 
+  it("en producción se apaga desde el .env", () => {
+    process.env.NEXT_PUBLIC_SELECTOR_EMPRESA = "false";
+    try {
+      const { container } = conMarca("cable-magico");
+      expect(container.innerHTML).toBe("");
+    } finally {
+      delete process.env.NEXT_PUBLIC_SELECTOR_EMPRESA;
+    }
+  });
+
   it("con sesión no aparece: la empresa la fija el token", () => {
     autenticado = true;
     const { container } = conMarca("cable-magico");
