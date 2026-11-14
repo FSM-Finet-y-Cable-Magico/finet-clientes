@@ -48,7 +48,8 @@ export async function fetchLandingPlanes(
     url.searchParams.set("id_empresa", String(idEmpresa));
   }
 
-  const res = await fetch(url.toString(), { next: { revalidate: 300 } });
+  // 30 s: los planes los cargan otros equipos directo en la base, sin avisar.
+  const res = await fetch(url.toString(), { next: { revalidate: 30 } });
 
   if (!res.ok) {
     if (res.status === 404) return [];
