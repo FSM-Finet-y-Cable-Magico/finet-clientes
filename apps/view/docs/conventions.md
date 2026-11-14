@@ -11,7 +11,7 @@
 | Módulo | Uso | Variable de entorno | Notas |
 |---|---|---|---|
 | `app/utils/api.ts` | Client components (`"use client"`) — el que usan las páginas de `portal/*` | `NEXT_PUBLIC_API_URL` | Objeto `api.get/post/put/patch/delete`. Envía `credentials: "include"`. En un 401 dispara el evento `EVENTO_SESION_EXPIRADA` de `_lib/consts.ts` (lo escucha `AuthProvider`) y loguea con `securityLogger`. |
-| `app/_lib/api.ts` | Server components de landing (`getLandingPlanes`, `getPlanById`) | `NEXT_PUBLIC_API_URL` | `fetch` con `next: { revalidate: 300 }`. Si el backend no responde, hace fallback silencioso a catálogo vacío (`console.error("Backend no disponible...")` — esto es lo que se ve en el log de `pnpm build`, es esperado). |
+| `app/_lib/api.ts` | Server components de landing (`getLandingPlanes`, `getPlanById`) | `NEXT_PUBLIC_API_URL` | `fetch` con `next: { revalidate: 30 }`. Si el backend no responde, hace fallback silencioso a catálogo vacío (`console.error("Backend no disponible...")` — esto es lo que se ve en el log de `pnpm build`, es esperado). |
 | `app/_lib/api-servidor.ts` | Acciones del servidor (`portal/_lib/portal-actions.ts`, `_lib/cookies-actions.ts`) | **`API_URL`** (sin `NEXT_PUBLIC_`) | `apiUrl(path)` arma la URL; lanza si falta la variable, no tiene valor por defecto. |
 
 `NEXT_PUBLIC_API_URL` se lee una sola vez, en `API_URL` de `app/_lib/consts.ts`: los
