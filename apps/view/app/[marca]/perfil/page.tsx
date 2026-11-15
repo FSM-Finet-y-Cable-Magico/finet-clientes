@@ -6,6 +6,8 @@ import ChangePasswordForm from "../../components/ChangePasswordForm";
 import UpdateTelefonoForm from "../../components/UpdateTelefonoForm";
 import UpdateEmailForm from "../../components/UpdateEmailForm";
 import { api } from "../../utils/api";
+// La base guarda el RUT con guion (12345678-9): el de login-schema lo limpia antes.
+import { formatRut } from "../../utils/login-schema";
 import { fechaInstante } from "@/app/_lib/formato";
 
 type ClientePerfil = {
@@ -40,13 +42,6 @@ export default function PerfilPage() {
     const t = setTimeout(() => fetchPerfil(), 0);
     return () => clearTimeout(t);
   }, [fetchPerfil]);
-
-  function formatRut(rut: string) {
-    const body = rut.slice(0, -1);
-    const dv = rut.slice(-1);
-    const dotted = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    return `${dotted}-${dv}`;
-  }
 
   return (
     <div className="max-w-2xl">

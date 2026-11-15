@@ -94,6 +94,23 @@ describe("formato de montos y fechas en las pantallas", () => {
     expect(await screen.findByText("4 de marzo de 2026")).toBeInTheDocument();
   });
 
+  it("perfil: el RUT como lo guarda la base (con guion) sale con un solo guion", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      responder({
+        id_cliente: 1,
+        nombre_completo: "Ana Pérez",
+        rut: "16234567-2",
+        email: "ana@example.com",
+        telefono: "+56912345678",
+        fecha_creacion: "2026-03-05T12:00:00.000Z",
+      }),
+    );
+
+    render(<PerfilPage />);
+
+    expect(await screen.findByText("16.234.567-2")).toBeInTheDocument();
+  });
+
   it("pagos anteriores: DD/MM/AAAA en hora de Chile y el monto", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       responder({
