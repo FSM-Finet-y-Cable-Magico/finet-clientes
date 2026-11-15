@@ -47,7 +47,7 @@ const faqsDe = (marca: Marca) => [
   {
     question: "¿Como puedo pagar?",
     answer:
-      "El pago es mensual mediante factura electronica. Recibiras tu factura por correo cada mes con la fecha de vencimiento. Pronto habilitaremos el pago en linea desde el Portal Cliente. Si tienes dudas sobre tu factura, contactanos por WhatsApp.",
+      "El pago es mensual mediante factura electronica. Recibiras tu factura por correo cada mes con la fecha de vencimiento. Puedes pagarla en línea con Webpay desde «Paga tu cuenta», solo con tu RUT, o desde tu Portal Cliente. Si tienes dudas sobre tu factura, contactanos por WhatsApp.",
   },
 ];
 

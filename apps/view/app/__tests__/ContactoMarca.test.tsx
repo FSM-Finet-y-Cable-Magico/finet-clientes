@@ -35,4 +35,16 @@ describe("ayuda de cada empresa", () => {
       ),
     ).toBe(true);
   });
+
+  it("Ayuda dice que el pago en línea ya está: Webpay, en Paga tu cuenta o en el Portal", async () => {
+    const { default: Ayuda } = await import("@/app/[marca]/ayuda/page");
+    const { container } = render(
+      await Ayuda({ params: Promise.resolve({ marca: "finet" }) }),
+    );
+
+    expect(container.innerHTML).not.toMatch(/[Pp]ronto habilitaremos el pago/);
+    expect(container.textContent).toContain(
+      "Puedes pagarla en línea con Webpay desde «Paga tu cuenta», solo con tu RUT, o desde tu Portal Cliente.",
+    );
+  });
 });
