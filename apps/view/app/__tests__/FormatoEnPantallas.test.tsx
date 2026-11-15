@@ -76,6 +76,38 @@ describe("formato de montos y fechas en las pantallas", () => {
     expect(screen.getByText("Vence: 10 may")).toBeInTheDocument();
   });
 
+  it("panel: el estado del ticket sale con su nombre, como en Tickets", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(
+      responder({
+        cliente: {
+          id_cliente: 1,
+          nombre_completo: "Ana Pérez",
+          rut: "123456785",
+          email: "ana@example.com",
+          telefono: "+56912345678",
+        },
+        contratos: [],
+        resumen_deuda: { tiene_deuda: false, saldo_total: 0, facturas_pendientes: [] },
+        tickets_recientes: [
+          {
+            id_ticket: 2,
+            codigo_seguimiento: "FIN-2026-000002",
+            estado: "ABIERTO",
+            prioridad: "MEDIA",
+            descripcion: "Se corta el Internet.",
+            fecha_creacion: "2026-11-14T13:12:00.000Z",
+            categoria: "Falla de Internet",
+          },
+        ],
+      }),
+    );
+
+    render(<PortalPage />);
+
+    expect(await screen.findByText(/Abierto/)).toBeInTheDocument();
+    expect(screen.queryByText(/ABIERTO/)).not.toBeInTheDocument();
+  });
+
   it("perfil: fecha larga de \"Cliente desde\", en hora de Chile", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       responder({

@@ -14,6 +14,7 @@ import PrimaryButton from "@/app/_components/ui/PrimaryButton";
 import { api } from "../../../utils/api";
 import type { ApiError } from "../../../utils/api";
 import StatusBadge, { type StatusTone } from "@/app/_components/ui/StatusBadge";
+import { estadoBadge } from "../_lib/estado-ticket";
 
 type Ticket = {
   id_ticket: number;
@@ -42,18 +43,6 @@ type TicketCreado = {
   id_ticket: number;
   codigo_seguimiento: string;
 };
-
-function estadoBadge(estado: string): { label: string; tone: StatusTone } {
-  const map: Record<string, { label: string; tone: StatusTone }> = {
-    abierto: { label: "Abierto", tone: "info" },
-    en_progreso: { label: "En progreso", tone: "warning" },
-    escalado: { label: "Escalado", tone: "warning" },
-    resuelto: { label: "Resuelto", tone: "success" },
-    cerrado: { label: "Cerrado", tone: "success" },
-  };
-  // El CRM los guarda en mayúsculas y los tickets antiguos están en minúsculas.
-  return map[estado.toLowerCase()] ?? { label: estado, tone: "neutral" };
-}
 
 function prioridadBadge(prioridad: string): {
   label: string;

@@ -14,6 +14,7 @@ import { fechaCalendario, formatPrecio } from "@/app/_lib/formato";
 import StatusBadge from "@/app/_components/ui/StatusBadge";
 import IrAPagarButton from "@/app/_components/portal/IrAPagarButton";
 import { estadoContratoBadge } from "@/app/_lib/estado-contrato";
+import { estadoBadge } from "./_lib/estado-ticket";
 
 type Contrato = {
   id_contrato: number;
@@ -296,7 +297,7 @@ export default function PortalPage() {
                       </span>
                       <span className="text-muted">
                         {" "}
-                        — {t.estado}
+                        — {estadoBadge(t.estado).label}
                       </span>
                       <p className="text-xs text-muted truncate">
                         {t.descripcion}
