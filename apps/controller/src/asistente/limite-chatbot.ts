@@ -21,6 +21,11 @@ export const LIMITE_CHATBOT_POR_MINUTO = 600;
  * `/asistente/mensajes`, siguen con el suyo.
  */
 export function limitePorMinuto(config: ConfigService) {
+  // Rama ppt: en la demo local todo llega desde la misma IP, asi que
+  // ppt/levantar.sh sube el limite comun con PPT_LIMITE_POR_MINUTO.
+  const demo = Number(config.get<string>('PPT_LIMITE_POR_MINUTO'));
+  const comun = Number.isInteger(demo) && demo > 0 ? demo : LIMITE_POR_MINUTO;
+
   return (context: ExecutionContext): number => {
     const recibida = context.switchToHttp().getRequest<Request>().headers[
       'x-api-key'
@@ -29,6 +34,6 @@ export function limitePorMinuto(config: ConfigService) {
 
     return esClaveDelChatbot(recibida, esperada)
       ? LIMITE_CHATBOT_POR_MINUTO
-      : LIMITE_POR_MINUTO;
+      : comun;
   };
 }

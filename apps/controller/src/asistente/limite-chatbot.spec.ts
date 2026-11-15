@@ -49,3 +49,31 @@ describe('limitePorMinuto', () => {
     expect(Number.isFinite(LIMITE_CHATBOT_POR_MINUTO)).toBe(true);
   });
 });
+
+// Rama ppt: en la demo local todo llega desde la misma IP.
+describe('limitePorMinuto en la demo local (PPT_LIMITE_POR_MINUTO)', () => {
+  const configPorClave = (valores: Record<string, string | undefined>) =>
+    ({ get: (clave: string) => valores[clave] }) as unknown as ConfigService;
+
+  it('usa PPT_LIMITE_POR_MINUTO como limite comun', () => {
+    const limite = limitePorMinuto(
+      configPorClave({
+        ASISTENTE_API_KEY: 'clave-del-bot',
+        PPT_LIMITE_POR_MINUTO: '600',
+      }),
+    );
+
+    expect(limite(peticion())).toBe(600);
+  });
+
+  it.each(['0', '-5', 'muchas', ''])(
+    'ignora un PPT_LIMITE_POR_MINUTO que no es un entero positivo (%s)',
+    (valor) => {
+      const limite = limitePorMinuto(
+        configPorClave({ PPT_LIMITE_POR_MINUTO: valor }),
+      );
+
+      expect(limite(peticion())).toBe(LIMITE_POR_MINUTO);
+    },
+  );
+});
