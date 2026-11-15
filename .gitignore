@@ -25,3 +25,6 @@ npm-debug.log*
 # apps/controller/scripts/extraer-cobertura-kml.mjs y solo emite geometria.
 *.kml
 *.kmz
+
+# Rama ppt: llaves, secretos, logs y binarios locales de la demo (nunca se commitean).
+ppt/.local/
