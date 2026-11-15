@@ -21,10 +21,30 @@ echo "Aplicando migraciones…"
 echo "Cargando datos de la demo…"
 psql "$URL" -X -q -v ON_ERROR_STOP=1 -f "$PPT_DIR/base/datos.sql"
 
+# Los correos reales quedan fuera del repo: con ppt/.local/correo-demo todos
+# los usuarios de prueba usan ese correo, y con ppt/.local/correo-registro,
+# Ignacio (el que se registra en la demo) usa ese otro.
+if [ -s "$LOCAL_DIR/correo-demo" ]; then
+  psql "$URL" -X -q -v ON_ERROR_STOP=1 -v correo="$(tr -d '[:space:]' <"$LOCAL_DIR/correo-demo")" <<'SQL'
+UPDATE cliente SET email = :'correo';
+UPDATE usuario SET email = :'correo';
+UPDATE prospecto SET email = :'correo';
+SQL
+  echo "  correo de los usuarios de prueba: el de ppt/.local/correo-demo"
+fi
+if [ -s "$LOCAL_DIR/correo-registro" ]; then
+  psql "$URL" -X -q -v ON_ERROR_STOP=1 -v correo="$(tr -d '[:space:]' <"$LOCAL_DIR/correo-registro")" <<'SQL'
+UPDATE cliente SET email = :'correo' WHERE rut = '22456789-8';
+UPDATE prospecto SET email = :'correo' WHERE id_cliente = (SELECT id_cliente FROM cliente WHERE rut = '22456789-8');
+SQL
+  echo "  correo de Ignacio: el de ppt/.local/correo-registro"
+fi
+
 psql "$URL" -X -At -F ' ' -c "
   select 'empresas', count(*) from empresa union all
   select 'planes', count(*) from plan union all
   select 'clientes', count(*) from cliente union all
+  select 'prospectos', count(*) from prospecto union all
   select 'contratos', count(*) from contrato union all
   select 'facturas', count(*) from factura union all
   select 'pagos', count(*) from pago union all

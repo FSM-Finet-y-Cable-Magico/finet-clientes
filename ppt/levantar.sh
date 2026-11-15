@@ -2,7 +2,8 @@
 # Levanta la demo local completa (rama ppt): correo (Mailpit), simuladores de G8
 # y G3, chatbot, API y sitio, contra la base local finet_ppt. Nada de esto toca
 # la VPS ni la base compartida: antes de arrancar cada servicio se revisa que
-# todas sus URL apunten a este PC (salvo fast.com y el LLM del chatbot).
+# todas sus URL apunten a este PC (salvo fast.com, el LLM del chatbot y, si
+# está ppt/.local/smtp-real.env, el Gmail de cada empresa).
 #
 # Los .env de apps/ no se tocan: las variables de aquí mandan sobre ellos.
 # Lo que no va al repo (secretos, llaves, logs, pids) queda en ppt/.local/.
@@ -84,22 +85,30 @@ fi
 arrancar vista "$REPO_DIR/apps/view" env -i "${BASICO[@]}" "${VISTA[@]}" pnpm exec next start -p 3000
 esperar "$SITIO/" "Sitio" || fallar vista
 
+if [ -f "$SMTP_REAL" ]; then
+  CORREOS="llegan de verdad a Gmail, desde la cuenta de cada empresa"
+else
+  CORREOS="http://localhost:8025 (Mailpit: aquí llega todo lo que manda el portal)"
+fi
 cat <<EOF
 
 Demo local lista (rama ppt, base $PPT_BASE). Nada de esto toca la VPS.
 
   Finet          $SITIO
   Cable Mágico   $SITIO/cable-magico
-  Correos        http://localhost:8025   (Mailpit: aquí llega todo lo que manda el portal)
+  Correos        $CORREOS
   Logs           ppt/.local/logs/        (g8.log y g3.log muestran lo que «reciben» G8 y G3)
 
-  Clientes con cuenta (contraseña Demo2026):
-    Finet         16.234.567-2  Camila Rojas    (deuda vencida y por vencer, tickets)
-    Finet         15.456.789-5  Sofía Pérez     (contrato suspendido)
-    Cable Mágico  18.567.890-3  Matías González (deuda por vencer, ticket abierto)
-  Sin cuenta, para registrarse:
-    Finet         17.345.678-6  Diego Muñoz
-    Cable Mágico  19.678.901-4  Valentina Soto
+  Con cuenta (contraseña Demo2026):
+    Finet         16.234.567-2  Camila Rojas    factura vencida y otra por vencer, ticket abierto
+    Finet         15.456.789-5  Sofía Pérez     contrato suspendido, dos facturas vencidas
+    Cable Mágico  18.567.890-3  Matías González factura por vencer, ticket abierto
+  Listo para registrarse (solicitud aprobada):
+    Finet         22.456.789-8  Ignacio Fuentes
+  Sin cuenta:
+    Finet         17.345.678-6  Diego Muñoz     factura que venció ayer (aviso de corte)
+    Cable Mágico  19.678.901-4  Valentina Soto  al día
+  Para pedir un plan en «Contratar»: 20.123.456-5 o 21.234.567-9
 
 Para bajar todo: ppt/detener.sh
 EOF

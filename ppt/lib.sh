@@ -79,6 +79,7 @@ esperar() {
 SECRETOS="$LOCAL_DIR/secretos.env"
 LLAVE_PRIVADA="$LOCAL_DIR/g3-privada.pem"
 LLAVE_PUBLICA="$LOCAL_DIR/g3-publica.pem"
+SMTP_REAL="$LOCAL_DIR/smtp-real.env"
 
 # Arma el entorno de cada servicio de la demo en los arreglos CONTROLLER,
 # VISTA, CHATBOT, G8 y G3 (más BASICO, SITIO, API y LLM_HOST). Lo usan
@@ -120,6 +121,27 @@ entorno_demo() {
   # Cada servicio arranca con env -i: solo ve PATH, HOME y lo que se le pasa aquí
   # (más el .env de su carpeta, que el servicio lee y que estas variables pisan).
   BASICO=(PATH="$PATH" HOME="$HOME" LANG="${LANG:-C.UTF-8}")
+
+  # Las cuentas de correo de cada empresa. Con ppt/.local/smtp-real.env (las
+  # cuentas Gmail reales de Finet y Cable Mágico, copiadas de la VPS) los
+  # correos llegan de verdad; sin él, las dos cuentas son Mailpit.
+  CUENTAS_SMTP=()
+  if [ -f "$SMTP_REAL" ]; then
+    while IFS= read -r linea; do
+      valor=${linea#*=}
+      valor=${valor#\"}; valor=${valor%\"}; valor=${valor#\'}; valor=${valor%\'}
+      CUENTAS_SMTP+=("${linea%%=*}=$valor")
+    done < <(grep -E '^SMTP_(FINET|CABLE_MAGICO)_[A-Z_]+=' "$SMTP_REAL")
+  else
+    CUENTAS_SMTP=(
+      SMTP_FINET_HOST=localhost SMTP_FINET_PORT=1025 SMTP_FINET_SECURE=false
+      SMTP_FINET_USER=demo SMTP_FINET_PASSWORD=demo
+      SMTP_FINET_FROM=finet@finet-demo.test SMTP_FINET_FROM_NAME=FiNet
+      SMTP_CABLE_MAGICO_HOST=localhost SMTP_CABLE_MAGICO_PORT=1025 SMTP_CABLE_MAGICO_SECURE=false
+      SMTP_CABLE_MAGICO_USER=demo SMTP_CABLE_MAGICO_PASSWORD=demo
+      SMTP_CABLE_MAGICO_FROM=cablemagico@cable-demo.test SMTP_CABLE_MAGICO_FROM_NAME="Cable Magico Litoral"
+    )
+  fi
   SITIO="http://localhost:3000"
   API="http://localhost:4000/api"
 
@@ -128,17 +150,12 @@ entorno_demo() {
     DATABASE_URL="$URL_BASE"
     JWT_SECRET="$JWT_SECRET" ENLACE_PAGO_SECRET="$ENLACE_PAGO_SECRET"
     FRONTEND_URL="$SITIO" CORS_ORIGIN="$SITIO"
-    # Como en producción, cada empresa manda desde su cuenta y con su remitente;
-    # aquí las dos cuentas son Mailpit (acepta cualquier usuario).
+    # Como en producción, cada empresa manda desde su cuenta y con su remitente
+    # (CUENTAS_SMTP, más abajo). La cuenta general es Mailpit.
     SMTP_HOST=localhost SMTP_PORT=1025 SMTP_USER= SMTP_PASS=
     MAIL_FROM="FiNet <finet@finet-demo.test>"
     SMTP_COMPANIES='[{"idEmpresa":1,"alias":"FINET"},{"idEmpresa":2,"alias":"CABLE_MAGICO"}]'
-    SMTP_FINET_HOST=localhost SMTP_FINET_PORT=1025 SMTP_FINET_SECURE=false
-    SMTP_FINET_USER=demo SMTP_FINET_PASSWORD=demo
-    SMTP_FINET_FROM=finet@finet-demo.test SMTP_FINET_FROM_NAME=FiNet
-    SMTP_CABLE_MAGICO_HOST=localhost SMTP_CABLE_MAGICO_PORT=1025 SMTP_CABLE_MAGICO_SECURE=false
-    SMTP_CABLE_MAGICO_USER=demo SMTP_CABLE_MAGICO_PASSWORD=demo
-    SMTP_CABLE_MAGICO_FROM=cablemagico@cable-demo.test SMTP_CABLE_MAGICO_FROM_NAME="Cable Magico Litoral"
+    "${CUENTAS_SMTP[@]}"
     INTEGRACION_G8_API_URL=http://127.0.0.1:4900 INTEGRACION_G8_API_KEY="$G8_API_KEY"
     G3_API_URL=http://127.0.0.1:4901 G3_API_KEY="$G3_API_KEY"
     G3_WIFI_PUBLIC_KEY="$(base64 -w0 "$LLAVE_PUBLICA")"

@@ -47,7 +47,10 @@ INSERT INTO cliente (id_cliente, id_empresa, rut, nombre_completo, email, telefo
       '$2b$10$R4lNkPy2V.CFAQ9YS4T7ru3LkiMHRkoAHThxvMp3pMcKdH6lFYVdW', 'activo', CURRENT_DATE - 200 + TIME '10:30'),
   (4, 2, '18567890-3', 'Matías González Vera',  'matias.gonzalez@cable-demo.test',  '+56944445555',
       '$2b$10$R4lNkPy2V.CFAQ9YS4T7ru3LkiMHRkoAHThxvMp3pMcKdH6lFYVdW', 'activo', CURRENT_DATE - 250 + TIME '10:30'),
-  (5, 2, '19678901-4', 'Valentina Soto Ríos',   'valentina.soto@cable-demo.test',   '+56955556666', NULL, 'activo', CURRENT_DATE - 90 + TIME '10:30');
+  (5, 2, '19678901-4', 'Valentina Soto Ríos',   'valentina.soto@cable-demo.test',   '+56955556666', NULL, 'activo', CURRENT_DATE - 90 + TIME '10:30'),
+  -- Ignacio pidió su plan desde «Contratar», G8 aprobó la solicitud y quedó
+  -- instalado ayer: está listo para crear su cuenta en el portal.
+  (6, 1, '22456789-8', 'Ignacio Fuentes Rojas', 'ignacio.fuentes@finet-demo.test',  '+56966667777', NULL, 'activo', CURRENT_DATE - 1 + TIME '10:30');
 
 -- Contratos: Sofía está suspendida (no puede pedir el cambio de clave WiFi).
 -- El día de pago de cada contrato calza con el vencimiento de sus facturas.
@@ -56,13 +59,23 @@ INSERT INTO contrato (id_contrato, id_cliente, id_plan, id_empresa, fecha_inicio
   (2, 2, 1, 1, CURRENT_DATE - 120, extract(day FROM CURRENT_DATE - 1),  'ACTIVO',     NULL),
   (3, 3, 1, 1, CURRENT_DATE - 200, extract(day FROM CURRENT_DATE - 20), 'SUSPENDIDO', CURRENT_DATE - 5),
   (4, 4, 7, 2, CURRENT_DATE - 250, extract(day FROM CURRENT_DATE + 3),  'ACTIVO',     NULL),
-  (5, 5, 6, 2, CURRENT_DATE - 90,  extract(day FROM CURRENT_DATE - 5),  'ACTIVO',     NULL);
+  (5, 5, 6, 2, CURRENT_DATE - 90,  extract(day FROM CURRENT_DATE - 5),  'ACTIVO',     NULL),
+  (6, 6, 2, 1, CURRENT_DATE - 1,   extract(day FROM CURRENT_DATE - 1),  'ACTIVO',     NULL);
 
 -- Servicio Internet de cada contrato (lo exige el cambio de clave WiFi).
 INSERT INTO servicio_contratado (id_servicio, id_cliente, id_empresa, id_contrato, tipo_servicio, estado_operativo) VALUES
   (1, 1, 1, 1, 'Internet', 'Operativo'), (2, 2, 1, 2, 'Internet', 'Operativo'),
   (3, 3, 1, 3, 'Internet', 'Suspendido'), (4, 4, 2, 4, 'Internet', 'Operativo'),
-  (5, 5, 2, 5, 'Internet', 'Operativo');
+  (5, 5, 2, 5, 'Internet', 'Operativo'), (6, 6, 1, 6, 'Internet', 'Operativo');
+
+-- La solicitud de Ignacio, como la deja el formulario de contratar y ya
+-- convertida en cliente por G8, con su dirección de instalación.
+INSERT INTO prospecto (id_prospecto, id_empresa, id_cliente, rut, nombre_completo, email, telefono, direccion, comuna, region,
+                       origen_contacto, id_plan_interes, estado_pipeline, fecha_creacion, fecha_conversion, tiempo_conversion_dias) VALUES
+  (1, 1, 6, '224567898', 'Ignacio Fuentes Rojas', 'ignacio.fuentes@finet-demo.test', '+56966667777', 'Pasaje Los Aromos 1234',
+   'La Pintana', 'Metropolitana de Santiago', 'Formulario web', 2, 'Prospecto Nuevo', CURRENT_DATE - 6 + TIME '18:20', CURRENT_DATE - 1, 5);
+INSERT INTO direccion_servicio (id_direccion, id_cliente, direccion_completa, comuna, es_principal) VALUES
+  (1, 6, 'Pasaje Los Aromos 1234', 'La Pintana', true);
 
 -- Facturas mensuales: cada una cobra el mes anterior al de su vencimiento, se
 -- emite el día 1 del mes en que vence y vence el día de pago del contrato.
@@ -121,9 +134,11 @@ SELECT setval(pg_get_serial_sequence('plan', 'id_plan'), 8);
 SELECT setval(pg_get_serial_sequence('categoria_falla', 'id_categoria'), 9);
 SELECT setval(pg_get_serial_sequence('rol', 'id_rol'), 1);
 SELECT setval(pg_get_serial_sequence('usuario', 'id_usuario'), 1);
-SELECT setval(pg_get_serial_sequence('cliente', 'id_cliente'), 5);
-SELECT setval(pg_get_serial_sequence('contrato', 'id_contrato'), 5);
-SELECT setval(pg_get_serial_sequence('servicio_contratado', 'id_servicio'), 5);
+SELECT setval(pg_get_serial_sequence('cliente', 'id_cliente'), 6);
+SELECT setval(pg_get_serial_sequence('contrato', 'id_contrato'), 6);
+SELECT setval(pg_get_serial_sequence('prospecto', 'id_prospecto'), 1);
+SELECT setval(pg_get_serial_sequence('direccion_servicio', 'id_direccion'), 1);
+SELECT setval(pg_get_serial_sequence('servicio_contratado', 'id_servicio'), 6);
 SELECT setval(pg_get_serial_sequence('factura', 'id_factura'), 10);
 SELECT setval(pg_get_serial_sequence('pago', 'id_pago'), 4);
 SELECT setval(pg_get_serial_sequence('ticket', 'id_ticket'), 3);
