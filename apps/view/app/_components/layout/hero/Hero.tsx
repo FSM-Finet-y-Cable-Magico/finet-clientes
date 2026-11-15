@@ -16,13 +16,7 @@ const SLIDES = [
     image: "/hero/slide-1.webp",
     overlayClass: "bg-[var(--color-hero-slide-1)]/25",
   },
-  {
-    id: 2,
-    title: "Television Digital HD",
-    subtitle: "Agrega entretenimiento a tu hogar con nuestros planes Duo.",
-    image: "/hero/slide-2.webp",
-    overlayClass: "bg-[var(--color-hero-slide-2)]/20",
-  },
+  // Rama ppt: sin la diapositiva de televisión, que no hay contenido de TV.
 ];
 
 export const Hero = () => {
@@ -110,41 +104,46 @@ export const Hero = () => {
         })}
       </div>
 
-      <button
-        onClick={prevSlide}
-        className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-white"
-        aria-label="Diapositiva anterior"
-      >
-        <ChevronLeft size={32} aria-hidden />
-      </button>
-      <button
-        onClick={nextSlide}
-        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-white"
-        aria-label="Diapositiva siguiente"
-      >
-        <ChevronRight size={32} aria-hidden />
-      </button>
+      {/* Flechas y puntos solo si hay más de una diapositiva. */}
+      {SLIDES.length > 1 && (
+        <>
+        <button
+          onClick={prevSlide}
+          className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-white"
+          aria-label="Diapositiva anterior"
+        >
+          <ChevronLeft size={32} aria-hidden />
+        </button>
+        <button
+          onClick={nextSlide}
+          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-white"
+          aria-label="Diapositiva siguiente"
+        >
+          <ChevronRight size={32} aria-hidden />
+        </button>
 
-      <div
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 flex space-x-3 z-20"
-        role="tablist"
-        aria-label="Navegacion del carrusel"
-      >
-        {SLIDES.map((_, index) => (
-          <button
-            key={index}
-            role="tab"
-            aria-selected={currentIndex === index}
-            onClick={() => setCurrentIndex(index)}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
-              currentIndex === index
-                ? "bg-white scale-125"
-                : "bg-white/50 hover:bg-white/80"
-            }`}
-            aria-label={`Ir a la diapositiva ${index + 1}`}
-          />
-        ))}
-      </div>
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 flex space-x-3 z-20"
+          role="tablist"
+          aria-label="Navegacion del carrusel"
+        >
+          {SLIDES.map((_, index) => (
+            <button
+              key={index}
+              role="tab"
+              aria-selected={currentIndex === index}
+              onClick={() => setCurrentIndex(index)}
+              className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                currentIndex === index
+                  ? "bg-white scale-125"
+                  : "bg-white/50 hover:bg-white/80"
+              }`}
+              aria-label={`Ir a la diapositiva ${index + 1}`}
+            />
+          ))}
+        </div>
+        </>
+      )}
     </section>
   );
 };

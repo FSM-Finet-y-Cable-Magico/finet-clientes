@@ -29,9 +29,10 @@ export const RUTAS_PUBLICAS: RutaPublica[] = [
   { path: RUTA_PLAN, indexable: true, changeFrequency: "weekly", priority: 0.7 },
   { path: "/empresas", indexable: true, changeFrequency: "weekly", priority: 0.8 },
   { path: "/cobertura", indexable: true, changeFrequency: "monthly", priority: 0.8 },
-  { path: "/tv", indexable: true, changeFrequency: "weekly", priority: 0.7 },
-  { path: "/tv/canales", indexable: true, changeFrequency: "weekly", priority: 0.6 },
-  { path: "/tv/parrilla", indexable: true, changeFrequency: "weekly", priority: 0.6 },
+  // Rama ppt: la TV no se enlaza ni va al sitemap (no hay contenido de TV).
+  { path: "/tv", indexable: false },
+  { path: "/tv/canales", indexable: false },
+  { path: "/tv/parrilla", indexable: false },
   { path: "/velocidad", indexable: true, changeFrequency: "monthly", priority: 0.6 },
   { path: "/ayuda", indexable: true, changeFrequency: "monthly", priority: 0.6 },
   { path: "/consultar-deuda", indexable: true, changeFrequency: "monthly", priority: 0.6 },

@@ -6,14 +6,7 @@ export const navItems: NavItem[] = [
     href: "/",
   },
   { label: "Planes", href: "/planes" },
-  {
-    label: "TV",
-    href: "/tv",
-    children: [
-      { label: "Canales", href: "/tv/canales" },
-      { label: "Parrilla", href: "/tv/parrilla" },
-    ],
-  },
+  // Rama ppt: TV, Canales y Parrilla no se enlazan (no hay contenido de TV).
   { label: "Cobertura", href: "/cobertura" },
   // Junto a Cobertura porque son las dos herramientas del sitio: una para ver
   // si llega la red y otra para medirla (CU-34/35).
