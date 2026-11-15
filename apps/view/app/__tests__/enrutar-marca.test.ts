@@ -1,3 +1,4 @@
+import { enlaceAOtraMarca, MARCAS, type SlugMarca } from "@/app/_lib/company";
 import { destinoInterno, enrutarMarca } from "@/app/_lib/enrutar-marca";
 
 /**
@@ -42,6 +43,28 @@ describe("enrutarMarca", () => {
       tipo: "redirigir",
       destino: "/",
     });
+  });
+
+  it("la ruta interna /finet/… recuerda Finet a quien venía de Cable Mágico", () => {
+    expect(
+      enrutarMarca({ ...sinNada, marcaCookie: "cable-magico", pathname: "/finet/contratar/1" }),
+    ).toEqual({ tipo: "redirigir", destino: "/contratar/1", guardarCookie: "finet" });
+  });
+
+  it("un plan de Finet abierto desde Cable Mágico llega a su página sin dar vueltas", () => {
+    // La página de contratar de Cable Mágico manda el plan de Finet a su sitio.
+    let destino = enlaceAOtraMarca(MARCAS["cable-magico"], MARCAS.finet, "/contratar/1");
+    let cookie: SlugMarca = "cable-magico";
+    for (let saltos = 0; saltos < 5; saltos++) {
+      const decision = enrutarMarca({ ...sinNada, marcaCookie: cookie, pathname: destino });
+      if (decision.tipo === "reescribir") {
+        expect(decision.destino).toBe("/finet/contratar/1");
+        return;
+      }
+      if (decision.guardarCookie) cookie = decision.guardarCookie;
+      destino = decision.destino;
+    }
+    throw new Error(`quedó dando vueltas entre ${destino} y Cable Mágico`);
   });
 
   it("quien eligió Cable Mágico sigue en su sitio al navegar a una ruta sin prefijo", () => {

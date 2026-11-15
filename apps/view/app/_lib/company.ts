@@ -222,6 +222,24 @@ export function enlaceEntreSitios(
     : urlMarca(destino, ruta);
 }
 
+/**
+ * El enlace con que una página manda al sitio de otra empresa. En un host
+ * compartido, una ruta sin prefijo es la de la marca que eligió el visitante
+ * (proxy.ts), así que quien venía de Cable Mágico volvería a Cable Mágico. Por
+ * eso a Finet se va por /finet/…, que el proxy lleva a su ruta de siempre
+ * recordando la marca.
+ */
+export function enlaceAOtraMarca(
+  actual: Marca,
+  destino: Marca,
+  ruta: `/${string}`,
+): string {
+  if (destino.url === actual.url && !destino.prefijo && destino.slug !== actual.slug) {
+    return `/${destino.slug}${ruta === "/" ? "" : ruta}`;
+  }
+  return enlaceEntreSitios(actual, destino, ruta);
+}
+
 // Falla al cargar (y en el build) si una URL del .env está mal escrita.
 const HOSTS = Object.values(MARCAS).map(
   (marca) => [new URL(marca.url).host, marca] as const,

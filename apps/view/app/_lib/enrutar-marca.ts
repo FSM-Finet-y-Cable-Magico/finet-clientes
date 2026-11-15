@@ -30,7 +30,12 @@ import {
 export const COOKIE_MARCA = "empresa";
 
 export type DecisionMarca =
-  | { tipo: "redirigir"; destino: string }
+  | {
+      tipo: "redirigir";
+      destino: string;
+      /** La marca que hay que recordar al redirigir, si cambió. */
+      guardarCookie?: SlugMarca;
+    }
   | {
       tipo: "reescribir";
       destino: string;
@@ -73,6 +78,11 @@ export function enrutarMarca(entrada: EntradaMarca): DecisionMarca {
       return {
         tipo: "redirigir",
         destino: `${enlaceEntreSitios(sitio, marca, ruta as `/${string}`)}${e.search}`,
+        // Quien pide /finet/… eligió Finet (enlaceAOtraMarca): si no, la ruta
+        // sin prefijo lo devolvería a la marca que tenía.
+        ...(e.marcaCookie && e.marcaCookie !== marca.slug
+          ? { guardarCookie: marca.slug as SlugMarca }
+          : {}),
       };
     }
   }

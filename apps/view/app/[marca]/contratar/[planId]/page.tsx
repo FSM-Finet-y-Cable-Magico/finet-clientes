@@ -7,7 +7,7 @@ import { formatPrecio } from "../../../_lib/formato";
 import { productJsonLd, breadcrumbJsonLd } from "../../../_lib/jsonld";
 import { metadataPlan } from "../../../_lib/seo";
 import {
-  enlaceEntreSitios,
+  enlaceAOtraMarca,
   marcaPorEmpresa,
   marcaPorSlug,
   rutaMarca,
@@ -54,7 +54,7 @@ export default async function ContratarPlanPage({ params }: ContratarPlanPagePro
   // Un plan se contrata en el sitio de su empresa: el prospecto queda en ella.
   const deLaEmpresa = marcaPorEmpresa(plan.id_empresa);
   if (plan.id_empresa != null && deLaEmpresa.slug !== marca.slug) {
-    redirect(enlaceEntreSitios(marca, deLaEmpresa, `/contratar/${planId}`));
+    redirect(enlaceAOtraMarca(marca, deLaEmpresa, `/contratar/${planId}`));
   }
 
   return (

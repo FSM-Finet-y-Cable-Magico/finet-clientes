@@ -101,8 +101,19 @@ export async function proxy(request: NextRequest) {
     marcaHost: (host?.slug as SlugMarca) ?? null,
   });
 
+  const recordarMarca = <T extends NextResponse>(response: T, slug: SlugMarca): T => {
+    response.cookies.set(COOKIE_MARCA, slug, {
+      path: "/",
+      maxAge: UN_ANIO_S,
+      sameSite: "lax",
+      secure: request.nextUrl.protocol === "https:",
+    });
+    return response;
+  };
+
   if (decision.tipo === "redirigir") {
-    return ajustarSesion(NextResponse.redirect(new URL(decision.destino, request.url)));
+    const response = ajustarSesion(NextResponse.redirect(new URL(decision.destino, request.url)));
+    return decision.guardarCookie ? recordarMarca(response, decision.guardarCookie) : response;
   }
 
   // El portal y el perfil piden sesión, en el sitio de cualquier empresa.
@@ -120,15 +131,7 @@ export async function proxy(request: NextRequest) {
   const response = ajustarSesion(
     NextResponse.rewrite(new URL(decision.destino, request.url)),
   );
-  if (decision.guardarCookie) {
-    response.cookies.set(COOKIE_MARCA, decision.guardarCookie, {
-      path: "/",
-      maxAge: UN_ANIO_S,
-      sameSite: "lax",
-      secure: request.nextUrl.protocol === "https:",
-    });
-  }
-  return response;
+  return decision.guardarCookie ? recordarMarca(response, decision.guardarCookie) : response;
 }
 
 /**
