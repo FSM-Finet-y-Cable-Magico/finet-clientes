@@ -26,7 +26,7 @@ describe('BruteForceFallback', () => {
     fallback = new BruteForceFallback(() => ahora);
   });
 
-  it('el 5.º intento desde una IP en 5 minutos bloquea la IP por 15 minutos', () => {
+  it('el 5.º intento desde una IP en 5 minutos bloquea la IP por 1 minuto (temporal)', () => {
     for (let i = 0; i < 4; i++) {
       expect(fallback.registrarIntento(`11111111${i}`, '10.0.0.1')).toEqual({
         bloquearRut: false,
@@ -37,7 +37,7 @@ describe('BruteForceFallback', () => {
     expect(fallback.registrarIntento('111111114', '10.0.0.1')).toEqual({
       bloquearRut: false,
       bloquearIp: true,
-      bloquearHasta: new Date(INICIO.getTime() + 15 * 60_000),
+      bloquearHasta: new Date(INICIO.getTime() + 1 * 60_000),
     });
     expect(fallback.estaBloqueado('999999999', '10.0.0.1')).toEqual({
       ip: true,
@@ -88,14 +88,14 @@ describe('BruteForceFallback', () => {
     });
   });
 
-  it('el bloqueo dura 15 minutos', () => {
+  it('el bloqueo dura 1 minuto (temporal)', () => {
     intentos(5, '123456785', '10.0.0.1');
-    avanzar(14);
+    avanzar(0.5);
     expect(fallback.estaBloqueado('123456785', '10.0.0.1')).toEqual({
       ip: true,
       rut: true,
     });
-    avanzar(2);
+    avanzar(1);
     expect(fallback.estaBloqueado('123456785', '10.0.0.1')).toEqual({
       ip: false,
       rut: false,

@@ -161,7 +161,7 @@ export class BruteForceFallback {
     const bloquearIp = intentosIp + 1 >= 5;
     const bloquearHasta =
       bloquearRut || bloquearIp
-        ? new Date(ahora.getTime() + 15 * 60 * 1000)
+        ? new Date(ahora.getTime() + 1 * 60 * 1000) // ponytail: temporal, revertir a 15 min
         : null;
 
     // Un solo registro en los dos índices: el intento que bloquea deja
@@ -755,7 +755,7 @@ export class AuthService {
       const bloquearIp = intentosIp + 1 >= 5;
       const bloquearHasta =
         bloquearRut || bloquearIp
-          ? new Date(ahora.getTime() + 15 * 60 * 1000)
+          ? new Date(ahora.getTime() + 1 * 60 * 1000) // ponytail: temporal, revertir a 15 min
           : null;
 
       if (bloquearHasta) {

@@ -880,7 +880,7 @@ describe('AuthService', () => {
       });
     });
 
-    it('el bloqueo dura 15 minutos (RF-05)', async () => {
+    it('el bloqueo dura 1 minuto (temporal, RF-05 pide 15)', async () => {
       (prisma.intento_fallido.count as jest.Mock)
         .mockResolvedValueOnce(0)
         .mockResolvedValueOnce(4);
@@ -894,8 +894,8 @@ describe('AuthService', () => {
         bloqueado_hasta: string;
       };
       const minutos = (new Date(bloqueado_hasta).getTime() - antes) / 60_000;
-      expect(minutos).toBeGreaterThanOrEqual(14.9);
-      expect(minutos).toBeLessThanOrEqual(15.1);
+      expect(minutos).toBeGreaterThanOrEqual(0.9);
+      expect(minutos).toBeLessThanOrEqual(1.1);
     });
 
     it('un intento que no bloquea no se audita', async () => {
