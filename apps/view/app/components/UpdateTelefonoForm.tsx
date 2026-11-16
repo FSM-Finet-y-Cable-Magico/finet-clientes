@@ -117,7 +117,13 @@ export default function UpdateTelefonoForm({
             value={telefono}
             onChange={(e) => {
               const cleaned = e.target.value.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
-              setTelefono(!cleaned || cleaned.startsWith("+") ? cleaned : "+" + cleaned);
+              // Un celular escrito sin el código del país (9 1234 5678) lleva
+              // el +56; si empieza con 5, se está escribiendo el 56.
+              setTelefono(
+                !cleaned || cleaned.startsWith("+")
+                  ? cleaned
+                  : (cleaned.startsWith("5") ? "+" : "+56") + cleaned,
+              );
               setErrors((prev) => ({ ...prev, telefono: "" }));
               setDone(false);
             }}

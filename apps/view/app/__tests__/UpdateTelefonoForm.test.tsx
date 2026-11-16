@@ -44,6 +44,24 @@ describe('UpdateTelefonoForm (CU-08)', () => {
     });
   });
 
+  it.each(['9 1234 5678', '912345678', '56912345678', '+56 9 1234 5678'])(
+    'un celular escrito como %s se guarda con el +56',
+    async (escrito) => {
+      const user = userEvent.setup();
+      (api.patch as jest.Mock).mockResolvedValueOnce({ id_cliente: 1, telefono: '+56912345678' });
+      render(<UpdateTelefonoForm />);
+      await user.type(screen.getByLabelText(/contraseña actual/i), 'TestPass1');
+      await user.type(screen.getByLabelText(/nuevo teléfono/i), escrito);
+      await user.click(screen.getByRole('button', { name: /actualizar teléfono/i }));
+      await waitFor(() => {
+        expect(api.patch).toHaveBeenCalledWith('/auth/perfil/telefono', {
+          password_actual: 'TestPass1',
+          telefono: '+56912345678',
+        });
+      });
+    },
+  );
+
   it('muestra error si la contraseña actual es incorrecta (CU-08 Excepción 2)', async () => {
     const user = userEvent.setup();
     (api.patch as jest.Mock).mockRejectedValueOnce({ message: 'La contraseña actual es incorrecta', status: 401 });
