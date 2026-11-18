@@ -25,8 +25,24 @@ export const LIMITE_CON_SESION_POR_MINUTO = 120;
  */
 export const LIMITE_COMPROBANTES_POR_MINUTO = 20;
 
+/**
+ * Rama ppt: en la demo local todos los usuarios salen de la misma IP, así que
+ * los límites por ruta se multiplican por PPT_MULTIPLICADOR_LIMITES (lo pone
+ * ppt/levantar.sh). Sin la variable, o con un valor que no sea un entero mayor
+ * que 1, el límite es el de main. Se lee en cada petición.
+ */
+export function limiteDemo(limite: number): () => number {
+  return () => {
+    const factor = Number(process.env.PPT_MULTIPLICADOR_LIMITES);
+    return Number.isInteger(factor) && factor > 1 ? limite * factor : limite;
+  };
+}
+
 /** El límite de las rutas con sesión, para el controlador o la ruta. */
 export const ConLimiteDeSesion = () =>
   Throttle({
-    default: { limit: LIMITE_CON_SESION_POR_MINUTO, ttl: UN_MINUTO_MS },
+    default: {
+      limit: limiteDemo(LIMITE_CON_SESION_POR_MINUTO),
+      ttl: UN_MINUTO_MS,
+    },
   });

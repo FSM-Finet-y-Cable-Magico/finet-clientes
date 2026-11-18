@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AsistenteService } from './asistente.service.js';
 import { ZodValidationPipe } from '../auth/pipes/zod-validation.pipe.js';
 import { MensajeAsistenteDto } from './dto/asistente.dto.js';
+import { limiteDemo } from '../common/constants/limites.js';
 
 /**
  * CU-65: asistente virtual del sitio publico (widget de chat).
@@ -26,7 +27,7 @@ export class AsistenteController {
    */
   @Post('mensajes')
   @HttpCode(200)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: limiteDemo(10), ttl: 60_000 } })
   enviar(
     @Body(new ZodValidationPipe(MensajeAsistenteDto))
     dto: MensajeAsistenteDto,

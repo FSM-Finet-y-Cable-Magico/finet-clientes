@@ -32,6 +32,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { CurrentClient } from './decorators/current-client.decorator.js';
 import {
   ConLimiteDeSesion,
+  limiteDemo,
   UN_MINUTO_MS,
 } from '../common/constants/limites.js';
 
@@ -72,7 +73,7 @@ export class AuthController {
    *   429 - Rate limit excedido (>5 req/min)
    */
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: UN_MINUTO_MS } })
+  @Throttle({ default: { limit: limiteDemo(5), ttl: UN_MINUTO_MS } })
   @HttpCode(200)
   async login(
     @Body(new ZodValidationPipe(loginSchema))
@@ -112,7 +113,7 @@ export class AuthController {
    *   503 - No se pudo enviar el correo
    */
   @Post('registro')
-  @Throttle({ default: { limit: 3, ttl: UN_MINUTO_MS } })
+  @Throttle({ default: { limit: limiteDemo(3), ttl: UN_MINUTO_MS } })
   @HttpCode(200)
   solicitarRegistro(
     @Body(new ZodValidationPipe(solicitudRegistroSchema))
@@ -144,7 +145,7 @@ export class AuthController {
    *   429 - Rate limit excedido (>3 req/min)
    */
   @Post('registro/confirmar')
-  @Throttle({ default: { limit: 3, ttl: UN_MINUTO_MS } })
+  @Throttle({ default: { limit: limiteDemo(3), ttl: UN_MINUTO_MS } })
   @HttpCode(200)
   async confirmarRegistro(
     @Body(new ZodValidationPipe(confirmacionRegistroSchema))
@@ -182,7 +183,7 @@ export class AuthController {
    *   429 - Rate limit excedido (>3 req/min)
    */
   @Post('recuperar-password')
-  @Throttle({ default: { limit: 3, ttl: UN_MINUTO_MS } })
+  @Throttle({ default: { limit: limiteDemo(3), ttl: UN_MINUTO_MS } })
   @HttpCode(200)
   async recuperarPassword(
     @Body(new ZodValidationPipe(recuperarPasswordSchema))
@@ -219,7 +220,7 @@ export class AuthController {
    *   429 - Rate limit excedido (>3 req/min)
    */
   @Post('restablecer-password')
-  @Throttle({ default: { limit: 3, ttl: UN_MINUTO_MS } })
+  @Throttle({ default: { limit: limiteDemo(3), ttl: UN_MINUTO_MS } })
   @HttpCode(200)
   async restablecerPassword(
     @Body(new ZodValidationPipe(restablecerPasswordSchema))

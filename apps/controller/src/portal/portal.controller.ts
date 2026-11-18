@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import {
   ConLimiteDeSesion,
   LIMITE_COMPROBANTES_POR_MINUTO,
+  limiteDemo,
   UN_MINUTO_MS,
 } from '../common/constants/limites.js';
 import { CurrentClient } from '../auth/decorators/current-client.decorator.js';
@@ -189,7 +190,10 @@ export class PortalController {
    */
   @Get('pagos/:id/comprobante')
   @Throttle({
-    default: { limit: LIMITE_COMPROBANTES_POR_MINUTO, ttl: UN_MINUTO_MS },
+    default: {
+      limit: limiteDemo(LIMITE_COMPROBANTES_POR_MINUTO),
+      ttl: UN_MINUTO_MS,
+    },
   })
   @Header('Cache-Control', 'no-store')
   @Header('X-Content-Type-Options', 'nosniff')
