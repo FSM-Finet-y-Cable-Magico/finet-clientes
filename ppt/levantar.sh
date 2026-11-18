@@ -19,8 +19,8 @@ for p in "${PUERTOS[@]}"; do
   fi
 done
 
-[ -x "$LOCAL_DIR/bin/mailpit" ] || { echo "Falta Mailpit en $LOCAL_DIR/bin/." >&2; exit 1; }
-[ -f "$LOCAL_DIR/llm.env" ] || { echo "Falta $LOCAL_DIR/llm.env (la llave del LLM del chatbot)." >&2; exit 1; }
+[ -x "$LOCAL_DIR/bin/mailpit" ] || { echo "Falta Mailpit en $LOCAL_DIR/bin/. Bájalo con: mkdir -p $LOCAL_DIR/bin && curl -sSL https://github.com/axllent/mailpit/releases/download/v1.33.1/mailpit-linux-amd64.tar.gz | tar -xz -C $LOCAL_DIR/bin mailpit" >&2; exit 1; }
+grep -qE '^OPENAI_API_KEY=.+' "$LOCAL_DIR/llm.env" 2>/dev/null || { echo "Falta la llave del LLM del chatbot en $LOCAL_DIR/llm.env: cópialo de ppt/llm.env.example y pon tu OPENAI_API_KEY." >&2; exit 1; }
 [ -f "$CHATBOT_DIR/dist/main.js" ] || { echo "Falta el chatbot compilado en $CHATBOT_DIR (pnpm install && pnpm build)." >&2; exit 1; }
 
 if [ "$(psql "$(url_base postgres)" -X -At -c "select 1 from pg_database where datname='$PPT_BASE'")" != "1" ]; then
