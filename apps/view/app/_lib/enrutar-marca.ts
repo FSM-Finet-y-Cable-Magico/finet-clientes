@@ -54,12 +54,26 @@ export type EntradaMarca = {
   /** La dueña del host pedido, si cada empresa tiene el suyo (`marcaPorHost`). */
   marcaHost?: SlugMarca | null;
   /**
-   * Es una precarga de Next, no una página que eligió el visitante: no cambia
-   * la marca recordada. Si la cambiara, una precarga en vuelo deshace lo que
-   * acaba de elegir en el selector.
+   * La pidió la página en segundo plano (precarga, datos de una página o una
+   * acción), no el visitante: no cambia la marca recordada. Si la cambiara,
+   * una en vuelo deshace lo que acaba de elegir en el selector.
    */
-  prefetch?: boolean;
+  segundoPlano?: boolean;
 };
+
+/**
+ * Si la petición es de la página en segundo plano. Next le quita al proxy las
+ * cabeceras de precarga (rsc, next-router-prefetch) y el parámetro _rsc, así
+ * que se mira Sec-Fetch-Dest, que pone el navegador: "document" es una página
+ * pedida de verdad. Sin la cabecera (un navegador antiguo, curl) cuenta como
+ * página, como antes.
+ */
+export function esSegundoPlano(cabeceras: {
+  get(nombre: string): string | null;
+}): boolean {
+  const destino = cabeceras.get("sec-fetch-dest");
+  return destino !== null && destino !== "document";
+}
 
 /**
  * Una sola barra al comienzo: para el navegador "//sitio" es otro dominio, y
@@ -86,7 +100,7 @@ export function enrutarMarca(entrada: EntradaMarca): DecisionMarca {
         destino: `${enlaceEntreSitios(sitio, marca, ruta as `/${string}`)}${e.search}`,
         // Quien pide /finet/… eligió Finet (enlaceAOtraMarca): si no, la ruta
         // sin prefijo lo devolvería a la marca que tenía.
-        ...(!e.prefetch && e.marcaCookie && e.marcaCookie !== marca.slug
+        ...(!e.segundoPlano && e.marcaCookie && e.marcaCookie !== marca.slug
           ? { guardarCookie: marca.slug as SlugMarca }
           : {}),
       };
@@ -113,7 +127,7 @@ export function enrutarMarca(entrada: EntradaMarca): DecisionMarca {
     destino: `/${elegida}${ruta === "/" ? "" : ruta}${e.search}`,
     marca: elegida,
     guardarCookie:
-      e.prefetch || e.marcaCookie === elegida
+      e.segundoPlano || e.marcaCookie === elegida
         ? null
         : conPrefijo || e.marcaToken
           ? elegida

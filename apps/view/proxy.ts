@@ -13,7 +13,7 @@ import {
   separarMarca,
   type SlugMarca,
 } from "./app/_lib/company";
-import { COOKIE_MARCA, enrutarMarca } from "./app/_lib/enrutar-marca";
+import { COOKIE_MARCA, enrutarMarca, esSegundoPlano } from "./app/_lib/enrutar-marca";
 import { COOKIE_HAY_SESION } from "./app/_lib/aviso-sesion";
 
 const PROTECTED_PATHS = ["/portal", "/perfil"];
@@ -99,10 +99,8 @@ export async function proxy(request: NextRequest) {
     marcaToken: ajena ? null : marcaToken,
     marcaCookie: esSlugMarca(cookie) ? cookie : null,
     marcaHost: (host?.slug as SlugMarca) ?? null,
-    // Las precargas de Next las marcan estos headers (Next 16).
-    prefetch:
-      request.headers.has("next-router-prefetch") ||
-      request.headers.has("next-router-segment-prefetch"),
+    // Precargas, datos de página y acciones no cambian la marca recordada.
+    segundoPlano: esSegundoPlano(request.headers),
   });
 
   const recordarMarca = <T extends NextResponse>(response: T, slug: SlugMarca): T => {

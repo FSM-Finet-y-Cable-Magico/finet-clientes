@@ -1,5 +1,5 @@
 import { enlaceAOtraMarca, MARCAS, type SlugMarca } from "@/app/_lib/company";
-import { destinoInterno, enrutarMarca } from "@/app/_lib/enrutar-marca";
+import { destinoInterno, enrutarMarca, esSegundoPlano } from "@/app/_lib/enrutar-marca";
 
 /**
  * Qué hace `proxy.ts` con cada ruta. Una sola app para las dos empresas, como
@@ -67,16 +67,17 @@ describe("enrutarMarca", () => {
     throw new Error(`quedó dando vueltas entre ${destino} y Cable Mágico`);
   });
 
-  // Rama ppt: una precarga de Next no es una elección del visitante. Si
-  // cambiara la marca, una precarga en vuelo deshace lo que eligió en el
-  // selector (15-11: elegía Finet y volvía a quedar en Cable Mágico).
-  it("una precarga de una ruta de Cable Mágico no cambia la marca recordada", () => {
+  // Rama ppt: una petición en segundo plano (precarga, datos de una página,
+  // una acción) no es una elección del visitante. Si cambiara la marca, una
+  // en vuelo deshace lo que eligió en el selector (15-11: elegía Finet y
+  // volvía a quedar en Cable Mágico).
+  it("una petición en segundo plano a Cable Mágico no cambia la marca recordada", () => {
     expect(
       enrutarMarca({
         ...sinNada,
         marcaCookie: "finet",
         pathname: "/cable-magico/planes",
-        prefetch: true,
+        segundoPlano: true,
       }),
     ).toEqual({
       tipo: "reescribir",
@@ -86,13 +87,13 @@ describe("enrutarMarca", () => {
     });
   });
 
-  it("una precarga de /finet/… tampoco cambia la marca recordada", () => {
+  it("una petición en segundo plano a /finet/… tampoco cambia la marca recordada", () => {
     expect(
       enrutarMarca({
         ...sinNada,
         marcaCookie: "cable-magico",
         pathname: "/finet/planes",
-        prefetch: true,
+        segundoPlano: true,
       }),
     ).toEqual({ tipo: "redirigir", destino: "/planes" });
   });
@@ -186,5 +187,25 @@ describe("destinoInterno", () => {
       expect(destinoInterno(malo, "/portal")).toBe("/portal");
     }
     expect(destinoInterno(null, "/cable-magico/portal")).toBe("/cable-magico/portal");
+  });
+});
+
+// Next le quita al proxy las cabeceras de precarga (rsc, next-router-prefetch)
+// y el parámetro _rsc; Sec-Fetch-Dest, que pone el navegador, sí le llega.
+describe("esSegundoPlano", () => {
+  const conDestino = (destino: string | null) => ({
+    get: (nombre: string) => (nombre === "sec-fetch-dest" ? destino : null),
+  });
+
+  it("una página pedida de verdad (document) no es segundo plano", () => {
+    expect(esSegundoPlano(conDestino("document"))).toBe(false);
+  });
+
+  it("los fetch de la página (precargas, datos, acciones) sí", () => {
+    expect(esSegundoPlano(conDestino("empty"))).toBe(true);
+  });
+
+  it("sin la cabecera (un navegador antiguo o curl) cuenta como página", () => {
+    expect(esSegundoPlano(conDestino(null))).toBe(false);
   });
 });
