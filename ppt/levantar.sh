@@ -85,7 +85,7 @@ fi
 arrancar vista "$REPO_DIR/apps/view" env -i "${BASICO[@]}" "${VISTA[@]}" pnpm exec next start -p 3000
 esperar "$SITIO/" "Sitio" || fallar vista
 
-if [ -f "$SMTP_REAL" ]; then
+if [ "$CORREO_REAL" = 1 ]; then
   CORREOS="llegan de verdad a Gmail, desde la cuenta de cada empresa"
 else
   CORREOS="http://localhost:8025 (Mailpit: aquí llega todo lo que manda el portal)"

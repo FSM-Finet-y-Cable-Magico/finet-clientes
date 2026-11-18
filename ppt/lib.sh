@@ -124,9 +124,12 @@ entorno_demo() {
 
   # Las cuentas de correo de cada empresa. Con ppt/.local/smtp-real.env (las
   # cuentas Gmail reales de Finet y Cable Mágico, copiadas de la VPS) los
-  # correos llegan de verdad; sin él, las dos cuentas son Mailpit.
+  # correos llegan de verdad; sin él, o con PPT_CORREO=mailpit (lo usa
+  # probar-todo.sh, para no mandar correos de prueba), las dos son Mailpit.
   CUENTAS_SMTP=()
-  if [ -f "$SMTP_REAL" ]; then
+  CORREO_REAL=0
+  if [ -f "$SMTP_REAL" ] && [ "${PPT_CORREO:-}" != mailpit ]; then
+    CORREO_REAL=1
     while IFS= read -r linea; do
       valor=${linea#*=}
       valor=${valor#\"}; valor=${valor%\"}; valor=${valor#\'}; valor=${valor%\'}
@@ -163,6 +166,10 @@ entorno_demo() {
     ASISTENTE_API_KEY="$ASISTENTE_API_KEY"
     WEBPAY_AMBIENTE=integracion WEBPAY_URL_RETORNO="$API/pagos/webpay/retorno"
     PPT_LIMITE_POR_MINUTO=600
+    # En la demo todos los usuarios salen de este PC: sin bloqueo por IP (RF-05
+    # sigue por RUT) y los límites por ruta (login, registro, etc.) ×20.
+    PPT_SIN_BLOQUEO_IP=1
+    PPT_MULTIPLICADOR_LIMITES=20
   )
   # Las NEXT_PUBLIC_* se fijan al compilar el sitio.
   VISTA=(
