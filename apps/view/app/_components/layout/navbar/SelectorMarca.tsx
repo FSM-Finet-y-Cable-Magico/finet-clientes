@@ -1,19 +1,21 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAuth } from "../../../_lib/auth";
 import { recordarMarca, useMarca } from "../../../_lib/marca";
 import {
-  enlaceEntreSitios,
+  enlaceAOtraMarca,
   MARCAS,
   separarMarca,
   type SlugMarca,
 } from "../../../_lib/company";
+import { irA } from "../../../_lib/navegar";
 
 /**
  * Finet o Cable Mágico, como el selector de empresa de G3: lleva a la misma
- * página en el sitio de la otra empresa y la deja recordada (proxy.ts). Con
- * sesión no aparece: la empresa la fija el token, como en G8.
+ * página en el sitio de la otra empresa y la deja recordada (proxy.ts). Se ve
+ * siempre (rama ppt, Emilio 15-11): con sesión, la empresa la fija el token,
+ * así que para pasar a la otra primero se cierra la sesión.
  *
  * Es para la demostración. En producción cada empresa tiene su dominio y el
  * selector se apaga con `NEXT_PUBLIC_SELECTOR_EMPRESA=false` (se lee al
@@ -22,20 +24,22 @@ import {
 export default function SelectorMarca() {
   const marca = useMarca();
   const pathname = usePathname();
-  const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
-  if (isAuthenticated || process.env.NEXT_PUBLIC_SELECTOR_EMPRESA === "false") {
+  if (process.env.NEXT_PUBLIC_SELECTOR_EMPRESA === "false") {
     return null;
   }
 
-  function elegir(slug: SlugMarca) {
+  async function elegir(slug: SlugMarca) {
+    if (slug === marca.slug) return;
+    if (isAuthenticated) await logout();
     recordarMarca(slug);
     const { ruta } = separarMarca(pathname);
-    const destino = enlaceEntreSitios(marca, MARCAS[slug], ruta as `/${string}`);
-    // El sitio de la otra empresa puede estar en otro host.
-    if (destino.startsWith("/")) router.push(destino);
-    else window.location.assign(destino);
+    // Página completa a la ruta explícita de la empresa (/finet/… o
+    // /cable-magico/…), que el proxy publica y deja recordada. Con
+    // router.push, la caché del router podía servir una redirección vieja a
+    // la otra empresa (15-11). Si cada empresa tiene su host, es la URL completa.
+    irA(enlaceAOtraMarca(marca, MARCAS[slug], ruta as `/${string}`));
   }
 
   return (

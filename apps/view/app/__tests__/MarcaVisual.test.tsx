@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import NavLogo from "@/app/_components/layout/navbar/NavLogo";
 import LoginBranding from "@/app/components/LoginBranding";
 import SelectorMarca from "@/app/_components/layout/navbar/SelectorMarca";
@@ -12,13 +12,20 @@ jest.mock("next/navigation", () => ({
   usePathname: () => pathname,
 }));
 
+// La página completa: jsdom no deja reemplazar window.location.
+const irA = jest.fn();
+jest.mock("@/app/_lib/navegar", () => ({ irA: (url: string) => irA(url) }));
+
 let autenticado = false;
+const logout = jest.fn().mockResolvedValue(true);
 jest.mock("@/app/_lib/auth", () => ({
-  useAuth: () => ({ isAuthenticated: autenticado, isLoading: false }),
+  useAuth: () => ({ isAuthenticated: autenticado, isLoading: false, logout }),
 }));
 
 beforeEach(() => {
   push.mockClear();
+  irA.mockClear();
+  logout.mockClear();
   autenticado = false;
   pathname = "/cable-magico/planes";
   document.cookie = "empresa=; max-age=0; path=/";
@@ -70,18 +77,23 @@ describe("selector de empresa", () => {
     ).toBe("false");
   });
 
-  it("cambiar a Finet lleva a la misma página de Finet y recuerda la elección", () => {
+  // Rama ppt: página completa a la ruta explícita de la empresa. Con
+  // router.push, la caché del router servía una redirección vieja a la otra
+  // empresa (15-11: elegía Finet y volvía a Cable Mágico).
+  it("cambiar a Finet carga la misma página de Finet por /finet/… y recuerda la elección", async () => {
     conMarca("cable-magico");
     fireEvent.click(screen.getByRole("button", { name: "Finet" }));
-    expect(push).toHaveBeenCalledWith("/planes");
+    await waitFor(() => expect(irA).toHaveBeenCalledWith("/finet/planes"));
+    expect(push).not.toHaveBeenCalled();
     expect(document.cookie).toContain("empresa=finet");
   });
 
-  it("cambiar a Cable Mágico lleva a la misma página con su prefijo", () => {
+  it("cambiar a Cable Mágico carga la misma página con su prefijo", async () => {
     pathname = "/empresas";
     conMarca("finet");
     fireEvent.click(screen.getByRole("button", { name: "Cable Mágico" }));
-    expect(push).toHaveBeenCalledWith("/cable-magico/empresas");
+    await waitFor(() => expect(irA).toHaveBeenCalledWith("/cable-magico/empresas"));
+    expect(push).not.toHaveBeenCalled();
     expect(document.cookie).toContain("empresa=cable-magico");
   });
 
@@ -95,9 +107,23 @@ describe("selector de empresa", () => {
     }
   });
 
-  it("con sesión no aparece: la empresa la fija el token", () => {
+  // Rama ppt (Emilio, 15-11): el selector se ve siempre. Con sesión, la
+  // empresa la fija el token, así que para pasar a la otra se cierra la sesión.
+  it("con sesión también aparece y, al cambiar de empresa, cierra la sesión antes de ir", async () => {
     autenticado = true;
-    const { container } = conMarca("cable-magico");
-    expect(container.innerHTML).toBe("");
+    conMarca("cable-magico");
+    fireEvent.click(screen.getByRole("button", { name: "Finet" }));
+    await waitFor(() => expect(irA).toHaveBeenCalledWith("/finet/planes"));
+    expect(logout).toHaveBeenCalled();
+    expect(logout.mock.invocationCallOrder[0]).toBeLessThan(irA.mock.invocationCallOrder[0]);
+  });
+
+  it("elegir la empresa en que ya está no cierra la sesión", () => {
+    autenticado = true;
+    conMarca("cable-magico");
+    fireEvent.click(screen.getByRole("button", { name: "Cable Mágico" }));
+    expect(logout).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+    expect(irA).not.toHaveBeenCalled();
   });
 });
