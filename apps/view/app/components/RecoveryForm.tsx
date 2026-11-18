@@ -6,8 +6,11 @@ import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import LoginBranding from "./LoginBranding";
 import PanelAviso from "./PanelAviso";
 import SolicitudPorRut from "./SolicitudPorRut";
+import { useMarca } from "@/app/_lib/marca";
+import { rutaMarca } from "@/app/_lib/company";
 
 export default function RecoveryForm() {
+  const marca = useMarca();
   const [sent, setSent] = useState(false);
 
   if (sent) {
@@ -21,7 +24,7 @@ export default function RecoveryForm() {
           correo electrónico.
         </p>
         <Link
-          href="/inicio-sesion"
+          href={rutaMarca(marca, "/inicio-sesion")}
           className="mt-6 inline-flex items-center gap-1.5 text-sm text-primary transition-colors hover:opacity-80"
         >
           <ArrowLeft size={14} aria-hidden />
@@ -54,7 +57,7 @@ export default function RecoveryForm() {
 
       <p className="mt-6 text-center">
         <Link
-          href="/inicio-sesion"
+          href={rutaMarca(marca, "/inicio-sesion")}
           className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-foreground"
         >
           <ArrowLeft size={14} aria-hidden />

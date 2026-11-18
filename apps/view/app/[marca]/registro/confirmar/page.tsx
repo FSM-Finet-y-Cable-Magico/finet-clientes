@@ -5,8 +5,11 @@ import Link from "next/link";
 import { useTokenDelEnlace } from "../../../_lib/token-del-enlace";
 import ConfirmarRegistroForm from "../../../components/ConfirmarRegistroForm";
 import PanelAviso from "../../../components/PanelAviso";
+import { useMarca } from "@/app/_lib/marca";
+import { rutaMarca } from "@/app/_lib/company";
 
 export default function ConfirmarRegistroPage() {
+  const marca = useMarca();
   const { listo, token } = useTokenDelEnlace();
 
   if (!listo) return null;
@@ -25,7 +28,7 @@ export default function ConfirmarRegistroPage() {
               Solicita uno nuevo desde Registrarse.
             </p>
             <Link
-              href="/inicio-sesion"
+              href={rutaMarca(marca, "/inicio-sesion")}
               className="mt-6 inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-foreground"
             >
               <ArrowLeft size={14} aria-hidden />

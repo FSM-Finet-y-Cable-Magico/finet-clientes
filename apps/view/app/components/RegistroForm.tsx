@@ -78,7 +78,7 @@ export default function RegistroForm({
         <button type="button" onClick={onIniciarSesion} className={botonPrincipal}>
           Iniciar sesión
         </button>
-        <Link href="/recuperar-password" className={`mt-3 ${enlaceSecundario}`}>
+        <Link href={rutaMarca(marca, "/recuperar-password")} className={`mt-3 ${enlaceSecundario}`}>
           Recuperar mi contraseña
         </Link>
       </PanelAviso>
@@ -123,7 +123,7 @@ export default function RegistroForm({
           La cuenta del portal es para clientes con un servicio contratado. Si
           todavía no lo eres, revisa nuestros planes.
         </p>
-        <Link href="/planes" className={botonPrincipal}>
+        <Link href={rutaMarca(marca, "/planes")} className={botonPrincipal}>
           Ver planes
         </Link>
         <button

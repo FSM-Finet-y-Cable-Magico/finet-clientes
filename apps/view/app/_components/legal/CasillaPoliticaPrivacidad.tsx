@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import type { Ref } from "react";
+import { useMarca } from "@/app/_lib/marca";
+import { rutaMarca } from "@/app/_lib/company";
 
 type CasillaPoliticaPrivacidadProps = {
   checked: boolean;
@@ -19,6 +23,7 @@ export default function CasillaPoliticaPrivacidad({
   error,
   ref,
 }: CasillaPoliticaPrivacidadProps) {
+  const marca = useMarca();
   return (
     <div>
       <div className="flex items-start gap-3">
@@ -41,7 +46,7 @@ export default function CasillaPoliticaPrivacidad({
           He leído y acepto la{" "}
           {/* Pestaña nueva: que abrir la política no borre lo ya escrito. */}
           <Link
-            href="/privacidad"
+            href={rutaMarca(marca, "/privacidad")}
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium text-primary underline underline-offset-2 hover:opacity-80"

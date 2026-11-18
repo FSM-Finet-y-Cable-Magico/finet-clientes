@@ -5,8 +5,11 @@ import Link from "next/link";
 import { useTokenDelEnlace } from "../../_lib/token-del-enlace";
 import ResetPasswordForm from "../../components/ResetPasswordForm";
 import PanelAviso from "../../components/PanelAviso";
+import { useMarca } from "@/app/_lib/marca";
+import { rutaMarca } from "@/app/_lib/company";
 
 export default function RestablecerPasswordPage() {
+  const marca = useMarca();
   const { listo, token } = useTokenDelEnlace();
 
   if (!listo) return null;
@@ -24,13 +27,13 @@ export default function RestablecerPasswordPage() {
               uno nuevo.
             </p>
             <Link
-              href="/recuperar-password"
+              href={rutaMarca(marca, "/recuperar-password")}
               className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90"
             >
               Solicitar nuevo enlace
             </Link>
             <Link
-              href="/inicio-sesion"
+              href={rutaMarca(marca, "/inicio-sesion")}
               className="mt-3 inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-foreground"
             >
               <ArrowLeft size={14} aria-hidden />

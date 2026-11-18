@@ -210,10 +210,10 @@ export default async function HomePage({
             de 24 horas.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <PrimaryButton href="/planes" variant="solid">
+            <PrimaryButton href={rutaMarca(marca, "/planes")} variant="solid">
               Ver planes
             </PrimaryButton>
-            <PrimaryButton href="/cobertura" variant="outline">
+            <PrimaryButton href={rutaMarca(marca, "/cobertura")} variant="outline">
               Consultar cobertura
             </PrimaryButton>
           </div>

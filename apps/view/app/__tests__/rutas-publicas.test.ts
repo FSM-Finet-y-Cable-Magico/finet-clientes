@@ -58,8 +58,9 @@ describe("registro de rutas publicas (CU-74)", () => {
       readdirSync(APP, { recursive: true, encoding: "utf8" })
         .filter((a) => /\.tsx?$/.test(a) && !a.startsWith(`__tests__${sep}`))
         .flatMap((a) => [
+          // Un href escrito tal cual o armado con la empresa (rutaMarca).
           ...readFileSync(join(APP, a), "utf8").matchAll(
-            /href(?:=|:\s*)["'`](\/[^"'`?#$]*)/g,
+            /(?:href(?:=|:\s*)|rutaMarca\([^,()]+,\s*)["'`](\/[^"'`?#$]*)/g,
           ),
         ])
         .map((m) => m[1]),

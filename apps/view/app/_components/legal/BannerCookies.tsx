@@ -8,6 +8,8 @@ import {
   type DecisionCookies,
 } from "@/app/_lib/cookies-consentimiento";
 import { registrarDecisionCookies } from "@/app/_lib/cookies-actions";
+import { useMarca } from "@/app/_lib/marca";
+import { rutaMarca } from "@/app/_lib/company";
 
 /** La cookie no cambia por fuera de este componente: no hay a qué suscribirse. */
 const suscribir = () => () => {};
@@ -27,6 +29,7 @@ const enElServidor = () => true;
  * esto es una región que avisa y se puede ignorar mientras se navega.
  */
 export default function BannerCookies() {
+  const marca = useMarca();
   const hayPreferencia = useSyncExternalStore(
     suscribir,
     hayPreferenciaGuardada,
@@ -65,7 +68,7 @@ export default function BannerCookies() {
             o rechazar las que usamos para medir cómo se navega. Tu elección se
             guarda en este navegador y puedes revisar el detalle en la{" "}
             <Link
-              href="/privacidad"
+              href={rutaMarca(marca, "/privacidad")}
               className="font-medium text-primary underline underline-offset-2 hover:opacity-80"
             >
               Política de Privacidad

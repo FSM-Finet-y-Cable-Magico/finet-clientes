@@ -9,12 +9,15 @@ import LoginBranding from "../components/LoginBranding";
 import PanelAviso from "./PanelAviso";
 import { CamposNuevaPassword, useNuevaPassword } from "./CamposNuevaPassword";
 import { MensajeError } from "./MensajesFormulario";
+import { useMarca } from "@/app/_lib/marca";
+import { rutaMarca } from "@/app/_lib/company";
 
 type Props = {
   token: string;
 };
 
 export default function ResetPasswordForm({ token }: Props) {
+  const marca = useMarca();
   const campos = useNuevaPassword();
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -53,7 +56,7 @@ export default function ResetPasswordForm({ token }: Props) {
           Tu contraseña ha sido restablecida exitosamente.
         </p>
         <Link
-          href="/inicio-sesion"
+          href={rutaMarca(marca, "/inicio-sesion")}
           className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90"
         >
           Ir al inicio de sesión
@@ -93,7 +96,7 @@ export default function ResetPasswordForm({ token }: Props) {
 
       <p className="mt-6 text-center">
         <Link
-          href="/inicio-sesion"
+          href={rutaMarca(marca, "/inicio-sesion")}
           className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-foreground"
         >
           <ArrowLeft size={14} aria-hidden />
