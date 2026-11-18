@@ -234,10 +234,21 @@ export function enlaceAOtraMarca(
   destino: Marca,
   ruta: `/${string}`,
 ): string {
-  if (destino.url === actual.url && !destino.prefijo && destino.slug !== actual.slug) {
-    return `/${destino.slug}${ruta === "/" ? "" : ruta}`;
+  if (destino.url === actual.url && destino.slug !== actual.slug) {
+    return rutaExplicita(destino, ruta);
   }
   return enlaceEntreSitios(actual, destino, ruta);
+}
+
+/**
+ * Una ruta de la marca que no depende de la empresa recordada: con prefijo, la
+ * de siempre; sin prefijo (Finet, en el host compartido), la interna /finet/…,
+ * que el proxy publica en su ruta de siempre recordando la marca.
+ */
+export function rutaExplicita(marca: Marca, ruta: `/${string}`): string {
+  return marca.prefijo
+    ? rutaMarca(marca, ruta)
+    : `/${marca.slug}${ruta === "/" ? "" : ruta}`;
 }
 
 // Falla al cargar (y en el build) si una URL del .env está mal escrita.

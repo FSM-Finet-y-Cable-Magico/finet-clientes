@@ -21,13 +21,28 @@ describe("sesión vencida", () => {
     global.fetch = jest.fn().mockResolvedValue(respuesta(401));
   });
 
-  it("un 401 del portal lleva al login con ?expired=1", async () => {
+  // Rama ppt: al login de la empresa de la página, por su ruta explícita,
+  // sin depender de la empresa recordada en la cookie (15-11: un cliente de
+  // Finet terminaba en el login de Cable Mágico).
+  it("un 401 del portal de Finet lleva al login de Finet con ?expired=1", async () => {
+    window.history.pushState({}, "", "/portal/deuda");
     render(<AuthProvider>contenido</AuthProvider>);
 
     await expect(api.get("/portal/deuda")).rejects.toMatchObject({ status: 401 });
 
     await waitFor(() =>
-      expect(push).toHaveBeenCalledWith("/inicio-sesion?expired=1"),
+      expect(push).toHaveBeenCalledWith("/finet/inicio-sesion?expired=1"),
+    );
+  });
+
+  it("un 401 del portal de Cable Mágico lleva al login de Cable Mágico", async () => {
+    window.history.pushState({}, "", "/cable-magico/portal/deuda");
+    render(<AuthProvider>contenido</AuthProvider>);
+
+    await expect(api.get("/portal/deuda")).rejects.toMatchObject({ status: 401 });
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/cable-magico/inicio-sesion?expired=1"),
     );
   });
 
@@ -38,7 +53,7 @@ describe("sesión vencida", () => {
       status: 401,
     });
 
-    expect(push).not.toHaveBeenCalledWith("/inicio-sesion?expired=1");
+    expect(push).not.toHaveBeenCalled();
   });
 });
 

@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { API_URL, EVENTO_SESION_EXPIRADA } from "./consts";
 import { securityLogger } from "./logger";
 import { hayAvisoDeSesion } from "./aviso-sesion";
+import { marcaPorHost, rutaExplicita, separarMarca } from "./company";
 
 export type Cliente = {
   id_cliente: number;
@@ -102,7 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function handleSessionExpired() {
       securityLogger.sessionExpired();
       setCliente(null);
-      router.push("/inicio-sesion?expired=1");
+      // El login de la empresa de esta página (su host o su prefijo), por su
+      // ruta explícita: sin prefijo, el proxy usaría la empresa recordada.
+      const marca =
+        marcaPorHost(window.location.host) ??
+        separarMarca(window.location.pathname).marca;
+      router.push(`${rutaExplicita(marca, "/inicio-sesion")}?expired=1`);
     }
 
     window.addEventListener(EVENTO_SESION_EXPIRADA, handleSessionExpired);
