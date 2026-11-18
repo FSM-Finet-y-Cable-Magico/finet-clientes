@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from '@jest/globals';
+import { afterEach, beforeEach, describe, it, expect } from '@jest/globals';
 import { BruteForceFallback } from './auth.service.js';
 
 /**
@@ -135,6 +135,40 @@ describe('BruteForceFallback', () => {
     intentos(4, '123456785', '10.0.0.1');
     intentos(4, '765432108', '10.0.0.2');
     expect(fallback.estaBloqueado('123456785', '10.0.0.1')).toEqual({
+      ip: false,
+      rut: false,
+    });
+  });
+});
+
+// Rama ppt: en la demo local todos los logins salen de la misma IP.
+describe('BruteForceFallback con PPT_SIN_BLOQUEO_IP=1', () => {
+  const INICIO = new Date('2026-10-23T12:00:00.000Z');
+  let fallback: BruteForceFallback;
+
+  beforeEach(() => {
+    process.env.PPT_SIN_BLOQUEO_IP = '1';
+    fallback = new BruteForceFallback(() => INICIO);
+  });
+  afterEach(() => {
+    delete process.env.PPT_SIN_BLOQUEO_IP;
+  });
+
+  it('el 5.º intento desde una IP no la bloquea', () => {
+    for (let i = 0; i < 4; i++)
+      fallback.registrarIntento(`11111111${i}`, '10.0.0.1');
+    expect(fallback.registrarIntento('111111114', '10.0.0.1')).toEqual({
+      bloquearRut: false,
+      bloquearIp: false,
+      bloquearHasta: null,
+    });
+  });
+
+  it('un RUT bloqueado no bloquea a los demás desde la misma IP', () => {
+    for (let i = 0; i < 5; i++)
+      fallback.registrarIntento('123456785', '10.0.0.1');
+    expect(fallback.estaBloqueado('123456785', '10.0.0.1').rut).toBe(true);
+    expect(fallback.estaBloqueado('999999999', '10.0.0.1')).toEqual({
       ip: false,
       rut: false,
     });

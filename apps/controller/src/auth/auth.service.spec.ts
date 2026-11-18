@@ -1,4 +1,11 @@
-import { jest, beforeEach, describe, it, expect } from '@jest/globals';
+import {
+  jest,
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  expect,
+} from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -681,6 +688,81 @@ describe('AuthService', () => {
           token: 'some-token',
         },
       });
+    });
+  });
+
+  // Rama ppt: en la demo local todos los logins salen de la misma IP, y 5
+  // errores entre todos los usuarios bloqueaban a todos por 15 minutos.
+  describe('bloqueo por IP desactivado en la demo (PPT_SIN_BLOQUEO_IP=1)', () => {
+    beforeEach(() => {
+      process.env.PPT_SIN_BLOQUEO_IP = '1';
+    });
+    afterEach(() => {
+      delete process.env.PPT_SIN_BLOQUEO_IP;
+    });
+
+    it('el 5.º intento desde una IP no la bloquea', async () => {
+      (prisma.intento_fallido.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.intento_fallido.create as jest.Mock).mockResolvedValue({
+        id_intento: 9n,
+      });
+      (prisma.intento_fallido.count as jest.Mock)
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(4);
+      porRut.mockResolvedValue(null);
+
+      await expect(
+        authService.login('999999999', 'password', '192.168.1.1'),
+      ).rejects.toThrow('RUT o contraseña incorrectos');
+
+      const createCall = (prisma.intento_fallido.create as jest.Mock).mock
+        .calls[0][0];
+      // Sin bloqueo, el intento queda sin bloqueado_hasta.
+      expect(createCall.data.bloqueado_hasta).toBeUndefined();
+    });
+
+    it('un RUT bloqueado no bloquea a los demás desde la misma IP', async () => {
+      // El registro que bloquea un RUT también lleva su IP.
+      (prisma.intento_fallido.findFirst as jest.Mock).mockImplementation(
+        (args: { where: { ip_address?: string } }) =>
+          Promise.resolve(
+            args.where.ip_address
+              ? {
+                  id_intento: 1n,
+                  bloqueado_hasta: new Date(Date.now() + 600000),
+                  ip_address: '10.0.0.5',
+                }
+              : null,
+          ),
+      );
+      (prisma.intento_fallido.create as jest.Mock).mockResolvedValue({
+        id_intento: 10n,
+      });
+      (prisma.intento_fallido.count as jest.Mock).mockResolvedValue(0);
+      porRut.mockResolvedValue(null);
+
+      await expect(
+        authService.login('123456785', 'password', '10.0.0.5'),
+      ).rejects.toThrow('RUT o contraseña incorrectos');
+    });
+
+    it('el bloqueo por RUT sigue: 5 intentos contra un RUT lo bloquean', async () => {
+      (prisma.intento_fallido.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.intento_fallido.create as jest.Mock).mockResolvedValue({
+        id_intento: 11n,
+      });
+      (prisma.intento_fallido.count as jest.Mock)
+        .mockResolvedValueOnce(4)
+        .mockResolvedValueOnce(0);
+      porRut.mockResolvedValue(null);
+
+      await expect(
+        authService.login('123456785', 'password', '127.0.0.1'),
+      ).rejects.toThrow('RUT o contraseña incorrectos');
+
+      const createCall = (prisma.intento_fallido.create as jest.Mock).mock
+        .calls[0][0];
+      expect(createCall.data.bloqueado_hasta).toBeInstanceOf(Date);
     });
   });
 

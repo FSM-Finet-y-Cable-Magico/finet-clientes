@@ -101,6 +101,16 @@ interface IntentoFallidoMemoria {
 }
 
 /**
+ * Rama ppt: en la demo local todos los logins salen de la misma IP, y 5
+ * errores entre todos los usuarios bloqueaban a todos por 15 minutos. Con
+ * PPT_SIN_BLOQUEO_IP=1 (lo pone ppt/levantar.sh) no se bloquea por IP; el
+ * bloqueo por RUT (RF-05) sigue igual. Sin la variable, como en main.
+ */
+export function bloqueoPorIpActivo(): boolean {
+  return process.env.PPT_SIN_BLOQUEO_IP !== '1';
+}
+
+/**
  * Fallback en memoria para mantener el control de bloqueo por fuerza bruta
  * cuando la base de datos no está disponible (CU-05 Excepción 1).
  *
@@ -131,7 +141,8 @@ export class BruteForceFallback {
     const bloqueado = (intentos: IntentoFallidoMemoria[]) =>
       intentos.some((i) => i.bloqueado_hasta && i.bloqueado_hasta > ahora);
     return {
-      ip: bloqueado(this.vigentes(this.porIp, ip, ahora)),
+      ip:
+        bloqueoPorIpActivo() && bloqueado(this.vigentes(this.porIp, ip, ahora)),
       rut: bloqueado(this.vigentes(this.porRut, rut, ahora)),
     };
   }
@@ -158,7 +169,7 @@ export class BruteForceFallback {
     ).length;
 
     const bloquearRut = intentosRut + 1 >= 5;
-    const bloquearIp = intentosIp + 1 >= 5;
+    const bloquearIp = bloqueoPorIpActivo() && intentosIp + 1 >= 5;
     const bloquearHasta =
       bloquearRut || bloquearIp
         ? new Date(ahora.getTime() + 15 * 60 * 1000)
@@ -273,13 +284,17 @@ export class AuthService {
 
     // Verificar bloqueo de IP y RUT — con fallback en memoria (CU-05 Excepción 1)
     try {
-      const ipBloqueo = await this.prisma.intento_fallido.findFirst({
-        where: {
-          ip_address: ip,
-          bloqueado_hasta: { gt: new Date() },
-        },
-        orderBy: { bloqueado_hasta: 'desc' },
-      });
+      // El registro que bloquea un RUT también lleva su IP: sin el bloqueo
+      // por IP, no se consulta (bloquearía a todos los de esa IP).
+      const ipBloqueo = bloqueoPorIpActivo()
+        ? await this.prisma.intento_fallido.findFirst({
+            where: {
+              ip_address: ip,
+              bloqueado_hasta: { gt: new Date() },
+            },
+            orderBy: { bloqueado_hasta: 'desc' },
+          })
+        : null;
 
       if (ipBloqueo?.bloqueado_hasta) {
         this.logger.warn(
@@ -752,7 +767,7 @@ export class AuthService {
       });
 
       const bloquearRut = intentosRut + 1 >= 5;
-      const bloquearIp = intentosIp + 1 >= 5;
+      const bloquearIp = bloqueoPorIpActivo() && intentosIp + 1 >= 5;
       const bloquearHasta =
         bloquearRut || bloquearIp
           ? new Date(ahora.getTime() + 15 * 60 * 1000)
