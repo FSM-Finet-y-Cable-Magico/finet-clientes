@@ -103,6 +103,7 @@ Demo local lista (rama ppt, base $PPT_BASE). Nada de esto toca la VPS.
     Finet         16.234.567-2  Camila Rojas    factura vencida y otra por vencer, ticket abierto
     Finet         15.456.789-5  Sofía Pérez     contrato suspendido, dos facturas vencidas
     Cable Mágico  18.567.890-3  Matías González factura por vencer, ticket abierto
+    Finet         17.890.123-0  Rodrigo Vidal   dos planes vigentes, al día
   Listo para registrarse (solicitud aprobada):
     Finet         22.456.789-8  Ignacio Fuentes
   Sin cuenta:
