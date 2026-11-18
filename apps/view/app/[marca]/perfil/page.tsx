@@ -6,6 +6,8 @@ import ChangePasswordForm from "../../components/ChangePasswordForm";
 import UpdateTelefonoForm from "../../components/UpdateTelefonoForm";
 import UpdateEmailForm from "../../components/UpdateEmailForm";
 import { api } from "../../utils/api";
+import type { ApiError } from "../../utils/api";
+import { EVENTO_SESION_EXPIRADA } from "@/app/_lib/consts";
 // La base guarda el RUT con guion (12345678-9): el de login-schema lo limpia antes.
 import { formatRut } from "../../utils/login-schema";
 import { fechaInstante } from "@/app/_lib/formato";
@@ -31,7 +33,13 @@ export default function PerfilPage() {
     try {
       const data = await api.get<ClientePerfil>("/auth/perfil");
       setPerfil(data);
-    } catch {
+    } catch (err) {
+      // utils/api no avisa los 401 de /auth/perfil (en los cambios del perfil
+      // son «contraseña actual incorrecta»); al cargarlo, es la sesión vencida.
+      if ((err as ApiError).status === 401) {
+        window.dispatchEvent(new CustomEvent(EVENTO_SESION_EXPIRADA));
+        return;
+      }
       setError(true);
     } finally {
       setLoading(false);

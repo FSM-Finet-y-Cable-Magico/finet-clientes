@@ -1,11 +1,12 @@
 import "@testing-library/jest-dom";
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 const push = jest.fn();
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 import { AuthProvider, useAuth } from "@/app/_lib/auth";
 import { api } from "@/app/utils/api";
+import PerfilPage from "@/app/[marca]/perfil/page";
 
 // Fija el aviso de sesión vencida entre utils/api (que lo emite ante un 401)
 // y AuthProvider (que lo escucha y manda al login), para que el nombre del
@@ -44,6 +45,22 @@ describe("sesión vencida", () => {
     await waitFor(() =>
       expect(push).toHaveBeenCalledWith("/cable-magico/inicio-sesion?expired=1"),
     );
+  });
+
+  // Rama ppt (15-11): con la sesión muerta, Mi Perfil quedaba en «No se pudo
+  // cargar la información» y el cliente no podía hacer nada.
+  it("Mi Perfil con la sesión vencida lleva al login, no a un error", async () => {
+    window.history.pushState({}, "", "/perfil");
+    render(
+      <AuthProvider>
+        <PerfilPage />
+      </AuthProvider>,
+    );
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith("/finet/inicio-sesion?expired=1"),
+    );
+    expect(screen.queryByText("No se pudo cargar la información")).not.toBeInTheDocument();
   });
 
   it("un 401 del login no, porque es una clave equivocada", async () => {
