@@ -50,7 +50,10 @@ INSERT INTO cliente (id_cliente, id_empresa, rut, nombre_completo, email, telefo
   (5, 2, '19678901-4', 'Valentina Soto Ríos',   'valentina.soto@cable-demo.test',   '+56955556666', NULL, 'activo', CURRENT_DATE - 90 + TIME '10:30'),
   -- Ignacio pidió su plan desde «Contratar», G8 aprobó la solicitud y quedó
   -- instalado ayer: está listo para crear su cuenta en el portal.
-  (6, 1, '22456789-8', 'Ignacio Fuentes Rojas', 'ignacio.fuentes@finet-demo.test',  '+56966667777', NULL, 'activo', CURRENT_DATE - 1 + TIME '10:30');
+  (6, 1, '22456789-8', 'Ignacio Fuentes Rojas', 'ignacio.fuentes@finet-demo.test',  '+56966667777', NULL, 'activo', CURRENT_DATE - 1 + TIME '10:30'),
+  -- Rodrigo tiene dos planes vigentes (su casa y su oficina) y está al día.
+  (7, 1, '17890123-0', 'Rodrigo Vidal Soto',    'rodrigo.vidal@finet-demo.test',    '+56977778888',
+      '$2b$10$R4lNkPy2V.CFAQ9YS4T7ru3LkiMHRkoAHThxvMp3pMcKdH6lFYVdW', 'activo', CURRENT_DATE - 400 + TIME '10:30');
 
 -- Contratos: Sofía está suspendida (no puede pedir el cambio de clave WiFi).
 -- El día de pago de cada contrato calza con el vencimiento de sus facturas.
@@ -60,13 +63,16 @@ INSERT INTO contrato (id_contrato, id_cliente, id_plan, id_empresa, fecha_inicio
   (3, 3, 1, 1, CURRENT_DATE - 200, extract(day FROM CURRENT_DATE - 20), 'SUSPENDIDO', CURRENT_DATE - 5),
   (4, 4, 7, 2, CURRENT_DATE - 250, extract(day FROM CURRENT_DATE + 3),  'ACTIVO',     NULL),
   (5, 5, 6, 2, CURRENT_DATE - 90,  extract(day FROM CURRENT_DATE - 5),  'ACTIVO',     NULL),
-  (6, 6, 2, 1, CURRENT_DATE - 1,   extract(day FROM CURRENT_DATE - 1),  'ACTIVO',     NULL);
+  (6, 6, 2, 1, CURRENT_DATE - 1,   extract(day FROM CURRENT_DATE - 1),  'ACTIVO',     NULL),
+  (7, 7, 2, 1, CURRENT_DATE - 400, extract(day FROM CURRENT_DATE - 8),  'ACTIVO',     NULL),
+  (8, 7, 4, 1, CURRENT_DATE - 150, extract(day FROM CURRENT_DATE - 8),  'ACTIVO',     NULL);
 
 -- Servicio Internet de cada contrato (lo exige el cambio de clave WiFi).
 INSERT INTO servicio_contratado (id_servicio, id_cliente, id_empresa, id_contrato, tipo_servicio, estado_operativo) VALUES
   (1, 1, 1, 1, 'Internet', 'Operativo'), (2, 2, 1, 2, 'Internet', 'Operativo'),
   (3, 3, 1, 3, 'Internet', 'Suspendido'), (4, 4, 2, 4, 'Internet', 'Operativo'),
-  (5, 5, 2, 5, 'Internet', 'Operativo'), (6, 6, 1, 6, 'Internet', 'Operativo');
+  (5, 5, 2, 5, 'Internet', 'Operativo'), (6, 6, 1, 6, 'Internet', 'Operativo'),
+  (7, 7, 1, 7, 'Internet', 'Operativo'), (8, 7, 1, 8, 'Internet', 'Operativo');
 
 -- La solicitud de Ignacio, como la deja el formulario de contratar y ya
 -- convertida en cliente por G8, con su dirección de instalación.
@@ -99,7 +105,10 @@ FROM (
     (8,  4, 18990, CURRENT_DATE + 3 - interval '1 month',  'Pagada'),
     (9,  4, 18990, CURRENT_DATE + 3 + interval '0 month',  'Pendiente'),
     -- Valentina: al día.
-    (10, 5, 14990, CURRENT_DATE - 5 + interval '0 month',  'Pagada')
+    (10, 5, 14990, CURRENT_DATE - 5 + interval '0 month',  'Pagada'),
+    -- Rodrigo: al día en sus dos planes.
+    (11, 7, 19990, CURRENT_DATE - 8 + interval '0 month',  'Pagada'),
+    (12, 8, 29990, CURRENT_DATE - 8 + interval '0 month',  'Pagada')
   ) AS v(id, contrato, monto, limite, estado)
 ) AS f;
 
@@ -108,7 +117,8 @@ FROM (
 INSERT INTO pago (id_pago, id_factura, id_cliente, monto, fecha_pago, codigo_transaccion, pasarela, codigo_autorizacion, comprobante_estado)
 SELECT p.id, f.id_factura, c.id_cliente, f.monto, f.fecha_limite_pago - 2 + p.hora,
        'F' || f.id_factura || '-DEMO', 'webpay', '1213', 'PENDIENTE'
-FROM (VALUES (1, 1, TIME '11:32'), (2, 4, TIME '09:15'), (3, 8, TIME '18:40'), (4, 10, TIME '13:05'))
+FROM (VALUES (1, 1, TIME '11:32'), (2, 4, TIME '09:15'), (3, 8, TIME '18:40'), (4, 10, TIME '13:05'),
+             (5, 11, TIME '20:10'), (6, 12, TIME '20:12'))
        AS p(id, factura, hora)
 JOIN factura f ON f.id_factura = p.factura
 JOIN contrato c ON c.id_contrato = f.id_contrato;
@@ -134,13 +144,13 @@ SELECT setval(pg_get_serial_sequence('plan', 'id_plan'), 8);
 SELECT setval(pg_get_serial_sequence('categoria_falla', 'id_categoria'), 9);
 SELECT setval(pg_get_serial_sequence('rol', 'id_rol'), 1);
 SELECT setval(pg_get_serial_sequence('usuario', 'id_usuario'), 1);
-SELECT setval(pg_get_serial_sequence('cliente', 'id_cliente'), 6);
-SELECT setval(pg_get_serial_sequence('contrato', 'id_contrato'), 6);
+SELECT setval(pg_get_serial_sequence('cliente', 'id_cliente'), 7);
+SELECT setval(pg_get_serial_sequence('contrato', 'id_contrato'), 8);
 SELECT setval(pg_get_serial_sequence('prospecto', 'id_prospecto'), 1);
 SELECT setval(pg_get_serial_sequence('direccion_servicio', 'id_direccion'), 1);
-SELECT setval(pg_get_serial_sequence('servicio_contratado', 'id_servicio'), 6);
-SELECT setval(pg_get_serial_sequence('factura', 'id_factura'), 10);
-SELECT setval(pg_get_serial_sequence('pago', 'id_pago'), 4);
+SELECT setval(pg_get_serial_sequence('servicio_contratado', 'id_servicio'), 8);
+SELECT setval(pg_get_serial_sequence('factura', 'id_factura'), 12);
+SELECT setval(pg_get_serial_sequence('pago', 'id_pago'), 6);
 SELECT setval(pg_get_serial_sequence('ticket', 'id_ticket'), 3);
 
 \o

@@ -167,9 +167,11 @@ entorno_demo() {
     WEBPAY_AMBIENTE=integracion WEBPAY_URL_RETORNO="$API/pagos/webpay/retorno"
     PPT_LIMITE_POR_MINUTO=600
     # En la demo todos los usuarios salen de este PC: sin bloqueo por IP (RF-05
-    # sigue por RUT) y los límites por ruta (login, registro, etc.) ×20.
-    PPT_SIN_BLOQUEO_IP=1
-    PPT_MULTIPLICADOR_LIMITES=20
+    # sigue por RUT) y los límites por ruta (login, registro, etc.) ×20. Para
+    # mostrar el CU-05 o el CU-83 como en main:
+    #   PPT_SIN_BLOQUEO_IP=0 PPT_MULTIPLICADOR_LIMITES=1 ppt/levantar.sh
+    PPT_SIN_BLOQUEO_IP="${PPT_SIN_BLOQUEO_IP:-1}"
+    PPT_MULTIPLICADOR_LIMITES="${PPT_MULTIPLICADOR_LIMITES:-20}"
   )
   # Las NEXT_PUBLIC_* se fijan al compilar el sitio.
   VISTA=(
