@@ -67,6 +67,36 @@ describe("enrutarMarca", () => {
     throw new Error(`quedó dando vueltas entre ${destino} y Cable Mágico`);
   });
 
+  // Rama ppt: una precarga de Next no es una elección del visitante. Si
+  // cambiara la marca, una precarga en vuelo deshace lo que eligió en el
+  // selector (15-11: elegía Finet y volvía a quedar en Cable Mágico).
+  it("una precarga de una ruta de Cable Mágico no cambia la marca recordada", () => {
+    expect(
+      enrutarMarca({
+        ...sinNada,
+        marcaCookie: "finet",
+        pathname: "/cable-magico/planes",
+        prefetch: true,
+      }),
+    ).toEqual({
+      tipo: "reescribir",
+      destino: "/cable-magico/planes",
+      marca: "cable-magico",
+      guardarCookie: null,
+    });
+  });
+
+  it("una precarga de /finet/… tampoco cambia la marca recordada", () => {
+    expect(
+      enrutarMarca({
+        ...sinNada,
+        marcaCookie: "cable-magico",
+        pathname: "/finet/planes",
+        prefetch: true,
+      }),
+    ).toEqual({ tipo: "redirigir", destino: "/planes" });
+  });
+
   it("quien eligió Cable Mágico sigue en su sitio al navegar a una ruta sin prefijo", () => {
     expect(
       enrutarMarca({ ...sinNada, pathname: "/pagar", search: "?rut=1", marcaCookie: "cable-magico" }),

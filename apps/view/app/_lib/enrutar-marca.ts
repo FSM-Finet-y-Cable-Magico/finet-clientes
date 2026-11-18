@@ -53,6 +53,12 @@ export type EntradaMarca = {
   marcaCookie: SlugMarca | null;
   /** La dueña del host pedido, si cada empresa tiene el suyo (`marcaPorHost`). */
   marcaHost?: SlugMarca | null;
+  /**
+   * Es una precarga de Next, no una página que eligió el visitante: no cambia
+   * la marca recordada. Si la cambiara, una precarga en vuelo deshace lo que
+   * acaba de elegir en el selector.
+   */
+  prefetch?: boolean;
 };
 
 /**
@@ -80,7 +86,7 @@ export function enrutarMarca(entrada: EntradaMarca): DecisionMarca {
         destino: `${enlaceEntreSitios(sitio, marca, ruta as `/${string}`)}${e.search}`,
         // Quien pide /finet/… eligió Finet (enlaceAOtraMarca): si no, la ruta
         // sin prefijo lo devolvería a la marca que tenía.
-        ...(e.marcaCookie && e.marcaCookie !== marca.slug
+        ...(!e.prefetch && e.marcaCookie && e.marcaCookie !== marca.slug
           ? { guardarCookie: marca.slug as SlugMarca }
           : {}),
       };
@@ -106,7 +112,12 @@ export function enrutarMarca(entrada: EntradaMarca): DecisionMarca {
     tipo: "reescribir",
     destino: `/${elegida}${ruta === "/" ? "" : ruta}${e.search}`,
     marca: elegida,
-    guardarCookie: e.marcaCookie === elegida ? null : conPrefijo || e.marcaToken ? elegida : null,
+    guardarCookie:
+      e.prefetch || e.marcaCookie === elegida
+        ? null
+        : conPrefijo || e.marcaToken
+          ? elegida
+          : null,
   };
 }
 

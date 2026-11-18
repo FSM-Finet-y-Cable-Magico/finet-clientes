@@ -99,6 +99,10 @@ export async function proxy(request: NextRequest) {
     marcaToken: ajena ? null : marcaToken,
     marcaCookie: esSlugMarca(cookie) ? cookie : null,
     marcaHost: (host?.slug as SlugMarca) ?? null,
+    // Las precargas de Next las marcan estos headers (Next 16).
+    prefetch:
+      request.headers.has("next-router-prefetch") ||
+      request.headers.has("next-router-segment-prefetch"),
   });
 
   const recordarMarca = <T extends NextResponse>(response: T, slug: SlugMarca): T => {
