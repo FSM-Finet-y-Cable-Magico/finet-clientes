@@ -10,8 +10,8 @@ jest.mock("@/app/_lib/api", () => ({
 }));
 
 /**
- * Rama ppt: no hay contenido de TV que mostrar, así que la sección no se
- * enlaza desde ninguna parte ni se anuncia (decisión de Emilio, 15-11).
+ * Rama ppt: no hay contenido de TV que mostrar, así que las páginas de TV no se
+ * enlazan desde el menú ni van al sitemap (decisión de Emilio, 15-11).
  */
 describe("TV oculta", () => {
   it("el menú no tiene TV, Canales ni Parrilla", () => {
@@ -19,13 +19,17 @@ describe("TV oculta", () => {
     expect(hrefs.filter((h) => h.startsWith("/tv"))).toEqual([]);
   });
 
-  it("la portada no anuncia televisión ni deja flechas de un carrusel de una sola diapositiva", () => {
+  // El carrusel de la portada sí queda con sus dos diapositivas (CU-16; Emilio,
+  // 18-11: «el carrusel tiene que estar»).
+  it("la portada mantiene el carrusel con sus dos diapositivas, flechas y puntos (CU-16)", () => {
     // jsdom no trae matchMedia; el Hero lo usa para el movimiento reducido.
     window.matchMedia = jest.fn().mockReturnValue({ matches: false });
     render(<Hero />);
-    expect(screen.queryByText(/Televisi[oó]n/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Diapositiva siguiente" })).not.toBeInTheDocument();
     expect(screen.getByText("Internet de Alta Velocidad")).toBeInTheDocument();
+    expect(screen.getByText("Television Digital HD")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Diapositiva anterior" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Diapositiva siguiente" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
   });
 
   it("el sitemap no lista la TV", async () => {
