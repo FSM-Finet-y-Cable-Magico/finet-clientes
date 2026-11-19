@@ -1,0 +1,4 @@
+# Los scripts de shell siempre en LF, también en Windows: con core.autocrlf=true
+# el checkout los dejaba en CRLF y el shebang quedaba como "bash\r", que falla
+# (en Linux y dentro de WSL). Aplica a ppt/*.sh y a cualquier .sh del repo.
+*.sh text eol=lf
