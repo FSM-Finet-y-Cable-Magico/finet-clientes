@@ -13,6 +13,18 @@ CHATBOT_DIR="${CHATBOT_DIR:-$(cd "$REPO_DIR/.." && pwd)/Finet-Chatbot-2}"
 
 mkdir -p "$LOCAL_DIR" "$LOG_DIR" "$PID_DIR"
 
+# macOS: Homebrew instala en /opt/homebrew (Apple Silicon) o /usr/local (Intel),
+# y postgresql@N queda aparte, sin enlazar en el PATH. Se agregan al final, para
+# que psql, node y pnpm se encuentren aunque la terminal no los tenga y sin
+# pisar nada que el usuario ya tenga delante.
+if [ "$(uname -s)" = Darwin ]; then
+  for _dir in /opt/homebrew/bin /usr/local/bin /opt/homebrew/opt/postgresql@*/bin \
+    /usr/local/opt/postgresql@*/bin /Applications/Postgres.app/Contents/Versions/latest/bin; do
+    if [ -d "$_dir" ]; then PATH="$PATH:$_dir"; fi
+  done
+  export PATH
+fi
+
 # La DATABASE_URL del .env local del controller, apuntada a finet_ppt.
 # $1 = nombre de la base (por defecto finet_ppt).
 url_base() {
@@ -161,7 +173,7 @@ entorno_demo() {
     "${CUENTAS_SMTP[@]}"
     INTEGRACION_G8_API_URL=http://127.0.0.1:4900 INTEGRACION_G8_API_KEY="$G8_API_KEY"
     G3_API_URL=http://127.0.0.1:4901 G3_API_KEY="$G3_API_KEY"
-    G3_WIFI_PUBLIC_KEY="$(base64 -w0 "$LLAVE_PUBLICA")"
+    G3_WIFI_PUBLIC_KEY="$(base64 <"$LLAVE_PUBLICA" | tr -d '\n')"
     CHATBOT_URL=http://127.0.0.1:3001 CHATBOT_API_KEY="$CHATBOT_API_KEY"
     ASISTENTE_API_KEY="$ASISTENTE_API_KEY"
     WEBPAY_AMBIENTE=integracion WEBPAY_URL_RETORNO="$API/pagos/webpay/retorno"
@@ -194,7 +206,29 @@ entorno_demo() {
 # Puertos de la demo: Mailpit (SMTP y web), G8, G3, chatbot, API y sitio.
 PUERTOS=(1025 8025 4900 4901 3001 4000 3000)
 
-puerto_ocupado() { ss -Hltn "sport = :$1" | grep -q .; }
+#
+# Lo que sigue es lo que cambia entre Linux y macOS: macOS no trae ss, setsid,
+# timeout, sha1sum ni /proc, así que cada función usa lo que haya en el sistema.
+# En Linux se comportan como antes.
+
+# ¿Hay algo escuchando en el puerto $1? ss en Linux; lsof en macOS.
+puerto_ocupado() {
+  if command -v ss >/dev/null 2>&1; then
+    [ -n "$(ss -Hltn "sport = :$1" 2>/dev/null || true)" ]
+  else
+    [ -n "$(lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null || true)" ]
+  fi
+}
+
+# Ejecuta un comando en una sesión nueva: así su pid es también el de su grupo
+# de procesos y detener.sh puede bajarlo entero. Sin setsid (macOS), lo hace perl,
+# que viene con el sistema.
+en_sesion_nueva() {
+  if command -v setsid >/dev/null 2>&1; then
+    exec setsid "$@"
+  fi
+  exec perl -MPOSIX -e 'POSIX::setsid() or die "setsid: $!\n"; exec { $ARGV[0] } @ARGV or die "no pude ejecutar $ARGV[0]: $!\n"' -- "$@"
+}
 
 # Arranca un servicio en segundo plano, en su propio grupo de procesos, con su
 # log en .local/logs y su pid en .local/pids. $1 = nombre, $2 = carpeta; el
@@ -202,6 +236,39 @@ puerto_ocupado() { ss -Hltn "sport = :$1" | grep -q .; }
 arrancar() {
   local nombre="$1" dir="$2"
   shift 2
-  (cd "$dir" && exec setsid "$@") >"$LOG_DIR/$nombre.log" 2>&1 </dev/null &
+  (cd "$dir" && en_sesion_nueva "$@") >"$LOG_DIR/$nombre.log" 2>&1 </dev/null &
   echo $! >"$PID_DIR/$nombre.pid"
+}
+
+# Espera hasta $2 segundos a que termine el proceso $1; sale con 1 si sigue vivo.
+# Va con perl y no con timeout + tail --pid (que macOS no trae), y sin sleep.
+esperar_salida() {
+  perl -e 'my ($pid, $seg) = @ARGV; for (1 .. $seg * 10) { exit 0 unless kill 0, $pid; select(undef, undef, undef, 0.1) } exit 1' "$1" "$2"
+}
+
+# sha1sum (Linux) o shasum (macOS): mismo formato de salida, "huella  archivo".
+sha1() {
+  if command -v sha1sum >/dev/null 2>&1; then sha1sum "$@"; else shasum -a 1 "$@"; fi
+}
+
+# El entorno del proceso $1, para revisar a qué URL apunta. Linux lo guarda en
+# /proc; en macOS lo da ps (solo de procesos propios), en una sola línea, y sirve
+# igual porque revisar_entorno busca las URL dentro del texto.
+entorno_de_proceso() {
+  if [ -r "/proc/$1/environ" ]; then
+    tr '\0' '\n' <"/proc/$1/environ"
+  else
+    ps eww -p "$1"
+  fi
+}
+
+# Las conexiones TCP abiertas con la IP $1 (una línea cada una; nada si no hay).
+conexiones_con() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -Htn state established dst "$1"
+  else
+    local ip
+    ip=$(printf '%s' "$1" | sed 's/\./\\./g')
+    netstat -an -p tcp | grep -E "[[:space:]]${ip}\.[0-9]+[[:space:]]+ESTABLISHED" || true
+  fi
 }

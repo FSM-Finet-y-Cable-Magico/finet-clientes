@@ -39,21 +39,23 @@ shopt -s nullglob
 for archivo in "$PID_DIR"/*.pid; do
   nombre=$(basename "$archivo" .pid)
   pid=$(cat "$archivo")
-  if [ ! -r "/proc/$pid/environ" ]; then mal "$nombre no está corriendo"; continue; fi
-  if tr '\0' '\n' <"/proc/$pid/environ" | revisar_entorno - api.fast.com "$LLM_HOST" 2>/dev/null; then
+  if ! kill -0 "$pid" 2>/dev/null; then mal "$nombre no está corriendo"; continue; fi
+  texto=$(entorno_de_proceso "$pid" 2>/dev/null || true)
+  if [ -z "$texto" ]; then mal "$nombre: no pude leer su entorno"; continue; fi
+  if printf '%s\n' "$texto" | revisar_entorno - api.fast.com "$LLM_HOST" 2>/dev/null; then
     ok "$nombre: todas sus URL son locales"
   else
     mal "$nombre tiene una URL que sale de este PC"
   fi
 done
 # La IP de la VPS no va al repo, que es público: se lee de ppt/.local/ip-vps.
-vps=$(tr -d '[:space:]' <"$LOCAL_DIR/ip-vps" 2>/dev/null || true)
+vps=$(tr -d '[:space:]' 2>/dev/null <"$LOCAL_DIR/ip-vps" || true)
 if [ -z "$vps" ]; then
   echo "  – sin ppt/.local/ip-vps: no se revisan las conexiones con la VPS"
-elif [ -z "$(ss -Htn state established dst "$vps")" ]; then
+elif [ -z "$(conexiones_con "$vps")" ]; then
   ok "ninguna conexión abierta con la VPS"
 else
-  mal "hay una conexión abierta con la VPS (revisa con: ss -tnp dst $vps)"
+  mal "hay una conexión abierta con la VPS (revisa con: lsof -nP -iTCP@$vps)"
 fi
 
 if [ "$fallas" -eq 0 ]; then echo "Todo en orden."; else echo "$fallas problema(s)." >&2; exit 1; fi

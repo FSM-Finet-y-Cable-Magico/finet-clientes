@@ -19,7 +19,7 @@ for p in "${PUERTOS[@]}"; do
   fi
 done
 
-[ -x "$LOCAL_DIR/bin/mailpit" ] || { echo "Falta Mailpit en $LOCAL_DIR/bin/. Bájalo con: mkdir -p $LOCAL_DIR/bin && curl -sSL https://github.com/axllent/mailpit/releases/download/v1.33.1/mailpit-linux-amd64.tar.gz | tar -xz -C $LOCAL_DIR/bin mailpit" >&2; exit 1; }
+[ -x "$LOCAL_DIR/bin/mailpit" ] || { echo "Falta Mailpit en $LOCAL_DIR/bin/. Bájalo (y deja lo demás listo) con: ppt/preparar.sh" >&2; exit 1; }
 grep -qE '^OPENAI_API_KEY=.+' "$LOCAL_DIR/llm.env" 2>/dev/null || { echo "Falta la llave del LLM del chatbot en $LOCAL_DIR/llm.env: cópialo de ppt/llm.env.example y pon tu OPENAI_API_KEY." >&2; exit 1; }
 [ -f "$CHATBOT_DIR/dist/main.js" ] || { echo "Falta el chatbot compilado en $CHATBOT_DIR (pnpm install && pnpm build)." >&2; exit 1; }
 
@@ -69,9 +69,9 @@ huella_vista() {
   {
     git -C "$REPO_DIR" rev-parse HEAD
     git -C "$REPO_DIR" diff HEAD -- apps/view ':!apps/view/AGENTS.md'
-    git -C "$REPO_DIR" ls-files --others --exclude-standard -- apps/view ':!apps/view/AGENTS.md' | (cd "$REPO_DIR" && xargs -r sha1sum)
+    git -C "$REPO_DIR" ls-files --others --exclude-standard -- apps/view ':!apps/view/AGENTS.md' | (cd "$REPO_DIR" && while IFS= read -r archivo; do sha1 "$archivo"; done)
     printf '%s\n' "${VISTA[@]}"
-  } | sha1sum | cut -d' ' -f1
+  } | sha1 | cut -d' ' -f1
 }
 HUELLA="$LOCAL_DIR/vista.huella"
 if [ ! -f "$HUELLA" ] || [ "$(cat "$HUELLA")" != "$(huella_vista)" ] || [ ! -f "$REPO_DIR/apps/view/.next/BUILD_ID" ]; then

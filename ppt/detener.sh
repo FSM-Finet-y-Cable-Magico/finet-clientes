@@ -9,7 +9,7 @@ for archivo in "$PID_DIR"/*.pid; do
   pid=$(cat "$archivo")
   # Cada servicio corre en su propio grupo de procesos (pnpm, next y sus hijos).
   if kill -TERM -- "-$pid" 2>/dev/null; then
-    timeout 15 tail --pid="$pid" -f /dev/null || kill -KILL -- "-$pid" 2>/dev/null || true
+    esperar_salida "$pid" 15 || kill -KILL -- "-$pid" 2>/dev/null || true
     echo "  ✓ $nombre detenido"
   fi
   rm -f "$archivo"
@@ -18,7 +18,7 @@ done
 ocupados=()
 for p in "${PUERTOS[@]}"; do puerto_ocupado "$p" && ocupados+=("$p"); done
 if [ ${#ocupados[@]} -gt 0 ]; then
-  echo "Siguen ocupados los puertos ${ocupados[*]}: no los levantó esta demo (revisa con: ss -ltnp)." >&2
+  echo "Siguen ocupados los puertos ${ocupados[*]}: no los levantó esta demo (revisa con: lsof -nP -iTCP -sTCP:LISTEN)." >&2
   exit 1
 fi
 echo "Demo local detenida."

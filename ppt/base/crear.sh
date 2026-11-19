@@ -22,8 +22,8 @@ echo "Cargando datos de la demo…"
 psql "$URL" -X -q -v ON_ERROR_STOP=1 -f "$PPT_DIR/base/datos.sql"
 
 # Los correos reales de los usuarios de prueba quedan fuera del repo.
-CORREO_DEMO=$(tr -d '[:space:]' <"$LOCAL_DIR/correo-demo" 2>/dev/null || true)
-CORREO_REGISTRO=$(tr -d '[:space:]' <"$LOCAL_DIR/correo-registro" 2>/dev/null || true)
+CORREO_DEMO=$(tr -d '[:space:]' 2>/dev/null <"$LOCAL_DIR/correo-demo" || true)
+CORREO_REGISTRO=$(tr -d '[:space:]' 2>/dev/null <"$LOCAL_DIR/correo-registro" || true)
 if [ -n "$CORREO_DEMO$CORREO_REGISTRO" ]; then
   psql "$URL" -X -q -o /dev/null -v ON_ERROR_STOP=1 -v correo="$CORREO_DEMO" -v registro="$CORREO_REGISTRO" -f "$PPT_DIR/base/correos.sql"
   echo "  correos de los usuarios: los de ppt/.local/"
