@@ -63,28 +63,10 @@ ppt/detener.sh       # al terminar
 Mientras se presenta, `caffeinate -dis` en otra terminal evita que el Mac se
 duerma.
 
-## Datos para la demostración técnica
-
-Todas las cuentas usan la contraseña `Demo2026`. El sitio está en
-<http://localhost:3000> y los correos en <http://localhost:8025>.
-
-| Para | Dato |
-|---|---|
-| Iniciar sesión y pagar | Camila Rojas, RUT `16.234.567-2` |
-| Facturas que se pueden pagar | #2 (9/2026, vencida) y #3 (10/2026), de $19.990 cada una |
-| RUT del chatbot (el de la sesión) | `16.234.567-2` |
-| RUT válido pero inexistente | `12.345.678-5` |
-
-El pago dentro de Webpay (ambiente de integración) se hace a mano. Cada pago
-aprobado deja la factura como Pagada; entre un ensayo y el siguiente:
-
-```bash
-ppt/rearmar-pagos.sh             # repone las facturas
-ppt/rearmar-pagos.sh --correos   # y además vacía Mailpit
-```
-
-Para dejar la base de cero, con fechas de hoy: `ppt/base/reiniciar.sh` (con la
-demo detenida).
+El sitio está en <http://localhost:3000> y los correos en <http://localhost:8025>.
+Los usuarios, las tarjetas de prueba de Webpay y el recorrido de la demostración
+técnica están en [`DEMO-TECNICA.md`](DEMO-TECNICA.md); los scripts, en
+[`README.md`](README.md).
 
 ## Si algo falla
 
@@ -105,3 +87,11 @@ demo detenida).
 macOS no trae `ss`, `setsid`, `timeout`, `sha1sum` ni `/proc`, y su bash es el
 3.2. Los scripts usan lo que haya en cada sistema (`lsof`, `perl`, `shasum`,
 `ps`): en Linux se comportan como antes. Las funciones están en `ppt/lib.sh`.
+
+## Estado de las pruebas
+
+Se probó en Linux, quitando del PATH las herramientas que macOS no trae
+(`levantar.sh`, `detener.sh`, `verificar.sh` y `preparar.sh` con la demo real).
+Falta una pasada en un Mac de verdad y con el bash 3.2 de Apple, en particular
+`ps eww` (lo usa `verificar.sh` para leer el entorno de cada servicio) y `netstat`
+(para las conexiones con la VPS). Quien la haga puede borrar esta sección.
